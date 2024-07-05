@@ -6,13 +6,14 @@ import "@forge-std/Test.sol";
 import {MToken} from "@protocol/MToken.sol";
 import {Configs} from "@proposals/Configs.sol";
 import {Proposal} from "@proposals/proposalTypes/Proposal.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {JumpRateModel} from "@protocol/irm/JumpRateModel.sol";
 import {CrossChainProposal} from "@proposals/proposalTypes/CrossChainProposal.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
+import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 
 contract mipb06 is Proposal, CrossChainProposal, Configs {
-    string public constant override name = "MIP-b06";
+    string public constant override name = "MIP-B06";
     uint256 public constant timestampsPerYear = 60 * 60 * 24 * 365;
     uint256 public constant SCALE = 1e18;
 
@@ -34,18 +35,19 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
             vm.readFile("./src/proposals/mips/mip-b06/MIP-B06.md")
         );
         _setProposalDescription(proposalDescription);
+
+        onchainProposalId = 54;
     }
 
-    /// @notice proposal's actions all happen on base
-    function primaryForkId() public view override returns (uint256) {
-        return baseForkId;
+    function primaryForkId() public pure override returns (uint256) {
+        return BASE_FORK_ID;
     }
 
     function _validateJRM(
         address jrmAddress,
         address tokenAddress,
         IRParams memory params
-    ) internal {
+    ) internal view {
         JumpRateModel jrm = JumpRateModel(jrmAddress);
         assertEq(
             address(MToken(tokenAddress).interestRateModel()),
@@ -82,7 +84,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
         Addresses addresses,
         address tokenAddress,
         uint256 collateralFactor
-    ) internal {
+    ) internal view {
         address unitrollerAddress = addresses.getAddress("UNITROLLER");
         Comptroller unitroller = Comptroller(unitrollerAddress);
 
@@ -103,7 +105,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
 
     function afterDeploy(Addresses addresses, address) public override {}
 
-    function afterDeploySetup(Addresses addresses) public override {}
+    function preBuildMock(Addresses addresses) public override {}
 
     function build(Addresses addresses) public override {
         address unitrollerAddress = addresses.getAddress("UNITROLLER");
@@ -141,7 +143,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
             addresses.getAddress("MOONWELL_WETH"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_WETH")
+                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_WETH_MIP_B06")
             ),
             "Set interest rate model for Moonwell WETH to updated rate model"
         );
@@ -153,7 +155,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
             addresses.getAddress("MOONWELL_DAI"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_DAI")
+                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_USD_MIP_B06")
             ),
             "Set interest rate model for Moonwell DAI to updated rate model"
         );
@@ -163,7 +165,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
             addresses.getAddress("MOONWELL_USDC"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_USDC")
+                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_USD_MIP_B06")
             ),
             "Set interest rate model for Moonwell USDC to updated rate model"
         );
@@ -173,7 +175,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
             addresses.getAddress("MOONWELL_USDBC"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_USDBC")
+                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_USD_MIP_B06")
             ),
             "Set interest rate model for Moonwell USDbC to updated rate model"
         );
@@ -185,7 +187,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
             addresses.getAddress("MOONWELL_cbETH"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_cbETH")
+                addresses.getAddress("JUMP_RATE_IRM_MOONWELL_CBETH_MIP_B06")
             ),
             "Set interest rate model for Moonwell cbETH to updated rate model"
         );
@@ -195,7 +197,7 @@ contract mipb06 is Proposal, CrossChainProposal, Configs {
 
     /// @notice assert that the new interest rate model is set correctly
     /// and that the interest rate model parameters are set correctly
-    function validate(Addresses addresses, address) public override {
+    function validate(Addresses addresses, address) public view override {
         // ======== WETH CF Update =========
         _validateCF(
             addresses,

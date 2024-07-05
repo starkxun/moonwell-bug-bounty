@@ -7,7 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "@forge-std/Test.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MoonwellViewsV1} from "@protocol/views/MoonwellViewsV1.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -37,10 +37,10 @@ contract DeployMoonwellViewsV1 is Script, Test {
 
         address unitroller = addresses.getAddress("UNITROLLER");
         address tokenSaleDistributor = addresses.getAddress("TOKENSALE");
-        address safetyModule = addresses.getAddress("STWELL");
-        address governanceToken = addresses.getAddress("WELL");
-        address nativeMarket = addresses.getAddress("mGLIMMER");
-        address governanceTokenLP = addresses.getAddress("WELL_LP");
+        address safetyModule = addresses.getAddress("STKGOVTOKEN");
+        address governanceToken = addresses.getAddress("GOVTOKEN");
+        address nativeMarket = addresses.getAddress("MNATIVE");
+        address governanceTokenLP = addresses.getAddress("GOVTOKEN_LP");
 
         MoonwellViewsV1 viewsContract = new MoonwellViewsV1();
 

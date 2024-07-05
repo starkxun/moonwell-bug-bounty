@@ -5,7 +5,8 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "@forge-std/Test.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {MOONBEAM_FORK_ID, BASE_FORK_ID} from "@utils/ChainIds.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {ParameterValidation} from "@proposals/utils/ParameterValidation.sol";
@@ -18,7 +19,7 @@ contract mipb16 is
     MultichainGovernorDeploy,
     ParameterValidation
 {
-    string public constant override name = "MIP-B16 Resubmission";
+    string public constant override name = "MIP-B16";
 
     /// @notice this is based on Warden Finance's recommendation for reward speeds
     uint256 public constant REWARD_SPEED = 896275511648961000;
@@ -33,15 +34,16 @@ contract mipb16 is
         );
 
         _setProposalDescription(proposalDescription);
+
+        onchainProposalId = 5;
     }
 
-    /// @notice proposal's actions happen only on base
-    function primaryForkId() public view override returns (uint256) {
-        return baseForkId;
+    function primaryForkId() public pure override returns (uint256) {
+        return BASE_FORK_ID;
     }
 
     function teardown(Addresses addresses, address) public override {
-        vm.selectFork(baseForkId);
+        vm.selectFork(primaryForkId());
 
         /// stop errors on unit tests of proposal infrastructure
         if (address(addresses) != address(0)) {
@@ -73,11 +75,11 @@ contract mipb16 is
         );
 
         _pushHybridAction(
-            addresses.getAddress("stkWELL_PROXY"),
+            addresses.getAddress("STK_GOVTOKEN"),
             abi.encodeWithSignature(
                 "configureAsset(uint128,address)",
                 REWARD_SPEED,
-                addresses.getAddress("stkWELL_PROXY")
+                addresses.getAddress("STK_GOVTOKEN")
             ),
             "Set reward speed for the Safety Module on Base",
             false
@@ -95,20 +97,20 @@ contract mipb16 is
             moonbeamActions.length == 0,
             "MIP-B16: should have no moonbeam actions"
         );
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         _runMoonbeamMultichainGovernor(addresses, address(1000000000));
 
-        vm.selectFork(baseForkId);
+        vm.selectFork(primaryForkId());
 
         _runBase(addresses, addresses.getAddress("TEMPORAL_GOVERNOR"));
     }
 
     /// @notice validations on Base
     function validate(Addresses addresses, address) public override {
-        vm.selectFork(baseForkId);
+        vm.selectFork(primaryForkId());
 
-        address stkWellProxy = addresses.getAddress("stkWELL_PROXY");
+        address stkWellProxy = addresses.getAddress("STK_GOVTOKEN");
         (
             uint128 emissionsPerSecond,
             uint128 lastUpdateTimestamp,

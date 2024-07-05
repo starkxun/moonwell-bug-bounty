@@ -8,13 +8,11 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/pr
 
 import "@forge-std/Test.sol";
 
-import {ERC20Votes} from "@openzeppelin-contracts/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import "@utils/ChainIds.sol";
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {MToken} from "@protocol/MToken.sol";
-import {ChainIds} from "@test/utils/ChainIds.sol";
 import {IWormhole} from "@protocol/wormhole/IWormhole.sol";
 import {Constants} from "@protocol/governance/multichain/Constants.sol";
-import {CreateCode} from "@proposals/utils/CreateCode.sol";
 import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {TestProposals} from "@proposals/TestProposals.sol";
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
@@ -27,7 +25,9 @@ import {WormholeRelayerAdapter} from "@test/mock/WormholeRelayerAdapter.sol";
 import {MockMultichainGovernor} from "@test/mock/MockMultichainGovernor.sol";
 import {MultiRewardDistributor} from "@protocol/rewards/MultiRewardDistributor.sol";
 import {TestMultichainProposals} from "@protocol/proposals/TestMultichainProposals.sol";
+import {ERC20Votes} from "@openzeppelin-contracts/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import {MultichainVoteCollection} from "@protocol/governance/multichain/MultichainVoteCollection.sol";
+
 import {ITemporalGovernor, TemporalGovernor} from "@protocol/governance/TemporalGovernor.sol";
 import {IEcosystemReserveUplift, IEcosystemReserveControllerUplift} from "@protocol/stkWell/IEcosystemReserveUplift.sol";
 import {TokenSaleDistributorInterfaceV1} from "@protocol/views/TokenSaleDistributorInterfaceV1.sol";
@@ -45,19 +45,16 @@ if the tests fail, try setting the environment variables as follows:
 
 export DO_DEPLOY=true
 export DO_AFTER_DEPLOY=true
-export DO_AFTER_DEPLOY_SETUP=true
+export DO_PRE_BUILD_MOCK=true
 export DO_BUILD=true
 export DO_RUN=true
 export DO_TEARDOWN=true
 export DO_VALIDATE=true
 
 */
-contract MultichainProposalTest is
-    Test,
-    ChainIds,
-    CreateCode,
-    TestMultichainProposals
-{
+contract MultichainProposalTest is Test, TestMultichainProposals {
+    using ChainIds for uint256;
+
     MultichainVoteCollection public voteCollection;
     MultichainGovernor public governor;
     IWormhole public wormhole;
@@ -100,23 +97,11 @@ contract MultichainProposalTest is
 
     WormholeRelayerAdapter wormholeRelayerAdapterBase;
 
-    string public constant DEFAULT_BASE_RPC_URL = "https://mainnet.base.org";
-
-    /// @notice fork ID for base
-    uint256 public baseForkId =
-        vm.createFork(vm.envOr("BASE_RPC_URL", DEFAULT_BASE_RPC_URL));
-
-    string public constant DEFAULT_MOONBEAM_RPC_URL =
-        "https://rpc.api.moonbeam.network";
-
-    /// @notice fork ID for moonbeam
-    uint256 public moonbeamForkId =
-        vm.createFork(vm.envOr("MOONBEAM_RPC_URL", DEFAULT_MOONBEAM_RPC_URL));
-
     function setUp() public override {
+        MOONBEAM_FORK_ID.createForksAndSelect();
         super.setUp();
 
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         proposalC = new mipm23c();
         proposalC.buildCalldata(addresses);
@@ -127,40 +112,40 @@ contract MultichainProposalTest is
         runProposals(false, true, true, true, true, true, true, true);
 
         voteCollection = MultichainVoteCollection(
-            addresses.getAddress("VOTE_COLLECTION_PROXY", baseChainId)
+            addresses.getAddress("VOTE_COLLECTION_PROXY", BASE_CHAIN_ID)
         );
         wormhole = IWormhole(
-            addresses.getAddress("WORMHOLE_CORE_MOONBEAM", moonBeamChainId)
+            addresses.getAddress("WORMHOLE_CORE_MOONBEAM", MOONBEAM_CHAIN_ID)
         );
 
-        well = ERC20Votes(addresses.getAddress("WELL", moonBeamChainId));
-        xwell = xWELL(addresses.getAddress("xWELL_PROXY", moonBeamChainId));
+        well = ERC20Votes(addresses.getAddress("GOVTOKEN", MOONBEAM_CHAIN_ID));
+        xwell = xWELL(addresses.getAddress("xWELL_PROXY", MOONBEAM_CHAIN_ID));
         // make xwell persistent so votes are valid on both chains
         vm.makePersistent(address(xwell));
 
         stakedWellMoonbeam = IStakedWell(
-            addresses.getAddress("stkWELL_PROXY", moonBeamChainId)
+            addresses.getAddress("STK_GOVTOKEN", MOONBEAM_CHAIN_ID)
         );
 
         distributor = TokenSaleDistributorInterfaceV1(
             addresses.getAddress(
                 "TOKEN_SALE_DISTRIBUTOR_PROXY",
-                moonBeamChainId
+                MOONBEAM_CHAIN_ID
             )
         );
 
         timelock = Timelock(
-            addresses.getAddress("MOONBEAM_TIMELOCK", moonBeamChainId)
+            addresses.getAddress("MOONBEAM_TIMELOCK", MOONBEAM_CHAIN_ID)
         );
         governor = MultichainGovernor(
-            addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY", moonBeamChainId)
+            addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY", MOONBEAM_CHAIN_ID)
         );
 
         // make governor persistent so we can call receiveWormholeMessage on
         // governor from base
         vm.makePersistent(address(governor));
         {
-            vm.selectFork(moonbeamForkId);
+            vm.selectFork(MOONBEAM_FORK_ID);
 
             wormholeRelayerAdapterMoonbeam = new WormholeRelayerAdapter();
 
@@ -176,7 +161,7 @@ contract MultichainProposalTest is
         }
 
         {
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
 
             assertEq(
                 address(voteCollection.wormholeRelayer()),
@@ -209,12 +194,12 @@ contract MultichainProposalTest is
                 "incorrect gas limit vote collection"
             );
 
-            stakedWellBase = IStakedWell(addresses.getAddress("stkWELL_PROXY"));
+            stakedWellBase = IStakedWell(addresses.getAddress("STK_GOVTOKEN"));
         }
     }
 
     function testSetup() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
         voteCollection = MultichainVoteCollection(
             addresses.getAddress("VOTE_COLLECTION_PROXY")
         );
@@ -231,37 +216,37 @@ contract MultichainProposalTest is
         );
         assertEq(
             address(voteCollection.stkWell()),
-            addresses.getAddress("stkWELL_PROXY"),
+            addresses.getAddress("STK_GOVTOKEN"),
             "incorrect xWELL contract"
         );
 
         temporalGov = TemporalGovernor(
-            addresses.getAddress("TEMPORAL_GOVERNOR")
+            payable(addresses.getAddress("TEMPORAL_GOVERNOR"))
         );
         /// artemis timelock does not start off as trusted sender
         assertFalse(
             temporalGov.isTrustedSender(
-                moonBeamWormholeChainId,
+                MOONBEAM_WORMHOLE_CHAIN_ID,
                 addresses.getAddress(
                     "MOONBEAM_TIMELOCK",
-                    sendingChainIdToReceivingChainId[block.chainid]
+                    block.chainid.toMoonbeamChainId()
                 )
             ),
             "artemis timelock should not be trusted sender"
         );
         assertTrue(
             temporalGov.isTrustedSender(
-                moonBeamWormholeChainId,
+                MOONBEAM_WORMHOLE_CHAIN_ID,
                 addresses.getAddress(
                     "MULTICHAIN_GOVERNOR_PROXY",
-                    sendingChainIdToReceivingChainId[block.chainid]
+                    block.chainid.toMoonbeamChainId()
                 )
             ),
             "multichain governor should be trusted sender"
         );
 
         assertEq(
-            temporalGov.allTrustedSenders(moonBeamWormholeChainId).length,
+            temporalGov.allTrustedSenders(MOONBEAM_WORMHOLE_CHAIN_ID).length,
             1,
             "incorrect amount of trusted senders post proposal"
         );
@@ -270,9 +255,9 @@ contract MultichainProposalTest is
     function testNoBaseWormholeCoreAddressInProposal() public {
         address wormholeBase = addresses.getAddress(
             "WORMHOLE_CORE_BASE",
-            baseChainId
+            BASE_CHAIN_ID
         );
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
         uint256[] memory proposals = governor.liveProposals();
         for (uint256 i = 0; i < proposals.length; i++) {
             if (proposals[i] == 4) {
@@ -292,7 +277,7 @@ contract MultichainProposalTest is
         }
     }
 
-    function testGetAllMarketConfigs() public {
+    function testGetAllMarketConfigs() public view {
         MultiRewardDistributor mrd = MultiRewardDistributor(
             addresses.getAddress("MRD_PROXY")
         );
@@ -363,7 +348,7 @@ contract MultichainProposalTest is
     }
 
     function testInitializeVoteCollectionFails() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
         voteCollection = MultichainVoteCollection(
             addresses.getAddress("VOTE_COLLECTION_PROXY")
         );
@@ -393,7 +378,7 @@ contract MultichainProposalTest is
     }
 
     function testInitializeMultichainGovernorFails() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
         /// test impl and logic contract initialization
         MultichainGovernor.InitializeData memory initializeData;
         WormholeTrustedSender.TrustedSender[]
@@ -421,7 +406,7 @@ contract MultichainProposalTest is
     }
 
     function testInitializeEcosystemReserveFails() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         IEcosystemReserveControllerUplift ecosystemReserveController = IEcosystemReserveControllerUplift(
                 addresses.getAddress("ECOSYSTEM_RESERVE_CONTROLLER")
@@ -447,11 +432,11 @@ contract MultichainProposalTest is
     }
 
     function testRetrieveGasPriceMoonbeamSucceeds() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         uint256 gasCost = MultichainGovernor(
             addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY")
-        ).bridgeCost(baseWormholeChainId);
+        ).bridgeCost(BASE_WORMHOLE_CHAIN_ID);
 
         assertTrue(gasCost != 0, "gas cost is 0 bridgeCost");
 
@@ -463,11 +448,11 @@ contract MultichainProposalTest is
     }
 
     function testRetrieveGasPriceBaseSucceeds() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         uint256 gasCost = MultichainVoteCollection(
             addresses.getAddress("VOTE_COLLECTION_PROXY")
-        ).bridgeCost(baseWormholeChainId);
+        ).bridgeCost(BASE_WORMHOLE_CHAIN_ID);
 
         assertTrue(gasCost != 0, "gas cost is 0 bridgeCost");
 
@@ -479,7 +464,7 @@ contract MultichainProposalTest is
     }
 
     function testProposeOnMoonbeamWellSucceeds() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -623,7 +608,7 @@ contract MultichainProposalTest is
     }
 
     function testVotingOnMoonbeamAllTokens() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // mint 1/4 of the amount for each token
         uint256 mintAmount = governor.quorum() / 4;
@@ -844,7 +829,7 @@ contract MultichainProposalTest is
     }
 
     function testProposeOnMoonbeamDefeat() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -985,7 +970,7 @@ contract MultichainProposalTest is
     }
 
     function testProposeMoonbeamCancel() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1041,7 +1026,7 @@ contract MultichainProposalTest is
     }
 
     function testVotingOnBasestkWellSucceeds() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1098,7 +1083,7 @@ contract MultichainProposalTest is
                 endTimestamp + governor.crossChainVoteCollectionPeriod()
             );
 
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
 
             vm.warp(startTimestamp - 5);
             xwell = xWELL(addresses.getAddress("xWELL_PROXY"));
@@ -1162,7 +1147,7 @@ contract MultichainProposalTest is
         public
         returns (uint256 proposalId)
     {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1219,7 +1204,7 @@ contract MultichainProposalTest is
                 endTimestamp + governor.crossChainVoteCollectionPeriod()
             );
 
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
 
             vm.warp(startTimestamp - 5);
             xwell = xWELL(addresses.getAddress("xWELL_PROXY"));
@@ -1280,7 +1265,7 @@ contract MultichainProposalTest is
     }
 
     function testVotingOnBasexWellPostVotingPeriodFails() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1337,7 +1322,7 @@ contract MultichainProposalTest is
                 endTimestamp + governor.crossChainVoteCollectionPeriod()
             );
 
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
 
             vm.warp(startTimestamp);
             xwell = xWELL(addresses.getAddress("xWELL_PROXY"));
@@ -1403,7 +1388,7 @@ contract MultichainProposalTest is
         public
     {
         /// propose, then rebroadcast
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1512,7 +1497,7 @@ contract MultichainProposalTest is
     {
         uint256 proposalId = testVotingOnBasexWellSucceeds();
 
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         (
             ,
@@ -1544,7 +1529,7 @@ contract MultichainProposalTest is
     }
 
     function testReceiveProposalFromRelayersSucceeds() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1602,7 +1587,7 @@ contract MultichainProposalTest is
                 crossChainPeriod
             );
 
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
 
             uint256 gasCost = wormholeRelayerAdapterBase.nativePriceQuote();
 
@@ -1661,7 +1646,7 @@ contract MultichainProposalTest is
     }
 
     function testReceiveSameProposalFromRelayersTwiceFails() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         /// mint whichever is greater, the proposal threshold or the quorum
         uint256 mintAmount = governor.proposalThreshold() > governor.quorum()
@@ -1719,7 +1704,7 @@ contract MultichainProposalTest is
                 crossChainPeriod
             );
 
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
 
             uint256 gasCost = wormholeRelayerAdapterBase.nativePriceQuote();
 
@@ -1794,7 +1779,7 @@ contract MultichainProposalTest is
     function testEmittingVotesPostVoteCollectionPeriodFails() public {
         uint256 proposalId = testVotingOnBasexWellSucceeds();
 
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         (
             ,
@@ -1817,7 +1802,7 @@ contract MultichainProposalTest is
     /// upgrading contract logic
 
     function testUpgradeMultichainGovernorThroughGovProposal() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         MockMultichainGovernor newGovernor = new MockMultichainGovernor();
 
@@ -1973,7 +1958,7 @@ contract MultichainProposalTest is
 
     /// this requires a new mock relayer contract
     function testUpgradeMultichainVoteCollection() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         MockVoteCollection newVoteCollection = new MockVoteCollection();
 
@@ -1998,24 +1983,24 @@ contract MultichainProposalTest is
         public
     {
         {
-            vm.selectFork(baseForkId);
+            vm.selectFork(BASE_FORK_ID);
             temporalGov = TemporalGovernor(
-                addresses.getAddress("TEMPORAL_GOVERNOR")
+                payable(addresses.getAddress("TEMPORAL_GOVERNOR"))
             );
             /// artemis timelock does not start off as trusted sender
             assertFalse(
                 temporalGov.isTrustedSender(
-                    uint16(moonBeamWormholeChainId),
+                    uint16(MOONBEAM_WORMHOLE_CHAIN_ID),
                     addresses.getAddress(
                         "MOONBEAM_TIMELOCK",
-                        sendingChainIdToReceivingChainId[block.chainid]
+                        block.chainid.toMoonbeamChainId()
                     )
                 ),
                 "artemis timelock should not be trusted sender"
             );
         }
 
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
         address artemisTimelockAddress = addresses.getAddress(
             "MOONBEAM_TIMELOCK"
         );
@@ -2041,8 +2026,8 @@ contract MultichainProposalTest is
         /// skip wormhole for now, circle back to that later and make array size 18
 
         /// targets
-        address[] memory targets = new address[](19);
-        bytes[] memory calldatas = new bytes[](19);
+        address[] memory targets = new address[](20);
+        bytes[] memory calldatas = new bytes[](20);
 
         targets[0] = addresses.getAddress("WORMHOLE_CORE_MOONBEAM");
         calldatas[0] = proposalC.approvedCalldata(0);
@@ -2059,7 +2044,7 @@ contract MultichainProposalTest is
         targets[4] = addresses.getAddress("CHAINLINK_ORACLE");
         calldatas[4] = changeAdminCalldata;
 
-        targets[5] = addresses.getAddress("stkWELL_PROXY");
+        targets[5] = addresses.getAddress("STK_GOVTOKEN");
         calldatas[5] = setEmissionsManagerCalldata;
 
         targets[6] = addresses.getAddress("UNITROLLER");
@@ -2068,19 +2053,19 @@ contract MultichainProposalTest is
         targets[7] = addresses.getAddress("ECOSYSTEM_RESERVE_CONTROLLER");
         calldatas[7] = transferOwnershipCalldata;
 
-        targets[8] = addresses.getAddress("MOONWELL_mwBTC");
+        targets[8] = addresses.getAddress("DEPRECATED_MOONWELL_mWBTC");
         calldatas[8] = _setPendingAdminCalldata;
 
         targets[9] = addresses.getAddress("MOONWELL_mBUSD");
         calldatas[9] = _setPendingAdminCalldata;
 
-        targets[10] = addresses.getAddress("MOONWELL_mETH");
+        targets[10] = addresses.getAddress("DEPRECATED_MOONWELL_mETH");
         calldatas[10] = _setPendingAdminCalldata;
 
         targets[11] = addresses.getAddress("MOONWELL_mUSDC");
         calldatas[11] = _setPendingAdminCalldata;
 
-        targets[12] = addresses.getAddress("mGLIMMER");
+        targets[12] = addresses.getAddress("MNATIVE");
         calldatas[12] = _setPendingAdminCalldata;
 
         targets[13] = addresses.getAddress("mxcDOT");
@@ -2095,18 +2080,21 @@ contract MultichainProposalTest is
         targets[16] = addresses.getAddress("mUSDCwh");
         calldatas[16] = _setPendingAdminCalldata;
 
-        targets[17] = addresses.getAddress("mxcUSDC");
+        targets[17] = addresses.getAddress("MOONWELL_mWBTC");
         calldatas[17] = _setPendingAdminCalldata;
 
-        targets[18] = addresses.getAddress("mETHwh");
+        targets[18] = addresses.getAddress("mxcUSDC");
         calldatas[18] = _setPendingAdminCalldata;
+
+        targets[19] = addresses.getAddress("MOONWELL_mETH");
+        calldatas[19] = _setPendingAdminCalldata;
 
         bytes[] memory temporalGovCalldatas = new bytes[](1);
         bytes memory temporalGovExecData;
         {
             address temporalGovAddress = addresses.getAddress(
                 "TEMPORAL_GOVERNOR",
-                baseChainId
+                BASE_CHAIN_ID
             );
             address wormholeCore = addresses.getAddress(
                 "WORMHOLE_CORE_MOONBEAM"
@@ -2139,7 +2127,7 @@ contract MultichainProposalTest is
         governor.executeBreakGlass(targets, calldatas);
 
         assertEq(
-            IStakedWellUplift(addresses.getAddress("stkWELL_PROXY"))
+            IStakedWellUplift(addresses.getAddress("STK_GOVTOKEN"))
                 .EMISSION_MANAGER(),
             artemisTimelockAddress,
             "stkWELL EMISSIONS MANAGER"
@@ -2184,14 +2172,14 @@ contract MultichainProposalTest is
         );
 
         assertEq(
-            Timelock(addresses.getAddress("mETHwh")).pendingAdmin(),
+            Timelock(addresses.getAddress("MOONWELL_mETH")).pendingAdmin(),
             artemisTimelockAddress,
-            "mETHwh pending admin incorrect"
+            "MOONWELL_mETH pending admin incorrect"
         );
         assertEq(
-            Timelock(addresses.getAddress("mETHwh")).admin(),
+            Timelock(addresses.getAddress("MOONWELL_mETH")).admin(),
             address(governor),
-            "mETHwh admin incorrect"
+            "MOONWELL_mETH admin incorrect"
         );
 
         assertEq(
@@ -2250,14 +2238,14 @@ contract MultichainProposalTest is
         );
 
         assertEq(
-            Timelock(addresses.getAddress("mGLIMMER")).pendingAdmin(),
+            Timelock(addresses.getAddress("MNATIVE")).pendingAdmin(),
             artemisTimelockAddress,
-            "mGLIMMER pending admin incorrect"
+            "MNATIVE pending admin incorrect"
         );
         assertEq(
-            Timelock(addresses.getAddress("mGLIMMER")).admin(),
+            Timelock(addresses.getAddress("MNATIVE")).admin(),
             address(governor),
-            "mGLIMMER admin incorrect"
+            "MNATIVE admin incorrect"
         );
 
         assertEq(
@@ -2283,25 +2271,44 @@ contract MultichainProposalTest is
         );
 
         assertEq(
-            Timelock(addresses.getAddress("MOONWELL_mwBTC")).pendingAdmin(),
+            Timelock(addresses.getAddress("DEPRECATED_MOONWELL_mWBTC"))
+                .pendingAdmin(),
             artemisTimelockAddress,
-            "MOONWELL_mwBTC pending admin incorrect"
+            "DEPRECATED_MOONWELL_mWBTC pending admin incorrect"
         );
         assertEq(
-            Timelock(addresses.getAddress("MOONWELL_mwBTC")).admin(),
+            Timelock(addresses.getAddress("DEPRECATED_MOONWELL_mWBTC")).admin(),
             address(governor),
-            "MOONWELL_mwBTC admin incorrect"
+            "DEPRECATED_MOONWELL_mWBTC admin incorrect"
         );
 
+        /// only test this condition if MIP-M32 passes
+        if (
+            Timelock(addresses.getAddress("MOONWELL_mWBTC")).pendingAdmin() ==
+            address(0)
+        ) {
+            assertEq(
+                Timelock(addresses.getAddress("MOONWELL_mWBTC")).pendingAdmin(),
+                artemisTimelockAddress,
+                "MOONWELL_mWBTC pending admin incorrect"
+            );
+            assertEq(
+                Timelock(addresses.getAddress("MOONWELL_mWBTC")).admin(),
+                address(governor),
+                "MOONWELL_mWBTC admin incorrect"
+            );
+        }
+
         assertEq(
-            Timelock(addresses.getAddress("MOONWELL_mETH")).pendingAdmin(),
+            Timelock(addresses.getAddress("DEPRECATED_MOONWELL_mETH"))
+                .pendingAdmin(),
             artemisTimelockAddress,
-            "MOONWELL_mETH pending admin incorrect"
+            "DEPRECATED_MOONWELL_mETH pending admin incorrect"
         );
         assertEq(
-            Timelock(addresses.getAddress("MOONWELL_mETH")).admin(),
+            Timelock(addresses.getAddress("DEPRECATED_MOONWELL_mETH")).admin(),
             address(governor),
-            "MOONWELL_mETH admin incorrect"
+            "DEPRECATED_MOONWELL_mETH admin incorrect"
         );
 
         assertEq(
@@ -2329,9 +2336,9 @@ contract MultichainProposalTest is
 
         /// Base simulation, LFG!
 
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
         temporalGov = TemporalGovernor(
-            addresses.getAddress("TEMPORAL_GOVERNOR")
+            payable(addresses.getAddress("TEMPORAL_GOVERNOR"))
         );
         vm.startPrank(address(temporalGov));
 
@@ -2346,7 +2353,7 @@ contract MultichainProposalTest is
 
         assertTrue(
             temporalGov.isTrustedSender(
-                uint16(moonBeamWormholeChainId),
+                uint16(MOONBEAM_WORMHOLE_CHAIN_ID),
                 artemisTimelockAddress
             ),
             "artemis timelock not added as a trusted sender"
@@ -2358,13 +2365,13 @@ contract MultichainProposalTest is
     /// - assert assets in ecosystem reserve deplete when rewards are claimed
 
     function testStakestkWellBaseSucceedsAndReceiveRewards() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         /// prank as the wormhole bridge adapter contract
         ///
         uint256 mintAmount = 1_000_000 * 1e18;
         IStakedWellUplift stkwell = IStakedWellUplift(
-            addresses.getAddress("stkWELL_PROXY")
+            addresses.getAddress("STK_GOVTOKEN")
         );
         assertGt(
             stkwell.DISTRIBUTION_END(),
@@ -2473,7 +2480,7 @@ contract MultichainProposalTest is
     }
 
     function testStakestkWellBaseSucceedsAndReceiveRewardsThreeUsers() public {
-        vm.selectFork(baseForkId);
+        vm.selectFork(BASE_FORK_ID);
 
         address userOne = address(1);
         address userTwo = address(2);
@@ -2487,7 +2494,7 @@ contract MultichainProposalTest is
         ///
         uint256 mintAmount = 1_000_000 * 1e18;
         IStakedWellUplift stkwell = IStakedWellUplift(
-            addresses.getAddress("stkWELL_PROXY")
+            addresses.getAddress("STK_GOVTOKEN")
         );
         assertGt(
             stkwell.DISTRIBUTION_END(),
@@ -2716,7 +2723,7 @@ contract MultichainProposalTest is
     }
 
     function testGrantGuardianRoleAfterPause() public {
-        vm.selectFork(moonbeamForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         address pauseGuardian = addresses.getAddress(
             "MOONBEAM_PAUSE_GUARDIAN_MULTISIG"

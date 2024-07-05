@@ -9,13 +9,14 @@ import {MToken} from "@protocol/MToken.sol";
 import {MErc20} from "@protocol/MErc20.sol";
 import {Configs} from "@proposals/Configs.sol";
 import {Proposal} from "@proposals/proposalTypes/Proposal.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MErc20Delegate} from "@protocol/MErc20Delegate.sol";
 import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {CrossChainProposal} from "@proposals/proposalTypes/CrossChainProposal.sol";
 import {JumpRateModel, InterestRateModel} from "@protocol/irm/JumpRateModel.sol";
 import {Comptroller, ComptrollerInterface} from "@protocol/Comptroller.sol";
+import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 
 /// @notice This MIP deploys and lists new MTokens for the protocol.
 /// It reads in the configuration from Config.sol, which reads in the mainnetMTokens.json file and deploys the MTokens specified in that file.
@@ -31,9 +32,8 @@ contract mip02 is Proposal, CrossChainProposal, Configs {
         address unitroller;
     }
 
-    /// @notice proposal's actions all happen on base
-    function primaryForkId() public view override returns (uint256) {
-        return baseForkId;
+    function primaryForkId() public pure override returns (uint256) {
+        return BASE_FORK_ID;
     }
 
     /// @notice the deployer should have both USDBC, WETH and any other assets that will be started as
@@ -44,11 +44,7 @@ contract mip02 is Proposal, CrossChainProposal, Configs {
 
         {
             MErc20Delegate mTokenLogic = new MErc20Delegate();
-            addresses.addAddress(
-                "MTOKEN_IMPLEMENTATION",
-                address(mTokenLogic),
-                true
-            );
+            addresses.addAddress("MTOKEN_IMPLEMENTATION", address(mTokenLogic));
         }
 
         Configs.CTokenConfiguration[]
@@ -78,8 +74,7 @@ contract mip02 is Proposal, CrossChainProposal, Configs {
                                 config.addressesString
                             )
                         ),
-                        address(irModel),
-                        true
+                        address(irModel)
                     );
                 }
 
@@ -120,11 +115,7 @@ contract mip02 is Proposal, CrossChainProposal, Configs {
                     ""
                 );
 
-                addresses.addAddress(
-                    config.addressesString,
-                    address(mToken),
-                    true
-                );
+                addresses.addAddress(config.addressesString, address(mToken));
             }
         }
     }
@@ -157,7 +148,7 @@ contract mip02 is Proposal, CrossChainProposal, Configs {
         }
     }
 
-    function afterDeploySetup(Addresses addresses) public override {}
+    function preBuildMock(Addresses addresses) public override {}
 
     function build(Addresses addresses) public override {
         ChainlinkOracle oracle = ChainlinkOracle(

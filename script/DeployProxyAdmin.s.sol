@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
-import {ChainIds} from "@test/utils/ChainIds.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Script} from "@forge-std/Script.sol";
 import {console} from "@forge-std/console.sol";
@@ -14,7 +13,7 @@ import {console} from "@forge-std/console.sol";
     forge script script/DeployProxyAdmin.s.sol:DeployProxyAdminScript -vvvv \ 
     --rpc-url moonbase/baseGoerli --broadcast --etherscan-api-key moonbase --verify
 */
-contract DeployProxyAdminScript is Script, ChainIds {
+contract DeployProxyAdminScript is Script {
     /// @notice addresses contract
     Addresses addresses;
 
@@ -33,7 +32,7 @@ contract DeployProxyAdminScript is Script, ChainIds {
         address proxyAdmin = address(new ProxyAdmin());
         vm.stopBroadcast();
 
-        addresses.addAddress("MRD_PROXY_ADMIN", proxyAdmin, true);
+        addresses.addAddress("MRD_PROXY_ADMIN", proxyAdmin);
 
         printAddresses();
     }

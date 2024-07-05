@@ -3,10 +3,11 @@ pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {MockERC20Params} from "@test/mock/MockERC20Params.sol";
 import {ParameterValidation} from "@proposals/utils/ParameterValidation.sol";
+import {MOONBEAM_FORK_ID} from "@utils/ChainIds.sol";
 
 /// DO_VALIDATE=true DO_DEPLOY=true DO_PRINT=true DO_BUILD=true DO_RUN=true forge script
 /// src/proposals/mips/mip-m25/mip-m25.sol:mipm25
@@ -24,11 +25,12 @@ contract mipm25 is HybridProposal, ParameterValidation {
             vm.readFile("./src/proposals/mips/mip-m25/MIP-M25.md")
         );
         _setProposalDescription(proposalDescription);
+
+        onchainProposalId = 2;
     }
 
-    /// @notice proposal's actions happen only on moonbeam
-    function primaryForkId() public view override returns (uint256) {
-        return moonbeamForkId;
+    function primaryForkId() public pure override returns (uint256) {
+        return MOONBEAM_FORK_ID;
     }
 
     function deploy(Addresses addresses, address) public override {
@@ -140,10 +142,10 @@ contract mipm25 is HybridProposal, ParameterValidation {
             addresses.getAddress("UNITROLLER"),
             abi.encodeWithSignature(
                 "_setCollateralFactor(address,uint256)",
-                addresses.getAddress("mGLIMMER"),
+                addresses.getAddress("MNATIVE"),
                 NEW_MGLIMMER_COLLATERAL_FACTOR
             ),
-            "Set collateral factor of mGLIMMER",
+            "Set collateral factor of MNATIVE",
             true
         );
 
@@ -181,7 +183,7 @@ contract mipm25 is HybridProposal, ParameterValidation {
             addresses.getAddress("mxcUSDC"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mxcUSDC")
+                0x32f3A6134590fc2d9440663d35a2F0a6265F04c4
             ),
             "Set interest rate model for mxcUSDC to updated rate model",
             true
@@ -191,7 +193,7 @@ contract mipm25 is HybridProposal, ParameterValidation {
             addresses.getAddress("mxcUSDT"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mxcUSDT")
+                0x1Cdb984008dcEe9d06c28654ed31cf82680EeA62
             ),
             "Set interest rate model for mxcUSDT to updated rate model",
             true
@@ -201,7 +203,7 @@ contract mipm25 is HybridProposal, ParameterValidation {
             addresses.getAddress("mFRAX"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mFRAX")
+                0xE1Dd796dBEB5A67CE37CbC52dCD164D0535c901E
             ),
             "Set interest rate model for mFRAX to updated rate model",
             true
@@ -211,7 +213,7 @@ contract mipm25 is HybridProposal, ParameterValidation {
             addresses.getAddress("mUSDCwh"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mUSDCwh")
+                0xF22c8255eA615b3Da6CA5CF5aeCc8956bfF07Aa8
             ),
             "Set interest rate model for mUSDCwh to updated rate model",
             true
@@ -229,8 +231,7 @@ contract mipm25 is HybridProposal, ParameterValidation {
         _runMoonbeamMultichainGovernor(addresses, address(1000000000));
     }
 
-    /// TODO fill out validations on Moonbeam
-    function validate(Addresses addresses, address) public override {
+    function validate(Addresses addresses, address) public view override {
         _validateCF(
             addresses,
             addresses.getAddress("mxcUSDC"),
@@ -239,7 +240,7 @@ contract mipm25 is HybridProposal, ParameterValidation {
 
         _validateCF(
             addresses,
-            addresses.getAddress("mGLIMMER"),
+            addresses.getAddress("MNATIVE"),
             NEW_MGLIMMER_COLLATERAL_FACTOR
         );
 

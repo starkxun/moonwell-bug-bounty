@@ -5,7 +5,7 @@ import {console} from "@forge-std/console.sol";
 import {Script} from "@forge-std/Script.sol";
 import "@forge-std/Test.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {FaucetTokenWithPermit} from "@test/helper/FaucetToken.sol";
 import {MockWeth} from "@test/mock/MockWeth.sol";
 import {MockChainlinkOracle} from "@test/mock/MockChainlinkOracle.sol";
@@ -58,12 +58,12 @@ contract PreMipB00Script is Script, Test {
 
         vm.stopBroadcast();
 
-        addresses.addAddress("USDBC", address(usdc), true);
-        addresses.addAddress("cbETH", address(cbETH), true);
-        addresses.addAddress("WETH", address(weth), true);
+        addresses.addAddress("USDBC", address(usdc));
+        addresses.addAddress("cbETH", address(cbETH));
+        addresses.addAddress("WETH", address(weth));
 
-        addresses.addAddress("USDC_ORACLE", address(usdcOracle), true);
-        addresses.addAddress("ETH_ORACLE", address(ethOracle), true);
+        addresses.addAddress("USDC_ORACLE", address(usdcOracle));
+        addresses.addAddress("ETH_ORACLE", address(ethOracle));
 
         vm.startBroadcast(PRIVATE_KEY);
 
@@ -77,7 +77,7 @@ contract PreMipB00Script is Script, Test {
 
         vm.stopBroadcast();
 
-        addresses.addAddress("cbETH_ORACLE", address(cbEthOracle), true);
+        addresses.addAddress("cbETH_ORACLE", address(cbEthOracle));
 
         (
             string[] memory recordedNames,

@@ -4,7 +4,8 @@ pragma solidity 0.8.19;
 import {console} from "@forge-std/console.sol";
 import {Script} from "@forge-std/Script.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {ChainIds} from "@utils/ChainIds.sol";
 
 /*
 How to use:
@@ -21,24 +22,25 @@ to verify after deploy:
 
 */
 abstract contract MIPProposal is Script {
-    /// @notice fork ID for base
-    uint256 public baseForkId;
+    using ChainIds for uint256;
 
-    /// @notice fork ID for moonbeam
-    uint256 public moonbeamForkId;
+    Addresses public addresses;
 
     uint256 private PRIVATE_KEY;
-    Addresses private addresses;
 
     bool private DEBUG;
     bool private DO_DEPLOY;
     bool private DO_AFTER_DEPLOY;
-    bool private DO_AFTER_DEPLOY_SETUP;
+    bool private DO_PRE_BUILD_MOCK;
     bool private DO_BUILD;
     bool private DO_RUN;
     bool private DO_TEARDOWN;
     bool private DO_VALIDATE;
     bool private DO_PRINT;
+
+    /// @notice onchain proposal id for the proposal
+    /// returns 0 if proposal has no onchain id. must be set in the proposal
+    uint256 public onchainProposalId;
 
     constructor() {
         PRIVATE_KEY = uint256(vm.envOr("ETH_PRIVATE_KEY", uint256(123)));
@@ -46,23 +48,20 @@ abstract contract MIPProposal is Script {
         DEBUG = vm.envOr("DEBUG", true);
         DO_DEPLOY = vm.envOr("DO_DEPLOY", true);
         DO_AFTER_DEPLOY = vm.envOr("DO_AFTER_DEPLOY", true);
-        DO_AFTER_DEPLOY_SETUP = vm.envOr("DO_AFTER_DEPLOY_SETUP", true);
+        DO_PRE_BUILD_MOCK = vm.envOr("DO_PRE_BUILD_MOCK", true);
         DO_BUILD = vm.envOr("DO_BUILD", true);
         DO_RUN = vm.envOr("DO_RUN", true);
         DO_TEARDOWN = vm.envOr("DO_TEARDOWN", true);
         DO_VALIDATE = vm.envOr("DO_VALIDATE", true);
         DO_PRINT = vm.envOr("DO_PRINT", true);
+    }
+
+    function run() public virtual {
+        primaryForkId().createForksAndSelect();
 
         addresses = new Addresses();
         vm.makePersistent(address(addresses));
 
-        setForkIds(
-            vm.createFork(vm.envOr("BASE_RPC_URL", string("base"))),
-            vm.createFork(vm.envOr("MOONBEAM_RPC_URL", string("moonbeam")))
-        );
-    }
-
-    function run() public virtual {
         vm.selectFork(primaryForkId());
 
         address deployerAddress = vm.addr(PRIVATE_KEY);
@@ -72,12 +71,12 @@ abstract contract MIPProposal is Script {
         vm.startBroadcast(PRIVATE_KEY);
         if (DO_DEPLOY) deploy(addresses, deployerAddress);
         if (DO_AFTER_DEPLOY) afterDeploy(addresses, deployerAddress);
-        if (DO_AFTER_DEPLOY_SETUP) afterDeploySetup(addresses);
         vm.stopBroadcast();
 
-        if (DO_TEARDOWN) teardown(addresses, deployerAddress);
+        if (DO_PRE_BUILD_MOCK) preBuildMock(addresses);
         if (DO_BUILD) build(addresses);
         if (DO_RUN) run(addresses, deployerAddress);
+        if (DO_TEARDOWN) teardown(addresses, deployerAddress);
         if (DO_VALIDATE) {
             validate(addresses, deployerAddress);
             console.log("Validation completed for proposal ", this.name());
@@ -89,15 +88,15 @@ abstract contract MIPProposal is Script {
         }
     }
 
-    function name() external view virtual returns (string memory);
+    function primaryForkId() public pure virtual returns (uint256);
 
-    function primaryForkId() public view virtual returns (uint256);
+    function name() external view virtual returns (string memory);
 
     function deploy(Addresses, address) public virtual;
 
     function afterDeploy(Addresses, address) public virtual;
 
-    function afterDeploySetup(Addresses) public virtual;
+    function preBuildMock(Addresses) public virtual;
 
     function build(Addresses) public virtual;
 
@@ -111,16 +110,12 @@ abstract contract MIPProposal is Script {
 
     function printProposalActionSteps() public virtual;
 
-    /// @notice set the fork IDs for base and moonbeam
-    function setForkIds(uint256 _baseForkId, uint256 _moonbeamForkId) public {
-        require(
-            _baseForkId != _moonbeamForkId,
-            "setForkIds: fork IDs cannot be the same"
-        );
-
-        baseForkId = _baseForkId;
-        moonbeamForkId = _moonbeamForkId;
-    }
+    // @notice search for a on-chain proposal that matches the proposal calldata
+    // @returns the proposal id, 0 if no proposal is found
+    function getProposalId(
+        Addresses,
+        address
+    ) public virtual returns (uint256 proposalId);
 
     /// @dev Print recorded addresses
     function _printAddressesChanges() private view {

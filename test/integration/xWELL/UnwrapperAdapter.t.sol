@@ -8,19 +8,18 @@ import "@forge-std/Test.sol";
 
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {mipm21} from "@proposals/mips/mip-m21/mip-m21.sol";
-import {ChainIds} from "@test/utils/ChainIds.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {ChainIds} from "@utils/ChainIds.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {BASE_WORMHOLE_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
 import {MintLimits} from "@protocol/xWELL/MintLimits.sol";
 import {XERC20Lockbox} from "@protocol/xWELL/XERC20Lockbox.sol";
 import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
 import {WormholeUnwrapperAdapter} from "@protocol/xWELL/WormholeUnwrapperAdapter.sol";
 import {Address} from "@utils/Address.sol";
 
-contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21, ChainIds {
+contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21 {
     using Address for address;
-
-    /// @notice addresses contract, stores all addresses
-    Addresses public addresses;
+    using ChainIds for uint256;
 
     /// @notice lockbox contract
     XERC20Lockbox public xerc20Lockbox;
@@ -40,12 +39,12 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21, ChainIds {
     /// @notice amount of well to mint
     uint256 public constant startingWellAmount = 100_000 * 1e18;
 
-    uint16 public constant wormholeBaseChainid = uint16(baseWormholeChainId);
+    uint16 public constant wormholeBaseChainid = uint16(BASE_WORMHOLE_CHAIN_ID);
 
     function setUp() public {
         addresses = new Addresses();
 
-        well = ERC20(addresses.getAddress("WELL"));
+        well = ERC20(addresses.getAddress("GOVTOKEN"));
         xwell = xWELL(addresses.getAddress("xWELL_PROXY"));
         xerc20Lockbox = XERC20Lockbox(addresses.getAddress("xWELL_LOCKBOX"));
         wormholeAdapter = WormholeBridgeAdapter(
@@ -55,7 +54,7 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21, ChainIds {
         deal(address(well), user, startingWellAmount);
     }
 
-    function testValidate() public {
+    function testValidate() public view {
         validate(addresses, address(0));
     }
 
@@ -92,7 +91,7 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21, ChainIds {
         );
     }
 
-    function testSetup() public {
+    function testSetup() public view {
         address externalChainAddress = wormholeAdapter.targetAddress(
             wormholeBaseChainid
         );
@@ -194,7 +193,7 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21, ChainIds {
         uint256 startingXWellTotalSupply = xwell.totalSupply();
         uint256 startingBuffer = xwell.buffer(address(wormholeAdapter));
 
-        uint16 dstChainId = uint16(chainIdToWormHoleId[block.chainid]);
+        uint16 dstChainId = block.chainid.toBaseWormholeChainId();
         uint256 cost = wormholeAdapter.bridgeCost(dstChainId);
 
         vm.deal(user, cost);
@@ -234,7 +233,7 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21, ChainIds {
         uint256 startingBuffer = xwell.buffer(address(wormholeAdapter));
         uint256 startingLockboxBuffer = xwell.buffer(address(xerc20Lockbox));
 
-        uint16 dstChainId = uint16(chainIdToWormHoleId[block.chainid]);
+        uint16 dstChainId = block.chainid.toBaseWormholeChainId();
         bytes memory payload = abi.encode(user, mintAmount);
         bytes32 sender = address(wormholeAdapter).toBytes();
         bytes32 nonce = keccak256(abi.encode(payload, block.timestamp));

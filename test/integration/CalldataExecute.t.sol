@@ -6,7 +6,7 @@ import {ERC20Votes} from "@openzeppelin-contracts/contracts/token/ERC20/extensio
 import "@forge-std/Test.sol";
 
 import {Configs} from "@proposals/Configs.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {TestProposals} from "@proposals/TestProposals.sol";
 import {IArtemisGovernor} from "@protocol/interfaces/IArtemisGovernor.sol";
 import {MultichainGovernor, IMultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
@@ -40,7 +40,7 @@ contract CalldataExecute is Test, Configs {
     /// forge test --mt testSimExistingProposalMoonbeam --fork-url moonbeam -vvvv
     function testSimExistingProposalMoonbeam() public {
         address caller = addresses.getAddress("WELL_FOUNDATION_MULTISIG");
-        address governanceToken = addresses.getAddress("WELL");
+        address governanceToken = addresses.getAddress("GOVTOKEN");
         address governorAddress = addresses.getAddress(
             "MULTICHAIN_GOVERNOR_PROXY"
         );
@@ -98,7 +98,7 @@ contract CalldataExecute is Test, Configs {
     /// forge test --mt testSimulateExecMoonbeam --fork-url moonbeam -vvvv
     function testSimulateExecMoonbeam() public {
         address caller = address(this);
-        address governanceToken = addresses.getAddress("WELL");
+        address governanceToken = addresses.getAddress("GOVTOKEN");
         address governorAddress = addresses.getAddress(
             "MULTICHAIN_GOVERNOR_PROXY"
         );
@@ -162,7 +162,7 @@ contract CalldataExecute is Test, Configs {
     /// forge test --mt testSimulateExecMoonriver --fork-url moonriver -vvvv
     function testSimulateExecMoonriver() public {
         address caller = address(this);
-        address governanceToken = addresses.getAddress("MFAM");
+        address governanceToken = addresses.getAddress("GOVTOKEN");
         address governorAddress = addresses.getAddress("APOLLO_GOVERNOR");
         IArtemisGovernor governor = IArtemisGovernor(governorAddress);
 

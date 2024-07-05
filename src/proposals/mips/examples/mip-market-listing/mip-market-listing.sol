@@ -9,7 +9,7 @@ import {MErc20} from "@protocol/MErc20.sol";
 import {MToken} from "@protocol/MToken.sol";
 import {Configs} from "@proposals/Configs.sol";
 import {Proposal} from "@proposals/proposalTypes/Proposal.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MIPProposal} from "@proposals/MIPProposal.s.sol";
 import {EIP20Interface} from "@protocol/EIP20Interface.sol";
 import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
@@ -18,6 +18,7 @@ import {MultiRewardDistributor} from "@protocol/rewards/MultiRewardDistributor.s
 import {MultiRewardDistributorCommon} from "@protocol/rewards/MultiRewardDistributorCommon.sol";
 import {JumpRateModel, InterestRateModel} from "@protocol/irm/JumpRateModel.sol";
 import {Comptroller, ComptrollerInterface} from "@protocol/Comptroller.sol";
+import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 
 /// @notice This lists all new markets provided in `mainnetMTokens.json`
 /// This is a template of a MIP proposal that can be used to add new mTokens
@@ -131,9 +132,8 @@ contract mip0x is Proposal, CrossChainProposal, Configs {
         console.log("\n\n");
     }
 
-    /// @notice proposal's actions all happen on base
-    function primaryForkId() public view override returns (uint256) {
-        return baseForkId;
+    function primaryForkId() public pure override returns (uint256) {
+        return BASE_FORK_ID;
     }
 
     /// @notice no contracts are deployed in this proposal
@@ -168,8 +168,7 @@ contract mip0x is Proposal, CrossChainProposal, Configs {
                                 config.addressesString
                             )
                         ),
-                        address(irModel),
-                        true
+                        address(irModel)
                     );
                 }
 
@@ -210,11 +209,7 @@ contract mip0x is Proposal, CrossChainProposal, Configs {
                     ""
                 );
 
-                addresses.addAddress(
-                    config.addressesString,
-                    address(mToken),
-                    true
-                );
+                addresses.addAddress(config.addressesString, address(mToken));
             }
         }
     }
@@ -248,7 +243,7 @@ contract mip0x is Proposal, CrossChainProposal, Configs {
         }
     }
 
-    function afterDeploySetup(Addresses addresses) public override {
+    function preBuildMock(Addresses addresses) public override {
         Configs.CTokenConfiguration[]
             memory cTokenConfigs = getCTokenConfigurations(block.chainid);
 
@@ -599,7 +594,7 @@ contract mip0x is Proposal, CrossChainProposal, Configs {
     function _validateCaps(
         Addresses addresses,
         Configs.CTokenConfiguration memory config
-    ) private {
+    ) private view {
         {
             if (config.supplyCap != 0 || config.borrowCap != 0) {
                 uint8 decimals = EIP20Interface(

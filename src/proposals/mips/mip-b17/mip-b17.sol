@@ -1,15 +1,17 @@
 //SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
+import {EnumerableSet} from "@openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "@forge-std/Test.sol";
 
 import {MErc20} from "@protocol/MErc20.sol";
 import {MToken} from "@protocol/MToken.sol";
+import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 import {Configs} from "@proposals/Configs.sol";
 import {Proposal} from "@proposals/proposalTypes/Proposal.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MIPProposal} from "@proposals/MIPProposal.s.sol";
 import {EIP20Interface} from "@protocol/EIP20Interface.sol";
 import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
@@ -24,15 +26,17 @@ import {Comptroller, ComptrollerInterface} from "@protocol/Comptroller.sol";
 /// @dev be sure to include all necessary underlying and price feed addresses
 /// in the Addresses.sol contract for the network the MTokens are being deployed on.
 contract mipb17 is Proposal, CrossChainProposal, Configs {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @notice the name of the proposal
     /// Read more here: https://forum.moonwell.fi/t/add-aero-market-on-base/873
-    string public constant override name = "MIP-B17 AERO Market Creation";
+    string public constant override name = "MIP-B17";
 
     /// @notice all MTokens have 8 decimals
     uint8 public constant mTokenDecimals = 8;
 
     /// @notice list of all mTokens that were added to the market with this proposal
-    MToken[] public mTokens;
+    EnumerableSet.AddressSet private mTokens;
 
     /// @notice supply caps of all mTokens that were added to the market with this proposal
     uint256[] public supplyCaps;
@@ -46,12 +50,7 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
         address unitroller;
     }
 
-    function primaryForkId() public view override returns (uint256) {
-        return baseForkId;
-    }
-
-    /// @notice Aero market mToken and corresponding IRM is deployed in this proposal
-    function deploy(Addresses addresses, address deployer) public override {
+    constructor() {
         string
             memory descriptionPath = "./src/proposals/mips/mip-b17/MIP-B17.md";
         bytes memory proposalDescription = abi.encodePacked(
@@ -59,24 +58,36 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
         );
 
         _setProposalDescription(proposalDescription);
-        _setMTokenConfiguration("./src/proposals/mips/mip-b17/MTokens.json");
-        _setEmissionConfiguration(
-            "./src/proposals/mips/mip-b17/RewardStreams.json"
-        );
 
-        console.log("\n\n------------ LOAD STATS ------------");
-        console.log(
-            "Loaded %d MToken configs",
-            cTokenConfigurations[block.chainid].length
-        );
-        console.log(
-            "Loaded %d reward configs",
-            emissions[block.chainid].length
-        );
-        console.log("\n\n");
+        onchainProposalId = 11;
+    }
 
+    function primaryForkId() public pure override returns (uint256) {
+        return BASE_FORK_ID;
+    }
+
+    /// @notice Aero market mToken and corresponding IRM is deployed in this proposal
+    function deploy(Addresses addresses, address deployer) public override {
         Configs.CTokenConfiguration[]
             memory cTokenConfigs = getCTokenConfigurations(block.chainid);
+
+        if (cTokenConfigs.length == 0) {
+            string
+                memory descriptionPath = "./src/proposals/mips/mip-b17/MIP-B17.md";
+            bytes memory proposalDescription = abi.encodePacked(
+                vm.readFile(descriptionPath)
+            );
+
+            _setProposalDescription(proposalDescription);
+            _setMTokenConfiguration(
+                "./src/proposals/mips/mip-b17/MTokens.json"
+            );
+            _setEmissionConfiguration(
+                "./src/proposals/mips/mip-b17/RewardStreams.json"
+            );
+
+            cTokenConfigs = getCTokenConfigurations(block.chainid);
+        }
 
         //// create all of the CTokens according to the configuration in Config.sol
         unchecked {
@@ -112,8 +123,7 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
                                 config.addressesString
                             )
                         ),
-                        address(irModel),
-                        true
+                        address(irModel)
                     );
                 }
 
@@ -160,8 +170,7 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
 
                     addresses.addAddress(
                         config.addressesString,
-                        address(mToken),
-                        true
+                        address(mToken)
                     );
                 }
             }
@@ -176,36 +185,65 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
         unchecked {
             for (uint256 i = 0; i < cTokenConfigs.length; i++) {
                 Configs.CTokenConfiguration memory config = cTokenConfigs[i];
-                supplyCaps.push(config.supplyCap);
-                borrowCaps.push(config.borrowCap);
 
                 /// get the mToken
-                mTokens.push(
-                    MToken(addresses.getAddress(config.addressesString))
-                );
+                mTokens.add(addresses.getAddress(config.addressesString));
 
                 _validateCaps(addresses, config); /// validate supply and borrow caps
 
                 if (
-                    mTokens[i].reserveFactorMantissa() !=
+                    MToken(mTokens.at(i)).reserveFactorMantissa() !=
                     config.reserveFactor &&
-                    mTokens[i].protocolSeizeShareMantissa() != config.seizeShare
+                    MToken(mTokens.at(i)).protocolSeizeShareMantissa() !=
+                    config.seizeShare
                 ) {
-                    mTokens[i]._setReserveFactor(config.reserveFactor);
-                    mTokens[i]._setProtocolSeizeShare(config.seizeShare);
-                    mTokens[i]._setPendingAdmin(payable(governor)); /// set governor as pending admin of the mToken
+                    MToken(mTokens.at(i))._setReserveFactor(
+                        config.reserveFactor
+                    );
+                    MToken(mTokens.at(i))._setProtocolSeizeShare(
+                        config.seizeShare
+                    );
+                    MToken(mTokens.at(i))._setPendingAdmin(payable(governor)); /// set governor as pending admin of the mToken
                 }
             }
         }
     }
 
-    function afterDeploySetup(Addresses addresses) public override {}
+    function preBuildMock(Addresses addresses) public override {}
 
     /// ------------ MTOKEN MARKET ACTIVIATION BUILD ------------
 
     function build(Addresses addresses) public override {
         Configs.CTokenConfiguration[]
             memory cTokenConfigs = getCTokenConfigurations(block.chainid);
+
+        if (cTokenConfigs.length == 0) {
+            string
+                memory descriptionPath = "./src/proposals/mips/mip-b17/MIP-B17.md";
+            bytes memory proposalDescription = abi.encodePacked(
+                vm.readFile(descriptionPath)
+            );
+
+            _setProposalDescription(proposalDescription);
+            _setMTokenConfiguration(
+                "./src/proposals/mips/mip-b17/MTokens.json"
+            );
+            _setEmissionConfiguration(
+                "./src/proposals/mips/mip-b17/RewardStreams.json"
+            );
+
+            cTokenConfigs = getCTokenConfigurations(block.chainid);
+        }
+
+        for (uint256 i = 0; i < cTokenConfigs.length; i++) {
+            Configs.CTokenConfiguration memory config = cTokenConfigs[i];
+
+            supplyCaps.push(config.supplyCap);
+            borrowCaps.push(config.borrowCap);
+
+            mTokens.add(addresses.getAddress(config.addressesString));
+        }
+
         address unitrollerAddress = addresses.getAddress("UNITROLLER");
         address chainlinkOracleAddress = addresses.getAddress(
             "CHAINLINK_ORACLE"
@@ -215,7 +253,7 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
             unitrollerAddress,
             abi.encodeWithSignature(
                 "_setMarketSupplyCaps(address[],uint256[])",
-                mTokens,
+                mTokens.values(),
                 supplyCaps
             ),
             "Set supply caps MToken market"
@@ -225,7 +263,7 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
             unitrollerAddress,
             abi.encodeWithSignature(
                 "_setMarketBorrowCaps(address[],uint256[])",
-                mTokens,
+                mTokens.values(),
                 borrowCaps
             ),
             "Set borrow caps MToken market"
@@ -530,7 +568,7 @@ contract mipb17 is Proposal, CrossChainProposal, Configs {
     function _validateCaps(
         Addresses addresses,
         Configs.CTokenConfiguration memory config
-    ) private {
+    ) private view {
         {
             if (config.supplyCap != 0 || config.borrowCap != 0) {
                 uint8 decimals = EIP20Interface(

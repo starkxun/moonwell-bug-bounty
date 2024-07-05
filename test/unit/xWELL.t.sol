@@ -11,7 +11,7 @@ contract xWELLUnitTest is BaseTest {
         xwellProxy.acceptOwnership();
     }
 
-    function testSetup() public {
+    function testSetup() public view {
         assertTrue(
             xwellProxy.DOMAIN_SEPARATOR() != bytes32(0),
             "domain separator not set"
@@ -808,7 +808,13 @@ contract xWELLUnitTest is BaseTest {
         assertTrue(xwellProxy.paused());
 
         xwellProxy.ownerUnpause();
-        assertTrue(xwellProxy.paused(), "contract not unpaused");
+        assertFalse(xwellProxy.paused(), "contract not unpaused");
+        assertEq(xwellProxy.pauseStartTime(), 0, "contract not unpaused");
+        assertEq(
+            xwellProxy.pauseGuardian(),
+            address(0),
+            "guardian not kicked after owner unpause"
+        );
     }
 
     function testOwnerUnpauseFailsNotPaused() public {

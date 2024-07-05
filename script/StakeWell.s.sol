@@ -2,7 +2,7 @@ pragma solidity 0.8.19;
 
 import {Script} from "@forge-std/Script.sol";
 import "@forge-std/Test.sol";
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
 contract StakeWell is Script, Test {
     /// @notice executor private key
@@ -17,7 +17,7 @@ contract StakeWell is Script, Test {
     }
 
     function run() public {
-        address stkWell = addresses.getAddress("stkWELL_PROXY");
+        address stkWell = addresses.getAddress("STK_GOVTOKEN");
         address xwell = addresses.getAddress("xWELL_PROXY");
 
         bytes memory data = abi.encodeWithSignature(

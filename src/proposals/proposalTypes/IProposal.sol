@@ -1,6 +1,6 @@
 pragma solidity 0.8.19;
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
 struct ProposalAction {
     /// address to call
@@ -29,7 +29,7 @@ interface IProposal {
     // After deploying, do setup for a testnet,
     // e.g. if you deployed a contract that needs funds
     // for a governance proposal, deal them funds
-    function afterDeploySetup(Addresses) external;
+    function preBuildMock(Addresses) external;
 
     /// After finishing deploy and deploy cleanup, build the proposal
     function build(Addresses) external;
@@ -65,13 +65,4 @@ interface IProposal {
     /// print out proposal steps one by one
     /// print proposal description
     function printProposalActionSteps() external;
-
-    /// fork ID for base
-    function baseForkId() external view returns (uint256);
-
-    /// fork ID for moonbeam
-    function moonbeamForkId() external view returns (uint256);
-
-    /// set fork ID's for base and moonbeam
-    function setForkIds(uint256 baseForkId, uint256 moonbeamForkId) external;
 }

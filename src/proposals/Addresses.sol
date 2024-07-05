@@ -24,8 +24,6 @@ contract Addresses is IAddresses, Test {
     struct SavedAddresses {
         /// address to store
         address addr;
-        /// chain id of network to store for
-        uint256 chainId;
         /// whether the address is a contract
         bool isContract;
         /// name of contract to store
@@ -51,25 +49,39 @@ contract Addresses is IAddresses, Test {
     // @notice array of addresses changed during a proposal
     ChangedAddress[] private changedAddresses;
 
-    string public addressesPath = "./utils/Addresses.json";
+    constructor(uint256[] memory chainids) {
+        string memory projectRoot = vm.projectRoot();
 
-    constructor() {
-        string memory data = vm.readFile(addressesPath);
-        bytes memory parsedJson = vm.parseJson(data);
-
-        SavedAddresses[] memory savedAddresses = abi.decode(
-            parsedJson,
-            (SavedAddresses[])
-        );
-
-        uint256 length = savedAddresses.length;
-        for (uint256 i = 0; i < length; i++) {
-            _addAddress(
-                savedAddresses[i].name,
-                savedAddresses[i].addr,
-                savedAddresses[i].chainId,
-                savedAddresses[i].isContract
+        for (uint256 j = 0; j < chainids.length; j++) {
+            /// fetch <chainid>.json file path and read its raw contents
+            string memory data = vm.readFile(
+                string(
+                    abi.encodePacked(
+                        projectRoot,
+                        "/utils/",
+                        vm.toString(chainids[j]),
+                        ".json"
+                    )
+                )
             );
+            bytes memory parsedJson = vm.parseJson(data);
+
+            SavedAddresses[] memory savedAddresses = abi.decode(
+                parsedJson,
+                (SavedAddresses[])
+            );
+
+            uint256 length = savedAddresses.length;
+            uint256 chainId = chainids[j];
+
+            for (uint256 i = 0; i < length; i++) {
+                _addAddress(
+                    savedAddresses[i].name,
+                    savedAddresses[i].addr,
+                    chainId,
+                    savedAddresses[i].isContract
+                );
+            }
         }
     }
 
@@ -89,36 +101,32 @@ contract Addresses is IAddresses, Test {
         return _getAddress(name, _chainId);
     }
 
+    /// it is assumed that all addresses added through this method are
+    /// contracts. any non contract address should be added through the
+    /// corresponding json file.
     /// @notice add an address for the current chainId
     /// @param name the name of the address
     /// @param addr the address to add
-    /// @param isContract whether the address is a contract
-    function addAddress(
-        string memory name,
-        address addr,
-        bool isContract
-    ) public {
-        _addAddress(name, addr, block.chainid, isContract);
+    function addAddress(string memory name, address addr) public override {
+        _addAddress(name, addr, block.chainid, true);
 
         recordedAddresses.push(
             RecordedAddress({name: name, chainId: block.chainid})
         );
     }
 
-    /// @notice add or change an address (if is aready set) for the current chainId
+    /// it is assumed that all addresses added through this method are EOA's
+    /// (without bytecode). any contract address should be added through the
+    /// addAddress method.
+    /// @notice add an address for the current chainId
     /// @param name the name of the address
-    /// @param addr the address to change to
-    /// @param isContract whether the address is a contract
-    function addOrChangeAddress(
-        string memory name,
-        address addr,
-        bool isContract
-    ) public {
-        if (isAddressSet(name)) {
-            changeAddress(name, addr, isContract);
-        } else {
-            addAddress(name, addr, isContract);
-        }
+    /// @param addr the address to add
+    function addAddressEOA(string memory name, address addr) public override {
+        _addAddress(name, addr, block.chainid, false);
+
+        recordedAddresses.push(
+            RecordedAddress({name: name, chainId: block.chainid})
+        );
     }
 
     /// @notice add an address for a specific chainId
@@ -394,4 +402,19 @@ contract Addresses is IAddresses, Test {
             }
         }
     }
+}
+
+contract AllChainAddresses is Addresses {
+    uint256[] public supportedChainIds = [
+        8453,
+        84532,
+        1285,
+        1284,
+        1287,
+        11155111,
+        11155420,
+        31337,
+        10
+    ];
+    constructor() Addresses(supportedChainIds) {}
 }

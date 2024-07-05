@@ -3,10 +3,11 @@ pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {MockERC20Params} from "@test/mock/MockERC20Params.sol";
 import {ParameterValidation} from "@proposals/utils/ParameterValidation.sol";
+import {MOONBEAM_FORK_ID} from "@utils/ChainIds.sol";
 
 /// DO_VALIDATE=true DO_DEPLOY=true DO_PRINT=true DO_BUILD=true DO_RUN=true forge script
 /// src/proposals/mips/mip-m27/mip-m27.sol:mipm27
@@ -26,11 +27,12 @@ contract mipm27 is HybridProposal, ParameterValidation {
             vm.readFile("./src/proposals/mips/mip-m27/MIP-M27.md")
         );
         _setProposalDescription(proposalDescription);
+
+        onchainProposalId = 13;
     }
 
-    /// @notice proposal's actions happen only on moonbeam
-    function primaryForkId() public view override returns (uint256) {
-        return moonbeamForkId;
+    function primaryForkId() public pure override returns (uint256) {
+        return MOONBEAM_FORK_ID;
     }
 
     function deploy(Addresses addresses, address) public override {
@@ -172,10 +174,10 @@ contract mipm27 is HybridProposal, ParameterValidation {
             addresses.getAddress("UNITROLLER"),
             abi.encodeWithSignature(
                 "_setCollateralFactor(address,uint256)",
-                addresses.getAddress("mWBTCwh"),
+                addresses.getAddress("MOONWELL_mWBTC"),
                 NEW_M_WBTCWH_COLLATERAL_FACTOR
             ),
-            "Set collateral factor of mWBTCwh",
+            "Set collateral factor of MOONWELL_mWBTC",
             true
         );
 
@@ -183,10 +185,10 @@ contract mipm27 is HybridProposal, ParameterValidation {
             addresses.getAddress("UNITROLLER"),
             abi.encodeWithSignature(
                 "_setCollateralFactor(address,uint256)",
-                addresses.getAddress("mETHwh"),
+                addresses.getAddress("MOONWELL_mETH"),
                 NEW_M_ETHWH_COLLATERAL_FACTOR
             ),
-            "Set collateral factor of mETHwh",
+            "Set collateral factor of MOONWELL_mETH",
             true
         );
 
@@ -194,7 +196,7 @@ contract mipm27 is HybridProposal, ParameterValidation {
             addresses.getAddress("mxcUSDC"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mxcUSDC")
+                0x0568a3aeb8E78262dEFf75ee68fAC20ae35ffA91
             ),
             "Set interest rate model for mxcUSDC to updated rate model",
             true
@@ -204,7 +206,7 @@ contract mipm27 is HybridProposal, ParameterValidation {
             addresses.getAddress("mxcUSDT"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mxcUSDT")
+                0xfC7b55cc7C5BD3aE89aC679c7250AB30754C5cC5
             ),
             "Set interest rate model for mxcUSDT to updated rate model",
             true
@@ -214,7 +216,7 @@ contract mipm27 is HybridProposal, ParameterValidation {
             addresses.getAddress("mFRAX"),
             abi.encodeWithSignature(
                 "_setInterestRateModel(address)",
-                addresses.getAddress("JUMP_RATE_IRM_mFRAX")
+                0x0f36Dda2b47984434051AeCAa5F9587DEA7f95B7
             ),
             "Set interest rate model for mFRAX to updated rate model",
             true
@@ -242,7 +244,7 @@ contract mipm27 is HybridProposal, ParameterValidation {
         _runMoonbeamMultichainGovernor(addresses, address(1000000000));
     }
 
-    function validate(Addresses addresses, address) public override {
+    function validate(Addresses addresses, address) public view override {
         _validateRF(
             addresses.getAddress("mxcUSDC"),
             NEW_MXC_USDC_RESERVE_FACTOR
@@ -266,13 +268,13 @@ contract mipm27 is HybridProposal, ParameterValidation {
 
         _validateCF(
             addresses,
-            addresses.getAddress("mWBTCwh"),
+            addresses.getAddress("MOONWELL_mWBTC"),
             NEW_M_WBTCWH_COLLATERAL_FACTOR
         );
 
         _validateCF(
             addresses,
-            addresses.getAddress("mETHwh"),
+            addresses.getAddress("MOONWELL_mETH"),
             NEW_M_ETHWH_COLLATERAL_FACTOR
         );
 

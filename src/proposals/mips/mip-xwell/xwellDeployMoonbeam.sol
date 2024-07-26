@@ -2,15 +2,16 @@
 pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
+import "@protocol/utils/ChainIds.sol";
 
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {Configs} from "@proposals/Configs.sol";
-import {ChainIds, BASE_CHAIN_ID, MOONBEAM_FORK_ID} from "@utils/ChainIds.sol";
-import {Proposal} from "@proposals/proposalTypes/Proposal.sol";
-import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {Proposal} from "@proposals/Proposal.sol";
 import {MintLimits} from "@protocol/xWELL/MintLimits.sol";
 import {xWELLDeploy} from "@protocol/xWELL/xWELLDeploy.sol";
 import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {ChainIds, BASE_CHAIN_ID, MOONBEAM_FORK_ID} from "@utils/ChainIds.sol";
 
 /// to run locally:
 ///     DO_DEPLOY=true DO_VALIDATE=true forge script src/proposals/mips/mip-xwell/xwellDeployMoonbeam.sol:xwellDeployMoonbeam --fork-url moonbeam
@@ -121,12 +122,20 @@ contract xwellDeployMoonbeam is Proposal, Configs, xWELLDeploy {
                 pauseGuardian
             );
 
+            /// trust same address on Base
+            address[] memory trustedSenders = new address[](1);
+            trustedSenders[0] = wormholeAdapter;
+
+            uint16[] memory trustedChainIds = new uint16[](1);
+            trustedChainIds[0] = block.chainid.toBaseWormholeChainId();
+
             initializeWormholeAdapter(
                 wormholeAdapter,
                 xwellProxy,
                 artemisTimelock,
                 relayer,
-                block.chainid.toBaseWormholeChainId()
+                trustedChainIds,
+                trustedSenders
             );
 
             /// add to moonbeam addresses

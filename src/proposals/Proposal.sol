@@ -3,30 +3,13 @@ pragma solidity 0.8.19;
 
 import {console} from "@forge-std/console.sol";
 import {Script} from "@forge-std/Script.sol";
+import {Test} from "@forge-std/Test.sol";
 
-import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {ChainIds} from "@utils/ChainIds.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
-/*
-How to use:
-forge script src/proposals/MIPProposal.s.sol:DeployProposal \
-    -vvvv \
-    --rpc-url $ETH_RPC_URL \
-    --broadcast
-Remove --broadcast if you want to try locally first, without paying any gas.
-
-to verify after deploy:
-  forge verify-contract --etherscan-api-key $BASESCAN_API_KEY \ 
-        <deployed contract address> src/MWethDelegate.sol:MWethDelegate
-        --chain 8453
-
-*/
-abstract contract MIPProposal is Script {
+abstract contract Proposal is Script, Test {
     using ChainIds for uint256;
-
-    Addresses public addresses;
-
-    uint256 private PRIVATE_KEY;
 
     bool private DEBUG;
     bool private DO_DEPLOY;
@@ -43,8 +26,6 @@ abstract contract MIPProposal is Script {
     uint256 public onchainProposalId;
 
     constructor() {
-        PRIVATE_KEY = uint256(vm.envOr("ETH_PRIVATE_KEY", uint256(123)));
-
         DEBUG = vm.envOr("DEBUG", true);
         DO_DEPLOY = vm.envOr("DO_DEPLOY", true);
         DO_AFTER_DEPLOY = vm.envOr("DO_AFTER_DEPLOY", true);
@@ -59,16 +40,17 @@ abstract contract MIPProposal is Script {
     function run() public virtual {
         primaryForkId().createForksAndSelect();
 
-        addresses = new Addresses();
+        Addresses addresses = new Addresses();
         vm.makePersistent(address(addresses));
 
         vm.selectFork(primaryForkId());
 
-        address deployerAddress = vm.addr(PRIVATE_KEY);
+        initProposal(addresses);
 
-        console.log("deployerAddress: ", deployerAddress);
+        vm.startBroadcast();
 
-        vm.startBroadcast(PRIVATE_KEY);
+        (, address deployerAddress, ) = vm.readCallers();
+
         if (DO_DEPLOY) deploy(addresses, deployerAddress);
         if (DO_AFTER_DEPLOY) afterDeploy(addresses, deployerAddress);
         vm.stopBroadcast();
@@ -83,12 +65,15 @@ abstract contract MIPProposal is Script {
         }
         if (DO_PRINT) {
             printProposalActionSteps();
+
+            addresses.removeAllRestrictions();
             printCalldata(addresses);
-            _printAddressesChanges();
+
+            _printAddressesChanges(addresses);
         }
     }
 
-    function primaryForkId() public pure virtual returns (uint256);
+    function primaryForkId() public virtual returns (uint256);
 
     function name() external view virtual returns (string memory);
 
@@ -117,8 +102,12 @@ abstract contract MIPProposal is Script {
         address
     ) public virtual returns (uint256 proposalId);
 
+    /// @notice initialize the proposal after the proposal is created and the
+    /// live fork is selected
+    function initProposal(Addresses) public virtual {}
+
     /// @dev Print recorded addresses
-    function _printAddressesChanges() private view {
+    function _printAddressesChanges(Addresses addresses) private view {
         (
             string[] memory recordedNames,
             ,

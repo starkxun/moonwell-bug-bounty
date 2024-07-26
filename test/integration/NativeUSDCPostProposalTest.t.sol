@@ -8,16 +8,15 @@ import "@forge-std/Test.sol";
 import {MErc20} from "@protocol/MErc20.sol";
 import {MToken} from "@protocol/MToken.sol";
 import {Configs} from "@proposals/Configs.sol";
-import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {mip0x as mip} from "@proposals/mips/examples/mip-market-listing/mip-market-listing.sol";
+import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 import {TestProposals} from "@proposals/TestProposals.sol";
 import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
+import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {MultiRewardDistributor} from "@protocol/rewards/MultiRewardDistributor.sol";
 import {MultiRewardDistributorCommon} from "@protocol/rewards/MultiRewardDistributorCommon.sol";
-
-import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
-import {BASE_FORK_ID} from "@utils/ChainIds.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
 contract NativeUSDCPostProposalTest is Test, PostProposalCheck, Configs {
     MultiRewardDistributor mrd;
@@ -60,12 +59,13 @@ contract NativeUSDCPostProposalTest is Test, PostProposalCheck, Configs {
     }
 
     function testSupplyingOverSupplyCapFailsUsdc() public {
+        uint256 mintAmount = 100_000_000e18;
         address underlying = address(mUSDC.underlying());
-        deal(underlying, address(this), 50_000_000e6);
+        deal(underlying, address(this), mintAmount);
 
-        IERC20(underlying).approve(address(mUSDC), 50_000_000e6);
+        IERC20(underlying).approve(address(mUSDC), mintAmount);
         vm.expectRevert("market supply cap reached");
-        mUSDC.mint(50_000_000e6);
+        mUSDC.mint(mintAmount);
     }
 
     function testBorrowingOverBorrowCapFailsUsdc() public {

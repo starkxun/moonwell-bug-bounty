@@ -6,7 +6,7 @@
     },
     {
         "addr": "0xa5B7D85a8f27dd7907dc8FdC21FA5657D5E2F901",
-        "name": "WORMHOLE_CORE_MOONBASE",
+        "name": "WORMHOLE_CORE",
         "isContract": true
     },
     {
@@ -76,7 +76,7 @@
     },
     {
         "addr": "0x599D4a1538d686814eE11b331EACBBa166D7C41a",
-        "name": "MULTICHAIN_GOVERNOR_IMPL",
+        "name": "DEPRECATED_MULTICHAIN_GOVERNOR_IMPL",
         "isContract": true
     },
     {

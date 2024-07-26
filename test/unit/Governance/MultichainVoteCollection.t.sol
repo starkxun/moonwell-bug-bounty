@@ -1,6 +1,7 @@
 pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
+import "@protocol/utils/ChainIds.sol";
 
 import {BASE_WORMHOLE_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
 import {IMultichainGovernor, MultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
@@ -17,6 +18,8 @@ import {MultichainVoteCollection} from "@protocol/governance/multichain/Multicha
 import {MultichainBaseTest} from "@test/helper/MultichainBaseTest.t.sol";
 
 contract MultichainVoteCollectionUnitTest is MultichainBaseTest {
+    bool private _receivingFunds;
+
     event CrossChainVoteCollected(
         uint256 proposalId,
         uint16 sourceChain,
@@ -24,6 +27,11 @@ contract MultichainVoteCollectionUnitTest is MultichainBaseTest {
         uint256 againstVotes,
         uint256 abstainVotes
     );
+
+    function setUp() public override {
+        super.setUp();
+        _receivingFunds = false;
+    }
 
     function testSetup() public view {
         assertEq(
@@ -1171,6 +1179,41 @@ contract MultichainVoteCollectionUnitTest is MultichainBaseTest {
         _assertGovernanceBalance();
     }
 
+    function testEmitVotesRefundFails() public {
+        uint256 proposalId = testVotingValidProposalIdSucceeds();
+        uint256 bridgeCost = voteCollection.bridgeCost(
+            MOONBEAM_WORMHOLE_CHAIN_ID
+        );
+        (, , uint256 endTimestamp, , , , , ) = voteCollection
+            .proposalInformation(proposalId);
+        vm.warp(endTimestamp + 1);
+
+        vm.deal(address(this), bridgeCost * 2);
+
+        vm.expectRevert("WormholeBridge: refund failed");
+        voteCollection.emitVotes{value: bridgeCost * 2}(proposalId);
+    }
+
+    function testEmitVotesRefundSucceeds() public {
+        uint256 proposalId = testVotingValidProposalIdSucceeds();
+        uint256 bridgeCost = voteCollection.bridgeCost(
+            MOONBEAM_WORMHOLE_CHAIN_ID
+        );
+        (, , uint256 endTimestamp, , , , , ) = voteCollection
+            .proposalInformation(proposalId);
+        vm.warp(endTimestamp + 1);
+        _receivingFunds = true;
+
+        vm.deal(address(this), bridgeCost * 5);
+
+        voteCollection.emitVotes{value: bridgeCost * 5}(proposalId);
+        assertEq(
+            address(this).balance,
+            bridgeCost * 4,
+            "incorrect refund amount"
+        );
+    }
+
     function testEmitVotesProposalHasNoVotes() public {
         _createProposalUpdateThreshold(address(this));
 
@@ -1476,5 +1519,9 @@ contract MultichainVoteCollectionUnitTest is MultichainBaseTest {
             0,
             0
         );
+    }
+
+    receive() external payable {
+        require(_receivingFunds);
     }
 }

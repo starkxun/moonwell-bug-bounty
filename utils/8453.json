@@ -36,7 +36,7 @@
     },
     {
         "addr": "0xbebdb6C8ddC678FfA9f8748f85C815C556Dd8ac6",
-        "name": "WORMHOLE_CORE_BASE",
+        "name": "WORMHOLE_CORE",
         "isContract": true
     },
     {
@@ -210,6 +210,16 @@
         "isContract": true
     },
     {
+        "addr": "0xfC7b55cc7C5BD3aE89aC679c7250AB30754C5cC5",
+        "name": "JUMP_RATE_IRM_MOONWELL_DAI_MIP_B14",
+        "isContract": true
+    },
+    {
+        "addr": "0x0568a3aeb8E78262dEFf75ee68fAC20ae35ffA91",
+        "name": "JUMP_RATE_IRM_MOONWELL_WETH_MIP_B14",
+        "isContract": true
+    },
+    {
         "addr": "0xF5C73A4198941b49831cc95C5E407571851fbA4b",
         "name": "JUMP_RATE_IRM_MOONWELL_WETH_MIP_B19",
         "isContract": true
@@ -365,7 +375,7 @@
         "isContract": true
     },
     {
-        "addr": "0x3b1BDDC0998058dD266e2a0aC855D0d750700a7f",
+        "addr": "0xBe08A91ADe130aD61193bE2321ea06c4c39E124A",
         "name": "xWELL_LOGIC",
         "isContract": true
     },
@@ -405,7 +415,7 @@
         "name": "VOTE_COLLECTION_PROXY"
     },
     {
-        "addr": "0xD5D971dE427b14E4329C6032c9c4cE54d6FDB5C3",
+        "addr": "0x98E708bbce1f158C1bde25f206afA7562fd0157f",
         "isContract": true,
         "name": "VOTE_COLLECTION_IMPL"
     },
@@ -483,5 +493,10 @@
         "addr": "0x0f36Dda2b47984434051AeCAa5F9587DEA7f95B7",
         "isContract": true,
         "name": "JUMP_RATE_IRM_MOONWELL_USD_MIP_B15"
+    },
+    {
+        "addr": "0xD791292655A1d382FcC1a6Cb9171476cf91F2caa",
+        "isContract": false,
+        "name": "DEX_RELAYER"
     }
 ]

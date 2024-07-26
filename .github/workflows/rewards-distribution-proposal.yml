@@ -1,0 +1,80 @@
+name: Run Rewards Distribution Proposal
+
+on: [pull_request]
+
+env:
+  OP_RPC_URL: ${{secrets.OP_RPC_URL}}
+  BASE_RPC_URL: ${{secrets.BASE_RPC_URL}}
+  MOONBEAM_RPC_URL: ${{secrets.MOONBEAM_RPC_URL}}
+  DESCRIPTION_PATH: "src/proposals/mips/mip-rewards-distribution/MIP-REWARDS-DISTRIBUTION-EXAMPLE.md"
+  MTOKENS_PATH: "src/proposals/mips/mip-o00/mTokens.json" # TODO remove this
+  # after o00 execution
+  EMISSIONS_PATH: "src/proposals/mips/mip-o00/emissionConfigWell.json" # TODO remove
+  # this after o00 execution
+  PRIMARY_FORK_ID: 0 
+  MIP_REWARDS_PATH: "src/proposals/mips/mip-rewards-distribution/mipRewardsDistributionExample.json"
+  MIP_REWARDS_ID: 0 # should only run if proposal is not on chain yet, if it is
+  # onchain skip this workflow and checks for on chain calldata match
+
+jobs:
+  run-base-tests:
+    name: rewards-distribution-proposal
+    runs-on: ubuntu-latest
+    if: ${{ vars.MIP_REWARDS_ID == '0' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: List and Delete Previous Comments
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.rest.issues.listComments({
+              ...context.repo,
+              issue_number: issue_number
+            });
+
+            const actionComments = comments.data.filter(comment => 
+              comment.user.login === 'github-actions[bot]' &&
+              comment.body.includes('Rewards Distribution Proposal')
+            );
+
+            if (actionComments.length === 0) {
+              return;
+            }
+            for (const comment of actionComments) {
+              await github.rest.issues.deleteComment({
+                ...context.repo,
+                comment_id: comment.id,
+              });
+            }
+
+      - name: Run Proposal
+        run: bin/run-rewards-distribution-proposal.sh
+
+      - name: Comment PR with Proposal Output
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('output.json')) {
+                const output = JSON.parse(fs.readFileSync('output.json', 'utf8'));
+                const prNumber = context.payload.pull_request.number;
+                github.rest.issues.createComment({
+                   ...context.repo,
+                   issue_number: prNumber,
+                   body: `### Rewards Distribution Proposal ${output.file}:\n\`\`\`\n${output.output}\n\`\`\``
+                   });
+             }
+
+
+

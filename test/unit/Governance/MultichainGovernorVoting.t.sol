@@ -1,7 +1,9 @@
 pragma solidity 0.8.19;
 
-import "@forge-std/Test.sol";
 import {stdError} from "@forge-std/StdError.sol";
+import "@forge-std/Test.sol";
+
+import "@protocol/utils/ChainIds.sol";
 
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {MockWeth} from "@test/mock/MockWeth.sol";
@@ -9,15 +11,17 @@ import {Constants} from "@protocol/governance/multichain/Constants.sol";
 import {MintLimits} from "@protocol/xWELL/MintLimits.sol";
 import {xWELLDeploy} from "@protocol/xWELL/xWELLDeploy.sol";
 import {SnapshotInterface} from "@protocol/governance/multichain/SnapshotInterface.sol";
-import {BASE_WORMHOLE_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
 import {MultichainBaseTest} from "@test/helper/MultichainBaseTest.t.sol";
 import {WormholeTrustedSender} from "@protocol/governance/WormholeTrustedSender.sol";
 import {WormholeRelayerAdapter} from "@test/mock/WormholeRelayerAdapter.sol";
 import {MultichainVoteCollection} from "@protocol/governance/multichain/MultichainVoteCollection.sol";
 import {MultichainGovernorDeploy} from "@protocol/governance/multichain/MultichainGovernorDeploy.sol";
 import {IMultichainGovernor, MultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
+import {BASE_WORMHOLE_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
 
 contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
+    bool private _receivingFunds;
+
     event ProposalCanceled(uint256 proposalId);
 
     event ProposalRebroadcasted(uint256 proposalId, bytes data);
@@ -43,6 +47,7 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
 
         vm.roll(block.number + 1);
         vm.warp(block.timestamp + 1);
+        _receivingFunds = false;
     }
 
     function _castVotes(
@@ -505,15 +510,15 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
         _assertGovernanceBalance();
     }
 
-    function testBridgeOutQuoteEVMPriceRevert() public {
+    function testBridgeOutQuoteEVMPriceRevertRefund() public {
         uint256 bridgeCost = governor.bridgeCostAll();
         vm.deal(address(this), bridgeCost);
 
         uint16[] memory chainToRevert = new uint16[](1);
         chainToRevert[0] = BASE_WORMHOLE_CHAIN_ID;
         wormholeRelayerAdapter.setShouldRevertQuoteAtChain(chainToRevert, true);
+        _receivingFunds = true;
 
-        vm.expectRevert("WormholeBridge: total cost not equal to quote");
         governor.propose{value: bridgeCost}(
             new address[](1),
             new uint256[](1),
@@ -521,10 +526,12 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
             "Proposal MIP-M00 - Update Proposal Threshold"
         );
 
+        assertEq(address(this).balance, bridgeCost, "value not refunded");
+
         uint256 startTimestamp = block.timestamp;
         uint256 endTimestamp = startTimestamp + governor.votingPeriod();
         bytes memory payload = abi.encode(
-            1,
+            2,
             startTimestamp - 1,
             startTimestamp,
             endTimestamp,
@@ -3322,5 +3329,9 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
         );
 
         _assertGovernanceBalance();
+    }
+
+    receive() external payable {
+        require(_receivingFunds);
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {Vm} from "@forge-std/Vm.sol";
+
 // Fork Ids
 uint256 constant MOONBEAM_FORK_ID = 0;
 uint256 constant BASE_FORK_ID = 1;
@@ -23,6 +24,7 @@ uint256 constant OPTIMISM_SEPOLIA_CHAIN_ID = 11155420;
 uint16 constant MOONBEAM_WORMHOLE_CHAIN_ID = 16;
 uint16 constant BASE_WORMHOLE_CHAIN_ID = 30;
 uint16 constant OPTIMISM_WORMHOLE_CHAIN_ID = 24;
+uint16 constant ETHEREUM_WORMHOLE_CHAIN_ID = 2;
 
 // Wormhole Testnet Chain Ids
 uint16 constant MOONBASE_WORMHOLE_CHAIN_ID = 16;
@@ -58,10 +60,16 @@ library ChainIds {
 
     function toBaseChainId(uint256 chainId) internal pure returns (uint256) {
         /// map base and moonbeam chain id to base chain id
-        if (chainId == MOONBEAM_CHAIN_ID || chainId == BASE_CHAIN_ID) {
+        if (
+            chainId == OPTIMISM_CHAIN_ID ||
+            chainId == MOONBEAM_CHAIN_ID ||
+            chainId == BASE_CHAIN_ID
+        ) {
             return BASE_CHAIN_ID;
         } else if (
-            chainId == MOONBASE_CHAIN_ID || chainId == BASE_SEPOLIA_CHAIN_ID
+            chainId == OPTIMISM_SEPOLIA_CHAIN_ID ||
+            chainId == MOONBASE_CHAIN_ID ||
+            chainId == BASE_SEPOLIA_CHAIN_ID
         ) {
             /// map base sepolia and moonbase chain id to base sepolia chain id
             return BASE_SEPOLIA_CHAIN_ID;
@@ -74,10 +82,16 @@ library ChainIds {
         uint256 chainId
     ) internal pure returns (uint256) {
         /// map optimism and moonbeam chain id to optimism chain id
-        if (chainId == MOONBEAM_CHAIN_ID || chainId == OPTIMISM_CHAIN_ID) {
+        if (
+            chainId == MOONBEAM_CHAIN_ID ||
+            chainId == OPTIMISM_CHAIN_ID ||
+            chainId == BASE_CHAIN_ID
+        ) {
             return OPTIMISM_CHAIN_ID;
         } else if (
-            chainId == MOONBASE_CHAIN_ID || chainId == OPTIMISM_SEPOLIA_CHAIN_ID
+            chainId == MOONBASE_CHAIN_ID ||
+            chainId == BASE_SEPOLIA_CHAIN_ID ||
+            chainId == OPTIMISM_SEPOLIA_CHAIN_ID
         ) {
             /// map optimism sepolia and moonbase chain id to optimism sepolia chain id
             return OPTIMISM_SEPOLIA_CHAIN_ID;
@@ -157,9 +171,18 @@ library ChainIds {
     }
 
     function createForksAndSelect(uint256 selectFork) internal {
-        vmInternal.createFork(vmInternal.envString("MOONBEAM_RPC_URL"));
-        vmInternal.createFork(vmInternal.envString("BASE_RPC_URL"));
-        vmInternal.createFork(vmInternal.envString("OP_RPC_URL"));
+        (bool success, ) = address(vmInternal).call(
+            abi.encodeWithSignature("activeFork()")
+        );
+        (bool successSwitchFork, ) = address(vmInternal).call(
+            abi.encodeWithSignature("switchFork(uint256)", selectFork)
+        );
+
+        if (!success || !successSwitchFork) {
+            vmInternal.createFork(vmInternal.envString("MOONBEAM_RPC_URL"));
+            vmInternal.createFork(vmInternal.envString("BASE_RPC_URL"));
+            vmInternal.createFork(vmInternal.envString("OP_RPC_URL"));
+        }
 
         vmInternal.selectFork(selectFork);
 
@@ -207,14 +230,78 @@ library ChainIds {
     function toBaseWormholeChainId(
         uint256 chainId
     ) internal pure returns (uint16) {
-        if (chainId == MOONBEAM_CHAIN_ID || chainId == BASE_CHAIN_ID) {
+        if (
+            chainId == MOONBEAM_CHAIN_ID ||
+            chainId == BASE_CHAIN_ID ||
+            chainId == OPTIMISM_CHAIN_ID
+        ) {
             return BASE_WORMHOLE_CHAIN_ID;
         } else if (
-            chainId == MOONBASE_CHAIN_ID || chainId == BASE_SEPOLIA_CHAIN_ID
+            chainId == MOONBASE_CHAIN_ID ||
+            chainId == BASE_SEPOLIA_CHAIN_ID ||
+            chainId == OPTIMISM_SEPOLIA_CHAIN_ID
         ) {
             return BASE_WORMHOLE_SEPOLIA_CHAIN_ID;
         } else {
             revert("ChainIds: invalid chain id");
         }
+    }
+
+    function toChainId(
+        uint256 wormholeChainId
+    ) internal pure returns (uint256) {
+        if (wormholeChainId == MOONBEAM_WORMHOLE_CHAIN_ID) {
+            return MOONBEAM_CHAIN_ID;
+        } else if (wormholeChainId == BASE_WORMHOLE_CHAIN_ID) {
+            return BASE_CHAIN_ID;
+        } else if (wormholeChainId == OPTIMISM_WORMHOLE_CHAIN_ID) {
+            return OPTIMISM_CHAIN_ID;
+        } else if (wormholeChainId == MOONBASE_WORMHOLE_CHAIN_ID) {
+            return MOONBASE_CHAIN_ID;
+        } else if (wormholeChainId == BASE_WORMHOLE_SEPOLIA_CHAIN_ID) {
+            return BASE_SEPOLIA_CHAIN_ID;
+        } else if (wormholeChainId == OPTIMISM_WORMHOLE_SEPOLIA_CHAIN_ID) {
+            return OPTIMISM_SEPOLIA_CHAIN_ID;
+        } else {
+            revert("ChainIds: invalid wormhole chain id");
+        }
+    }
+
+    function chainForkToName(
+        uint256 forkId
+    ) internal pure returns (string memory) {
+        if (forkId == MOONBEAM_FORK_ID) {
+            return "Moonbeam";
+        } else if (forkId == BASE_FORK_ID) {
+            return "Base";
+        } else if (forkId == OPTIMISM_FORK_ID) {
+            return "Optimism";
+        } else {
+            revert("ChainIds: invalid fork id");
+        }
+    }
+
+    function chainIdToName(
+        uint256 chainId
+    ) internal pure returns (string memory) {
+        if (chainId == MOONBEAM_CHAIN_ID) {
+            return "Moonbeam";
+        } else if (chainId == BASE_CHAIN_ID) {
+            return "Base";
+        } else if (chainId == OPTIMISM_CHAIN_ID) {
+            return "Optimism";
+        } else if (chainId == MOONBASE_CHAIN_ID) {
+            return "Moonbase";
+        } else if (chainId == BASE_SEPOLIA_CHAIN_ID) {
+            return "Base Sepolia";
+        } else if (chainId == OPTIMISM_SEPOLIA_CHAIN_ID) {
+            return "Optimism Sepolia";
+        } else {
+            revert("ChainIds: invalid chain id");
+        }
+    }
+
+    function nonMoonbeamChainIds(uint256 chainId) internal pure returns (bool) {
+        return chainId != MOONBEAM_CHAIN_ID && chainId != MOONBASE_CHAIN_ID;
     }
 }

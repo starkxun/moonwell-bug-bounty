@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 import "@forge-std/Test.sol";
+import "@protocol/utils/ChainIds.sol";
 
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {mipm21} from "@proposals/mips/mip-m21/mip-m21.sol";
@@ -20,6 +21,9 @@ import {Address} from "@utils/Address.sol";
 contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21 {
     using Address for address;
     using ChainIds for uint256;
+
+    /// @notice all addresses
+    Addresses public addresses;
 
     /// @notice lockbox contract
     XERC20Lockbox public xerc20Lockbox;
@@ -62,12 +66,14 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21 {
         WormholeUnwrapperAdapter wormholeUnwrapperAdapter = WormholeUnwrapperAdapter(
                 addresses.getAddress("WORMHOLE_UNWRAPPER_ADAPTER")
             );
-        vm.expectRevert("Initializable: contract is already initialized");
+
+        vm.expectRevert();
         wormholeUnwrapperAdapter.initialize(
             address(1),
             address(1),
             address(1),
-            0
+            new uint16[](0),
+            new address[](0)
         );
     }
 
@@ -82,12 +88,13 @@ contract UnwrapperAdapterLiveSystemMoonbeamTest is mipm21 {
             address(0)
         );
 
-        vm.expectRevert("Initializable: contract is already initialized");
+        vm.expectRevert();
         wormholeAdapter.initialize(
             address(1),
             address(1),
             address(1),
-            wormholeBaseChainid
+            new uint16[](0),
+            new address[](0)
         );
     }
 

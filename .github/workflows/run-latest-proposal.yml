@@ -24,8 +24,8 @@ jobs:
         with:
           submodules: "recursive"
 
-      - name: "Install Foundry"
-        uses: "foundry-rs/foundry-toolchain@v1"
+      - name: Setup Environment
+        uses: ./.github/actions
 
       - name: Get Changed Files
         id: files
@@ -34,7 +34,8 @@ jobs:
           format: "space-delimited"
 
       - name: Set PR_CHANGED_FILES
-        run: echo "PR_CHANGED_FILES=${{ steps.files.outputs.all }}" >> $GITHUB_ENV
+        run: |
+          echo "PR_CHANGED_FILES=${{ steps.files.outputs.added_modified }}" >> $GITHUB_ENV
 
       - name: Set DEBUG flag
         run: echo "DEBUG=true" >> $GITHUB_ENV
@@ -53,7 +54,10 @@ jobs:
               issue_number: issue_number
             });
 
-            const actionComments = comments.data.filter(comment => comment.user.login === 'github-actions[bot]');
+            const actionComments = comments.data.filter(comment => 
+              comment.user.login === 'github-actions[bot]' &&
+              comment.body.includes('Latest Proposal')
+            );
 
             if (actionComments.length === 0) {
               return;
@@ -80,6 +84,6 @@ jobs:
                 github.rest.issues.createComment({
                    ...context.repo,
                    issue_number: prNumber,
-                   body: `### Proposal output for ${output.file}:\n\`\`\`\n${output.output}\n\`\`\``
+                   body: `### Latest Proposal: ${output.file}\n\`\`\`\n${output.output}\n\`\`\``
                    });
              }

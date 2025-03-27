@@ -212,6 +212,27 @@ contract BaseMoonwellViews is Initializable {
         return _result;
     }
 
+    /// @notice A view to get all info from the staking module
+    function getStakingInfo()
+        external
+        view
+        returns (StakingInfo memory _result)
+    {
+        if (address(safetyModule) != address(0)) {
+            _result.cooldown = safetyModule.COOLDOWN_SECONDS();
+            _result.unstakeWindow = safetyModule.UNSTAKE_WINDOW();
+            _result.distributionEnd = safetyModule.DISTRIBUTION_END();
+            _result.totalSupply = safetyModule.totalSupply();
+
+            SafetyModuleInterfaceV1.AssetData memory asset = safetyModule
+                .assets(address(safetyModule));
+            _result.emissionPerSecond = asset.emissionPerSecond;
+            _result.lastUpdateTimestamp = asset.lastUpdateTimestamp;
+            _result.index = asset.index;
+        }
+        return _result;
+    }
+
     /// @notice Virtual function to get market incentives, must be overrided overriden on the version of the deployment
     function getMarketIncentives(
         MToken market

@@ -8,7 +8,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import "@forge-std/Test.sol";
 
-import {Addresses} from "@proposals/Addresses.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MorphoViews} from "@protocol/views/MorphoViews.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -40,7 +40,7 @@ contract DeployMorphoViews is Script, Test {
         vm.startBroadcast(PRIVATE_KEY);
 
         address unitroller = addresses.getAddress("UNITROLLER");
-        address morpho = 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb;
+        address morpho = 0xce95AfbB8EA029495c66020883F87aaE8864AF92;
 
         MorphoViews viewsContract = new MorphoViews();
 

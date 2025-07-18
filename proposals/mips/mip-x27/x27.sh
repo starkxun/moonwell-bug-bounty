@@ -1,3 +1,4 @@
+#!/bin/bash
 export JSON_PATH=proposals/mips/mip-x27/x27.json
 export DESCRIPTION_PATH=proposals/mips/mip-x27/x27.md
 export PRIMARY_FORK_ID=0

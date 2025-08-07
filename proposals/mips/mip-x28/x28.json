@@ -211,7 +211,7 @@
                 "token": "xWELL_PROXY"
             },
             {
-                "amount": 60000e18,
+                "amount": 10000e18,
                 "from": "FOUNDATION_OP_MULTISIG",
                 "to": "TEMPORAL_GOVERNOR",
                 "token": "OP"

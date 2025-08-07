@@ -84,7 +84,7 @@ implemented:
 - Set trusted sender in Temporal Governor
 - Set the Staked Well emission manager
 - Set the Ecosystem Reserve Controller owner
-- Set the the Proxy Admin owner
+- Set the Proxy Admin owner
 
 By completing these actions, the new multichain governor will assume governance
 powers over the Moonwell Protocol, enabling cross-chain governance and user

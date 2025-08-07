@@ -9,7 +9,7 @@ When a user calls the `mint` function on the MToken, it will call the
 `mintAllowed` function on the Comptroller. If the mint is allowed, then
 `updateMarketSupplyIndexAndDisburseSupplierRewards` on the
 MultiRewardDistributor contract is called, which then updates the supply reward
-index on the the MultiRewardDistributor. Then, the user individual rewards is
+index on the MultiRewardDistributor. Then, the user individual rewards is
 updated by calling the MToken `balanceOf` function, figuring out how much tokens
 a user had for what duration, and then calculating the amount of rewards they
 have accrued.

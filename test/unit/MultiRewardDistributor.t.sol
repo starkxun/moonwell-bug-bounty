@@ -572,7 +572,7 @@ contract MultiRewardSupplySideDistributorUnitTest is
         // Fast forward 20s, then update rewards and check things out
         vm.warp(startTime + 20);
 
-        // Update indexes and and claim rewards
+        // Update indexes and claim rewards
         vm.prank(address(comptroller));
         distributor.updateMarketSupplyIndex(mToken);
 

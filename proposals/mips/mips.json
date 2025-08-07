@@ -1,6 +1,6 @@
 [
     {
-        "envpath": "proposals/mips/mip-x28/x28.sh",
+        "envpath": "proposals/mips/mip-x29/x29.sh",
         "governor": "MultichainGovernor",
         "id": 0,
         "path": "MarketUpdate.sol/MarketUpdateTemplate.json",

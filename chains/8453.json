@@ -2,12 +2,12 @@
     {
         "addr": "0xDcB85eCF9746302aC59d4BA565dc322BB0b173B3",
         "isContract": true,
-        "name": "JUMP_RATE_IRM_MOONWELL_cbXRP_MIP_X28"
+        "name": "JUMP_RATE_IRM_MOONWELL_cbXRP_MIP_X29"
     },
     {
         "addr": "0x0F704fD3A00780779551046D492B1c64d15e6cab",
         "isContract": true,
-        "name": "JUMP_RATE_IRM_MOONWELL_USDC_MIP_X28"
+        "name": "JUMP_RATE_IRM_MOONWELL_USDC_MIP_X29"
     },
     {
         "addr": "0x86CBee66b3FF313Af153e697f4DC02d423ACD5CE",

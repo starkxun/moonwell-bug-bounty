@@ -314,7 +314,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     );
                     IERC20(addresses.getAddress("OP")).approve(
                         addresses.getAddress("TEMPORAL_GOVERNOR"),
-                        6e22
+                        60000e18
                     );
                     vm.stopPrank();
                 }

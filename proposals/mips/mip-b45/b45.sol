@@ -70,7 +70,7 @@ contract mipb45 is HybridProposal, Configs {
     }
 
     function build(Addresses addresses) public override {
-        address safetyModule = addresses.getAddress("ECOSYSTEM_RESERVE_PROXY");
+        address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
         uint128[] memory emissionPerSecond = new uint128[](1);
         emissionPerSecond[0] = 0;
         uint256[] memory totalStaked = new uint256[](1);
@@ -79,17 +79,16 @@ contract mipb45 is HybridProposal, Configs {
         underlyingAsset[0] = safetyModule;
 
         // TODO add bridge to base call
-
-        //         _pushAction(
-        //            safetyModule,
-        //            abi.encodeWithSignature(
-        //                "configureAssets(uint128[],uint256[],address[])",
-        //                emissionPerSecond,
-        //                totalStaked,
-        //                underlyingAsset
-        //            ),
-        //            "Configure safety module assets"
-        //        );
+        _pushAction(
+            safetyModule,
+            abi.encodeWithSignature(
+                "configureAssets(uint128[],uint256[],address[])",
+                emissionPerSecond,
+                totalStaked,
+                underlyingAsset
+            ),
+            "Configure safety module assets"
+        );
 
         _pushAction(
             addresses.getAddress("xWELL_PROXY"),
@@ -99,6 +98,12 @@ contract mipb45 is HybridProposal, Configs {
                 totalAirdropAmount
             ),
             "Approve merkle campaign creator"
+        );
+
+        _pushAction(
+            addresses.getAddress("MERKLE_CAMPAIGN_CREATOR"),
+            abi.encodeWithSignature("acceptConditions()"),
+            "Accept merkle campaign creator conditions"
         );
 
         IMerkleCampaignCreator.CampaignParameters

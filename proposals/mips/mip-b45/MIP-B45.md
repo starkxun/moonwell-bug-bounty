@@ -96,6 +96,8 @@ If approved, this proposal will:
      `0x8b621804a7637b781e2BbD58e256a591F2dF7d51`
    - Regardless of whether these wallets return the funds or not, they will not
      face any legal repercussions.
+   - If you send within 100 WELL of the overclaimed amount we will consider your
+     debt repaid.
 
 ---
 

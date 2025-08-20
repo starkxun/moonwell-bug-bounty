@@ -136,7 +136,7 @@ contract mipb45 is HybridProposal, Configs {
     }
 
     function validate(Addresses addresses, address) public override {
-        address safetyModule = addresses.getAddress("ECOSYSTEM_RESERVE_PROXY");
+        address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
 
         address user = 0xFDd96AcCea44F2c4B71C792220781c9420E5Cb0e;
 
@@ -149,7 +149,7 @@ contract mipb45 is HybridProposal, Configs {
         vm.startPrank(user);
         IStakedWell(safetyModule).cooldown();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 7 days + 1);
 
         IStakedWell(safetyModule).redeem(user, userBalance);
 

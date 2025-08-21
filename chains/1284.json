@@ -368,5 +368,10 @@
         "addr": "0x8ef58a6c1cC0AeEa815BB88D9d43822E8D1358Fa",
         "name": "ANTHIAS_MULTISIG",
         "isContract": true
+    },
+    {
+        "addr": "0xF130e4946F862F2c6CA3d007D51C21688908e006",
+        "name": "F-GLMR-DEVGRANT",
+        "isContract": true
     }
 ]

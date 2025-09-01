@@ -992,6 +992,25 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 ActionType.Moonbeam
             );
         }
+
+        // check governor glrm balance
+        uint256 governorGlrmBalance = address(
+            addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY")
+        ).balance;
+        // transfer exceed glrm to F-GLMR-DEVGRANT
+        if (governorGlrmBalance > 0) {
+            _pushAction(
+                addresses.getAddress("F-GLMR-DEVGRANT"),
+                governorGlrmBalance,
+                bytes(""),
+                string.concat(
+                    "Transfer ",
+                    vm.toString(governorGlrmBalance),
+                    " GLRM to F-GLMR-DEVGRANT on Moonbeam"
+                ),
+                ActionType.Moonbeam
+            );
+        }
     }
 
     function _buildExternalChainActions(

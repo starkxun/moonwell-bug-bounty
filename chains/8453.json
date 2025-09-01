@@ -1093,5 +1093,10 @@
         "addr": "0x08eDEbFFaE68970DCf751baa826182b3a4aCFC05",
         "isContract": true,
         "name": "ANTHIAS_MULTISIG"
+    },
+    {
+        "addr": "0x8BB4C975Ff3c250e0ceEA271728547f3802B36Fd",
+        "isContract": true,
+        "name": "MERKLE_CAMPAIGN_CREATOR"
     }
 ]

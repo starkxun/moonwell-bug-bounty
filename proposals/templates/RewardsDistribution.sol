@@ -279,6 +279,22 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     }
 
     function beforeSimulationHook(Addresses addresses) public override {
+        // Check that no actions use the deprecated 'configureAsset' interface
+        for (uint256 i = 0; i < actions.length; i++) {
+            bytes4 selector = bytes4(actions[i].data);
+            bytes4 configureAssetSelector = bytes4(
+                keccak256("configureAsset(uint128,address)")
+            );
+            require(
+                selector != configureAssetSelector,
+                string.concat(
+                    "Action ",
+                    vm.toString(i),
+                    " uses deprecated configureAsset interface. Use configureAssets instead."
+                )
+            );
+        }
+
         // mock relayer so we can simulate bridging well
         WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
         vm.makePersistent(address(wormholeRelayer));
@@ -978,12 +994,24 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         );
 
         if (spec.stkWellEmissionsPerSecond != -1) {
+            address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
+            uint128[] memory emissionPerSecond = new uint128[](1);
+            emissionPerSecond[0] = spec
+                .stkWellEmissionsPerSecond
+                .toUint256()
+                .toUint128();
+            uint256[] memory totalStaked = new uint256[](1);
+            totalStaked[0] = 0;
+            address[] memory underlyingAsset = new address[](1);
+            underlyingAsset[0] = safetyModule;
+
             _pushAction(
-                addresses.getAddress("STK_GOVTOKEN_PROXY"),
+                safetyModule,
                 abi.encodeWithSignature(
-                    "configureAsset(uint128,address)",
-                    spec.stkWellEmissionsPerSecond.toUint256().toUint128(),
-                    addresses.getAddress("STK_GOVTOKEN_PROXY")
+                    "configureAssets(uint128[],uint256[],address[])",
+                    emissionPerSecond,
+                    totalStaked,
+                    underlyingAsset
                 ),
                 string.concat(
                     "Set reward speed for the Safety Module on Moonbeam.\nEmissions per second: ",
@@ -1155,12 +1183,24 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
 
         if (spec.stkWellEmissionsPerSecond != -1) {
+            address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
+            uint128[] memory emissionPerSecond = new uint128[](1);
+            emissionPerSecond[0] = spec
+                .stkWellEmissionsPerSecond
+                .toUint256()
+                .toUint128();
+            uint256[] memory totalStaked = new uint256[](1);
+            totalStaked[0] = 0;
+            address[] memory underlyingAsset = new address[](1);
+            underlyingAsset[0] = safetyModule;
+
             _pushAction(
-                addresses.getAddress("STK_GOVTOKEN_PROXY"),
+                safetyModule,
                 abi.encodeWithSignature(
-                    "configureAsset(uint128,address)",
-                    spec.stkWellEmissionsPerSecond.toUint256().toUint128(),
-                    addresses.getAddress("STK_GOVTOKEN_PROXY")
+                    "configureAssets(uint128[],uint256[],address[])",
+                    emissionPerSecond,
+                    totalStaked,
+                    underlyingAsset
                 ),
                 string.concat(
                     "Set reward speed to ",

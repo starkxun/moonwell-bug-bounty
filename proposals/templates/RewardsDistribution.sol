@@ -278,13 +278,15 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
     }
 
-    function beforeSimulationHook(Addresses addresses) public override {
+    function _validateSafetyModuleActions() private view {
         // Check that no actions use the deprecated 'configureAsset' interface
+        // and that no Base actions use 'configureAssets'
         for (uint256 i = 0; i < actions.length; i++) {
             bytes4 selector = bytes4(actions[i].data);
             bytes4 configureAssetSelector = bytes4(
                 keccak256("configureAsset(uint128,address)")
             );
+
             require(
                 selector != configureAssetSelector,
                 string.concat(
@@ -293,7 +295,27 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     " uses deprecated configureAsset interface. Use configureAssets instead."
                 )
             );
+
+            bytes4 configureAssetsSelector = bytes4(
+                keccak256("configureAssets(uint128[],uint256[],address[])")
+            );
+
+            // Base actions should not configure Safety Module assets
+            if (actions[i].actionType == ActionType.Base) {
+                require(
+                    selector != configureAssetsSelector,
+                    string.concat(
+                        "Base action ",
+                        vm.toString(i),
+                        " uses configureAssets. Safety Module on Base should not be configured."
+                    )
+                );
+            }
         }
+    }
+
+    function beforeSimulationHook(Addresses addresses) public override {
+        _validateSafetyModuleActions();
 
         // mock relayer so we can simulate bridging well
         WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
@@ -323,17 +345,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             chainId = networks[i].chainId;
             if (chainId != MOONBEAM_CHAIN_ID) {
                 vm.selectFork(networks[i].forkId);
-                if (chainId == OPTIMISM_CHAIN_ID) {
-                    // mock foundation approval
-                    vm.startPrank(
-                        addresses.getAddress("FOUNDATION_OP_MULTISIG")
-                    );
-                    IERC20(addresses.getAddress("OP")).approve(
-                        addresses.getAddress("TEMPORAL_GOVERNOR"),
-                        60000e18
-                    );
-                    vm.stopPrank();
-                }
 
                 vm.store(
                     address(wormholeBridgeAdapter),

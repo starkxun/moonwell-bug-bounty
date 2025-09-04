@@ -817,10 +817,10 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 "MekleCampaign: reward token cannot be empty"
             );
 
-            require(
-                campaign.startTimestamp > block.timestamp,
-                "MekleCampaign: start timestamp must be in the future"
-            );
+            //     require(
+            //         campaign.startTimestamp > block.timestamp,
+            //         "MekleCampaign: start timestamp must be in the future"
+            //     );
 
             externalChainActions[_chainId].mekleCampaigns.push(campaign);
         }

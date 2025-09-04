@@ -255,7 +255,8 @@
                 "rewardToken": "OP",
                 "vault": "USDC_MULTI_REWARDER"
             }
-        ]
+        ],
+        "mekleCampaign": []
     },
     "1284": {
         "bridgeToRecipient": [

@@ -1596,7 +1596,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                         creator: address(0),
                         rewardToken: campaign.rewardToken,
                         amount: campaign.amount,
-                        campaignType: 4, // 4 is airdrop
+                        campaignType: 18, // 4 is Token Holding Campaign
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
                         campaignData: "" // Empty campaign data for now

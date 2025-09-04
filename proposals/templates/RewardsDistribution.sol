@@ -140,7 +140,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     struct MekleCampaign {
         uint256 amount;
         uint32 duration;
-        address rewardToken;
+        string rewardToken;
         uint32 startTimestamp;
     }
 
@@ -548,13 +548,14 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         string memory prefix,
         uint256 _chainId
     ) private {
-        uint256 stkWellEmissionsPerSecond = vm.parseJsonUint(
-            data,
-            string.concat(prefix, ".stkWellEmissionsPerSecond")
-        );
         require(
             _chainId != BASE_CHAIN_ID,
             "Safety Module on Base should not be configured"
+        );
+
+        uint256 stkWellEmissionsPerSecond = vm.parseJsonUint(
+            data,
+            string.concat(prefix, ".stkWellEmissionsPerSecond")
         );
 
         assertLe(
@@ -812,8 +813,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             );
 
             require(
-                campaign.rewardToken != address(0),
-                "MekleCampaign: reward token cannot be zero address"
+                bytes(campaign.rewardToken).length > 0,
+                "MekleCampaign: reward token cannot be empty"
             );
 
             require(
@@ -832,7 +833,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     ) private {
         string memory prefix = string.concat(".", vm.toString(_chainId));
 
-        _saveStkWellEmissionsPerSecond(data, prefix, _chainId);
+        if (_chainId != BASE_CHAIN_ID) {
+            _saveStkWellEmissionsPerSecond(data, prefix, _chainId);
+        }
 
         (
             uint256 totalWellEpochRewards,
@@ -852,14 +855,21 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             ecosystemReserveProxyAmount +
             _saveWithdrawWell(addresses, data, prefix, _chainId);
 
-        assertApproxEqRel(
-            ecosystemReserveProxyAmount,
-            externalChainActions[_chainId].stkWellEmissionsPerSecond *
-                endTimeStamp -
-                startTimeStamp,
-            1e18,
-            "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
-        );
+        if (_chainId == BASE_CHAIN_ID) {
+            assertEq(
+                ecosystemReserveProxyAmount,
+                0,
+                "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be 0 for Base chain"
+            );
+        } else {
+            assertApproxEqRel(
+                ecosystemReserveProxyAmount,
+                externalChainActions[_chainId].stkWellEmissionsPerSecond *
+                    (endTimeStamp - startTimeStamp),
+                1e18,
+                "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
+            );
+        }
 
         bytes memory transferReservesBytes = vm.parseJson(
             data,
@@ -1570,9 +1580,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         for (uint256 i = 0; i < spec.mekleCampaigns.length; i++) {
             MekleCampaign memory campaign = spec.mekleCampaigns[i];
 
+            address rewardTokenAddress = addresses.getAddress(
+                campaign.rewardToken
+            );
+
             // Approve the merkle campaign creator to spend the reward token
             _pushAction(
-                campaign.rewardToken,
+                rewardTokenAddress,
                 abi.encodeWithSignature(
                     "approve(address,uint256)",
                     addresses.getAddress("MERKLE_CAMPAIGN_CREATOR"),
@@ -1594,7 +1608,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     .CampaignParameters({
                         campaignId: bytes32(0),
                         creator: address(0),
-                        rewardToken: campaign.rewardToken,
+                        rewardToken: rewardTokenAddress,
                         amount: campaign.amount,
                         campaignType: 18, // 4 is Token Holding Campaign
                         startTimestamp: campaign.startTimestamp,
@@ -1618,7 +1632,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 ),
                 string.concat(
                     "Create merkle campaign for token ",
-                    vm.getLabel(campaign.rewardToken),
+                    vm.getLabel(rewardTokenAddress),
                     " with amount ",
                     vm.toString(campaign.amount)
                 )

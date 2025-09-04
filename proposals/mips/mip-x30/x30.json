@@ -249,7 +249,8 @@
                 "rewardToken": "OP",
                 "vault": "USDC_MULTI_REWARDER"
             }
-        ]
+        ],
+        "mekleCampaigns": []
     },
     "1284": {
         "bridgeToRecipient": [
@@ -761,12 +762,14 @@
                 "to": "TEMPORAL_GOVERNOR"
             }
         ],
-        "mekleCampaign": {
-            "amount": 1.1537666426929776e25,
-            "duration": 4838400,
-            "rewardToken": "xWELL_PROXY",
-            "startTimestamp": 1754623800
-        }
+        "mekleCampaigns": [
+            {
+                "amount": 1.1537666426929776e25,
+                "duration": 4838400,
+                "rewardToken": "xWELL_PROXY",
+                "startTimestamp": 1754623800
+            }
+        ]
     },
     "endTimeSTamp": 1759462200,
     "startTimeStamp": 1757043000

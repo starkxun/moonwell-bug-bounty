@@ -160,7 +160,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         TransferFrom[] transferFroms;
         TransferReserves[] transferReserves;
         WithdrawWell[] withdrawWell;
-        MekleCampaign[] mekleCampaigns;
+        MekleCampaign[] merkleCampaigns;
     }
 
     JsonSpecMoonbeam moonbeamActions;
@@ -790,15 +790,15 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     ) private {
         bytes memory mekleCampaignsBytes = vm.parseJson(
             data,
-            string.concat(prefix, ".mekleCampaigns")
+            string.concat(prefix, ".merkleCampaigns")
         );
-        MekleCampaign[] memory mekleCampaigns = abi.decode(
+        MekleCampaign[] memory merkleCampaigns = abi.decode(
             mekleCampaignsBytes,
             (MekleCampaign[])
         );
 
-        for (uint256 i = 0; i < mekleCampaigns.length; i++) {
-            MekleCampaign memory campaign = mekleCampaigns[i];
+        for (uint256 i = 0; i < merkleCampaigns.length; i++) {
+            MekleCampaign memory campaign = merkleCampaigns[i];
 
             // Validate campaign parameters
             require(
@@ -821,7 +821,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             //         "MekleCampaign: start timestamp must be in the future"
             //     );
 
-            externalChainActions[_chainId].mekleCampaigns.push(campaign);
+            externalChainActions[_chainId].merkleCampaigns.push(campaign);
         }
     }
 
@@ -1576,8 +1576,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
 
         // Process Merkle campaigns
-        for (uint256 i = 0; i < spec.mekleCampaigns.length; i++) {
-            MekleCampaign memory campaign = spec.mekleCampaigns[i];
+        for (uint256 i = 0; i < spec.merkleCampaigns.length; i++) {
+            MekleCampaign memory campaign = spec.merkleCampaigns[i];
 
             address rewardTokenAddress = addresses.getAddress(
                 campaign.rewardToken
@@ -2145,6 +2145,80 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 string.concat(
                     "Reward period should not be finished for token ",
                     rewarder.rewardToken
+                )
+            );
+        }
+
+        // Validate Merkle campaign configurations
+        for (uint256 i = 0; i < spec.merkleCampaigns.length; i++) {
+            MekleCampaign memory campaign = spec.merkleCampaigns[i];
+
+            IMerkleCampaignCreator.CampaignParameters
+                memory campaignParameters = IMerkleCampaignCreator
+                    .CampaignParameters({
+                        campaignId: bytes32(0),
+                        creator: address(0),
+                        rewardToken: addresses.getAddress(campaign.rewardToken),
+                        amount: campaign.amount,
+                        campaignType: 18, // 4 is Token Holding Campaign
+                        startTimestamp: campaign.startTimestamp,
+                        duration: campaign.duration,
+                        campaignData: "" // Empty campaign data for now
+                    });
+
+            // Check if the campaign is created
+            bytes32 campaignId = IMerkleCampaignCreator(
+                addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
+            ).campaignId(campaignParameters);
+
+            assertNotEq(
+                campaignId,
+                bytes32(0),
+                string.concat(
+                    "Merkle campaign should be created for token ",
+                    campaign.rewardToken
+                )
+            );
+
+            // Validate campaign exists and has correct parameters
+            IMerkleCampaignCreator.CampaignParameters
+                memory storedCampaign = IMerkleCampaignCreator(
+                    addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
+                ).campaign(campaignId);
+
+            assertEq(
+                storedCampaign.rewardToken,
+                addresses.getAddress(campaign.rewardToken),
+                string.concat(
+                    "Campaign reward token mismatch for ",
+                    campaign.rewardToken
+                )
+            );
+
+            assertEq(
+                storedCampaign.amount,
+                campaign.amount,
+                string.concat(
+                    "Campaign amount mismatch for ",
+                    campaign.rewardToken
+                )
+            );
+
+            assertEq(
+                storedCampaign.duration,
+                campaign.duration,
+                string.concat(
+                    "Campaign duration mismatch for ",
+                    campaign.rewardToken
+                )
+            );
+
+            assertEq(
+                storedCampaign.startTimestamp,
+                campaign.startTimestamp,
+                string.concat(
+                    "Campaign start timestamp mismatch for ",
+                    campaign.rewardToken
                 )
             );
         }

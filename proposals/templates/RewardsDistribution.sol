@@ -532,8 +532,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 assertApproxEqRel(
                     spec.transferFroms[i].amount,
                     spec.stkWellEmissionsPerSecond *
-                        endTimeStamp -
-                        startTimeStamp,
+                        (endTimeStamp - startTimeStamp),
                     0.1e18,
                     "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
                 );

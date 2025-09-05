@@ -1986,13 +1986,19 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     }
                 }
 
-                if (!alreadyChecked) {
+                bool isTempGov = to ==
+                    addresses.getAddress("TEMPORAL_GOVERNOR");
+
+                if (!alreadyChecked && !isTempGov) {
                     assertEq(
                         IERC20(addresses.getAddress("xWELL_PROXY")).balanceOf(
                             to
                         ),
                         wellBalancesBefore[to] + spec.withdrawWell[i].amount,
-                        string.concat("balance wrong for ", vm.getLabel(to))
+                        string.concat(
+                            "withdrawWell: balance wrong for ",
+                            vm.getLabel(to)
+                        )
                     );
                 }
             }

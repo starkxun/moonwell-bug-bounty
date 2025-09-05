@@ -290,6 +290,16 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     function beforeSimulationHook(Addresses addresses) public override {
         _validateSafetyModuleActions();
 
+        vm.selectFork(MOONBEAM_FORK_ID);
+
+        // Mock approval for F-GLMR-DEVGRANT to allow the transfer to succeed
+        vm.startPrank(addresses.getAddress("F-GLMR-DEVGRANT"));
+        IERC20(addresses.getAddress("GOVTOKEN")).approve(
+            addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
+            11669037203603280000000000 // 1.166903720360328e25
+        );
+        vm.stopPrank();
+
         // mock relayer so we can simulate bridging well
         WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
         vm.makePersistent(address(wormholeRelayer));

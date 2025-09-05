@@ -1115,9 +1115,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
 
         AddRewardInfo memory stellaSwapReward = spec.addRewardInfo;
-        // calculate the total amount needed based on rewardPerSec and duration
-        uint256 calculatedAmount = stellaSwapReward.rewardPerSec *
-            (endTimeStamp - startTimeStamp);
+        uint256 calculatedAmount = stellaSwapReward.amount;
         // first approve
         _pushAction(
             addresses.getAddress("GOVTOKEN"),

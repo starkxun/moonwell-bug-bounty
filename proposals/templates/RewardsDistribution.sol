@@ -1813,12 +1813,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             )
         );
 
-        // validate that stellaswap receive the correct amount of well
-        uint256 expectedAmount = addRewardInfo.rewardPerSec *
-            (endTimeStamp - startTimeStamp);
         assertApproxEqAbs(
             well.balanceOf(stellaSwapRewarder),
-            wellBalancesBefore[stellaSwapRewarder] + expectedAmount,
+            wellBalancesBefore[stellaSwapRewarder] + addRewardInfo.amount,
             1e18,
             string.concat(
                 "StellaSwap Rewarder should have received the correct amount of WELL"

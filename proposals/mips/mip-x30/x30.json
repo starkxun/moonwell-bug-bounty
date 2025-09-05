@@ -195,7 +195,7 @@
                 "token": "GOVTOKEN"
             },
             {
-                "amount": 1.1288511485925516e22,
+                "amount": 13165826131809284742544,
                 "from": "MGLIMMER_MULTISIG",
                 "to": "MULTICHAIN_GOVERNOR_PROXY",
                 "token": "GOVTOKEN"

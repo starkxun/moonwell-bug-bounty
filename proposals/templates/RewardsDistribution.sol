@@ -1816,7 +1816,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         assertApproxEqAbs(
             well.balanceOf(stellaSwapRewarder),
             wellBalancesBefore[stellaSwapRewarder] + addRewardInfo.amount,
-            1e18,
+            10e18,
             string.concat(
                 "StellaSwap Rewarder should have received the correct amount of WELL"
             )

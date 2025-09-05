@@ -255,7 +255,8 @@
                 "rewardToken": "OP",
                 "vault": "USDC_MULTI_REWARDER"
             }
-        ]
+        ],
+        "merkleCampaigns": []
     },
     "1284": {
         "bridgeToRecipient": [
@@ -723,7 +724,8 @@
                 "amount": 8.428495116811554e24,
                 "to": "ECOSYSTEM_RESERVE_PROXY"
             }
-        ]
+        ],
+        "merkleCampaigns": []
     },
     "endTimeSTamp": 1757043000,
     "startTimeStamp": 1754623800

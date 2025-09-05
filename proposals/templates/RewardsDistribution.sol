@@ -1115,17 +1115,20 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
 
         AddRewardInfo memory stellaSwapReward = spec.addRewardInfo;
+        // calculate the total amount needed based on rewardPerSec and duration
+        uint256 calculatedAmount = stellaSwapReward.rewardPerSec *
+            (endTimeStamp - startTimeStamp);
         // first approve
         _pushAction(
             addresses.getAddress("GOVTOKEN"),
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 addresses.getAddress(stellaSwapReward.target),
-                uint256(stellaSwapReward.amount)
+                calculatedAmount
             ),
             string.concat(
                 "Approve StellaSwap spend ",
-                vm.toString(uint256(stellaSwapReward.amount) / 1e18),
+                vm.toString(calculatedAmount / 1e18),
                 " WELL"
             ),
             ActionType.Moonbeam
@@ -1813,9 +1816,11 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         );
 
         // validate that stellaswap receive the correct amount of well
+        uint256 expectedAmount = addRewardInfo.rewardPerSec *
+            (endTimeStamp - startTimeStamp);
         assertApproxEqAbs(
             well.balanceOf(stellaSwapRewarder),
-            wellBalancesBefore[stellaSwapRewarder] + addRewardInfo.amount,
+            wellBalancesBefore[stellaSwapRewarder] + expectedAmount,
             1e18,
             string.concat(
                 "StellaSwap Rewarder should have received the correct amount of WELL"

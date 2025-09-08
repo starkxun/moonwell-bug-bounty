@@ -195,7 +195,7 @@
                 "token": "GOVTOKEN"
             },
             {
-                "amount": 1.198564253637981e22,
+                "amount": 15160487476317736790718,
                 "from": "MGLIMMER_MULTISIG",
                 "to": "MULTICHAIN_GOVERNOR_PROXY",
                 "token": "GOVTOKEN"
@@ -214,7 +214,7 @@
             }
         ],
         "addRewardInfo": {
-            "amount": 1.198564253637981e22,
+            "amount": 15160487476317736790718,
             "endTimestamp": 1760103018,
             "pid": 15,
             "rewardPerSec": 4954378528596151,

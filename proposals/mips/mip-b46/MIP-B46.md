@@ -4,7 +4,8 @@
 
 This proposal distributes 3.33 million WELL tokens as rewards to users who
 deposit assets into Moonwell's Morpho vaults on Base. The tokens will be
-distributed equally across four popular vaults: cbBTC, USDC, WETH, and EURC.
+distributed proportionally across four popular vaults based on their strategic
+importance: USDC (50%), WETH (24%), EURC (13%), and cbBTC (13%).
 
 ## What Are Morpho Vaults?
 
@@ -33,10 +34,14 @@ By adding WELL token rewards, we can:
 ## Reward Distribution
 
 - **Total WELL Rewards**: 3,333,333 WELL tokens
-- **Per Vault**: ~833,333 WELL tokens each
+- **USDC Vault**: ~1,667,000 WELL tokens (50% - highest allocation)
+- **WETH Vault**: ~800,000 WELL tokens (24% - significant allocation)
+- **EURC Vault**: ~433,000 WELL tokens (13% - moderate allocation)
+- **cbBTC Vault**: ~433,000 WELL tokens (13% - moderate allocation)
 - **Who Gets Rewards**: Users who deposit assets into any of the four Morpho
   vaults
 - **How Rewards Work**: Distributed proportionally based on your vault deposits
+- **Campaign Duration**: 26 days of rewards distribution
 
 ## What Happens When This Passes?
 

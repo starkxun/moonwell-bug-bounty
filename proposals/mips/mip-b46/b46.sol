@@ -52,9 +52,14 @@ contract mipb46 is HybridProposal, Configs {
     /// @notice the name of the proposal
     string public constant override name = "MIP-B46";
 
-    uint256 public constant totalCampaignAmount = 3333333333333333000000000;
-    uint256 public constant amountToBridge = 3333333333333333000000000;
-    uint256 public constant amountPerVault = 833333333333333250000000;
+    uint256 public constant totalCampaignAmount = 3333333333333333000000000; // 3.33M WELL tokens
+    uint256 public constant campaignDuration = 26 days;
+
+    // Proportional distribution based on flagship vault allocations
+    uint256 public constant USDC_AMOUNT = 1666666666500000000000000; // ~1.67M WELL (50%)
+    uint256 public constant WETH_AMOUNT = 799999999920000000000000; // ~800K WELL (24%)
+    uint256 public constant EURC_AMOUNT = 433333333290000000000000; // ~433K WELL (13%)
+    uint256 public constant cbBTC_AMOUNT = 433333333290000000000000; // ~433K WELL (13%)
 
     // Campaign type for MORPHOVAULT
     uint32 public constant MORPHOVAULT_CAMPAIGN_TYPE = 56;
@@ -110,7 +115,7 @@ contract mipb46 is HybridProposal, Configs {
         vm.startPrank(addresses.getAddress("F-GLMR-DEVGRANT"));
         IERC20(addresses.getAddress("GOVTOKEN")).approve(
             addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
-            amountToBridge
+            totalCampaignAmount
         );
         vm.stopPrank();
         vm.selectFork(primaryForkId());
@@ -135,7 +140,7 @@ contract mipb46 is HybridProposal, Configs {
                 "transferFrom(address,address,uint256)",
                 addresses.getAddress("F-GLMR-DEVGRANT"),
                 addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
-                amountToBridge
+                totalCampaignAmount
             ),
             string(
                 abi.encodePacked(
@@ -150,12 +155,12 @@ contract mipb46 is HybridProposal, Configs {
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 router,
-                amountToBridge
+                totalCampaignAmount
             ),
             string(
                 abi.encodePacked(
                     "Approve xWELL Router to spend ",
-                    vm.toString(amountToBridge / 1e18),
+                    vm.toString(totalCampaignAmount / 1e18),
                     " ",
                     vm.getLabel(well)
                 )
@@ -167,11 +172,11 @@ contract mipb46 is HybridProposal, Configs {
 
         _pushAction(
             router,
-            amountToBridge,
+            totalCampaignAmount,
             abi.encodeWithSignature(
                 "bridgeToRecipient(address,uint256,uint16)",
                 addresses.getAddress("TEMPORAL_GOVERNOR", BASE_CHAIN_ID),
-                amountToBridge,
+                totalCampaignAmount,
                 wormholeChainId
             ),
             "Bridge xWELL to TEMPORAL_GOVERNOR",
@@ -198,27 +203,48 @@ contract mipb46 is HybridProposal, Configs {
             "Accept merkle campaign creator conditions"
         );
 
-        // Create campaigns for all MetaMorpho vaults
-        _createCampaign(addresses, "cbBTC_METAMORPHO_VAULT", "cbBTC");
-        _createCampaign(addresses, "USDC_METAMORPHO_VAULT", "USDC");
-        _createCampaign(addresses, "WETH_METAMORPHO_VAULT", "WETH");
-        _createCampaign(addresses, "EURC_METAMORPHO_VAULT", "EURC");
+        // Create campaigns for all MetaMorpho vaults with proportional distribution
+        _createCampaign(
+            addresses,
+            "cbBTC_METAMORPHO_VAULT",
+            "cbBTC",
+            cbBTC_AMOUNT
+        );
+        _createCampaign(
+            addresses,
+            "USDC_METAMORPHO_VAULT",
+            "USDC",
+            USDC_AMOUNT
+        );
+        _createCampaign(
+            addresses,
+            "WETH_METAMORPHO_VAULT",
+            "WETH",
+            WETH_AMOUNT
+        );
+        _createCampaign(
+            addresses,
+            "EURC_METAMORPHO_VAULT",
+            "EURC",
+            EURC_AMOUNT
+        );
     }
 
     function _createCampaign(
         Addresses addresses,
         string memory vaultName,
-        string memory assetName
+        string memory assetName,
+        uint256 campaignAmount
     ) internal {
         IMerkleCampaignCreator.CampaignParameters
             memory campaign = IMerkleCampaignCreator.CampaignParameters({
                 campaignId: bytes32(0),
                 creator: address(0),
                 rewardToken: addresses.getAddress("xWELL_PROXY"),
-                amount: amountPerVault,
+                amount: campaignAmount,
                 campaignType: MORPHOVAULT_CAMPAIGN_TYPE,
-                startTimestamp: uint32(block.timestamp),
-                duration: 3600, // 1 hour
+                startTimestamp: 1757975452, // 2025-09-15
+                duration: campaignDuration,
                 campaignData: CAMPAIGN_DATA
             });
 
@@ -255,6 +281,12 @@ contract mipb46 is HybridProposal, Configs {
         ];
 
         string[4] memory assetNames = ["cbBTC", "USDC", "WETH", "EURC"];
+        uint256[4] memory vaultAmounts = [
+            cbBTC_AMOUNT,
+            USDC_AMOUNT,
+            WETH_AMOUNT,
+            EURC_AMOUNT
+        ];
 
         for (uint256 i = 0; i < vaultNames.length; i++) {
             IMerkleCampaignCreator.CampaignParameters
@@ -263,7 +295,7 @@ contract mipb46 is HybridProposal, Configs {
                         campaignId: bytes32(0),
                         creator: address(0),
                         rewardToken: addresses.getAddress("xWELL_PROXY"),
-                        amount: amountPerVault,
+                        amount: vaultAmounts[i],
                         campaignType: MORPHOVAULT_CAMPAIGN_TYPE,
                         startTimestamp: uint32(block.timestamp),
                         duration: 3600,
@@ -287,7 +319,10 @@ contract mipb46 is HybridProposal, Configs {
         }
 
         // Validate that the total amount was properly approved and distributed
-        uint256 expectedTotalAmount = amountPerVault * 4;
+        uint256 expectedTotalAmount = USDC_AMOUNT +
+            WETH_AMOUNT +
+            EURC_AMOUNT +
+            cbBTC_AMOUNT;
         assertEq(
             expectedTotalAmount,
             totalCampaignAmount,

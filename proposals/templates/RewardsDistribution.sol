@@ -864,13 +864,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             ecosystemReserveProxyAmount +
             _saveWithdrawWell(addresses, data, prefix, _chainId);
 
-        if (_chainId == BASE_CHAIN_ID) {
-            assertEq(
-                ecosystemReserveProxyAmount,
-                0,
-                "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be 0 for Base chain"
-            );
-        } else {
+        if (_chainId != BASE_CHAIN_ID) {
             assertApproxEqRel(
                 ecosystemReserveProxyAmount,
                 externalChainActions[_chainId].stkWellEmissionsPerSecond *

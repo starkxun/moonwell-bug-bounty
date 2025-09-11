@@ -232,6 +232,7 @@ contract mipb46 is HybridProposal, Configs {
 
     function _createCampaign(
         Addresses addresses,
+        string memory _vaultName,
         string memory assetName,
         uint256 campaignAmount
     ) internal {

@@ -53,7 +53,7 @@ contract mipb46 is HybridProposal, Configs {
     string public constant override name = "MIP-B46";
 
     uint256 public constant totalCampaignAmount = 3333333333333333000000000; // 3.33M WELL tokens
-    uint256 public constant campaignDuration = 26 days;
+    uint32 public constant campaignDuration = 26 days;
 
     // Proportional distribution based on flagship vault allocations
     uint256 public constant USDC_AMOUNT = 1666666666500000000000000; // ~1.67M WELL (50%)
@@ -232,7 +232,6 @@ contract mipb46 is HybridProposal, Configs {
 
     function _createCampaign(
         Addresses addresses,
-        string memory vaultName,
         string memory assetName,
         uint256 campaignAmount
     ) internal {

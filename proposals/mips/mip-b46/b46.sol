@@ -43,19 +43,7 @@ interface IMerkleCampaignCreator {
 
     function campaign(
         bytes32 campaignId
-    )
-        external
-        view
-        returns (
-            bytes32,
-            address,
-            address,
-            uint256,
-            uint32,
-            uint32,
-            uint32,
-            bytes memory
-        );
+    ) external view returns (CampaignParameters memory);
 }
 
 /// @notice MIP-B46: Moonwell Morpho Vault Incentive Campaigns
@@ -303,8 +291,8 @@ contract mipb46 is HybridProposal, Configs {
                         rewardToken: addresses.getAddress("xWELL_PROXY"),
                         amount: vaultAmounts[i],
                         campaignType: MORPHOVAULT_CAMPAIGN_TYPE,
-                        startTimestamp: uint32(block.timestamp),
-                        duration: 3600,
+                        startTimestamp: 1757975452,
+                        duration: campaignDuration,
                         campaignData: campaignDatas[i]
                     });
 
@@ -324,46 +312,43 @@ contract mipb46 is HybridProposal, Configs {
             );
 
             // Validate that the campaign data is correct
-            (
-                ,
-                address creator,
-                address rewardToken,
-                uint256 amount,
-                uint32 campaignType,
-                uint32 startTimestamp,
-                uint32 duration,
-                bytes memory campaignData
-            ) = IMerkleCampaignCreator(
+            IMerkleCampaignCreator.CampaignParameters
+                memory returnedCampaignParams = IMerkleCampaignCreator(
                     addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
                 ).campaign(campaignId);
             assertEq(
-                creator,
+                returnedCampaignParams.creator,
                 campaignParams.creator,
                 "Creator should be correct"
             );
             assertEq(
-                rewardToken,
+                returnedCampaignParams.rewardToken,
                 campaignParams.rewardToken,
                 "Reward token should be correct"
             );
-            assertEq(amount, campaignParams.amount, "Amount should be correct");
+            assertApproxEqRel(
+                returnedCampaignParams.amount,
+                campaignParams.amount - ((campaignParams.amount * 1) / 100),
+                1e16,
+                "Amount should be correct"
+            ); // // reduce the 1% fee
             assertEq(
-                campaignType,
+                returnedCampaignParams.campaignType,
                 campaignParams.campaignType,
                 "Campaign type should be correct"
             );
             assertEq(
-                startTimestamp,
+                returnedCampaignParams.startTimestamp,
                 campaignParams.startTimestamp,
                 "Start timestamp should be correct"
             );
             assertEq(
-                duration,
+                returnedCampaignParams.duration,
                 campaignParams.duration,
                 "Duration should be correct"
             );
             assertEq(
-                campaignData,
+                returnedCampaignParams.campaignData,
                 campaignDatas[i],
                 "Campaign data should be correct"
             );

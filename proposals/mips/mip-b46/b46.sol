@@ -12,6 +12,8 @@ import {HybridProposal, ActionType} from "@proposals/proposalTypes/HybridProposa
 import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
 import {WormholeRelayerAdapter} from "@test/mock/WormholeRelayerAdapter.sol";
 
+import {xWELLRouter} from "@protocol/xWELL/xWELLRouter.sol";
+
 interface IMerkleCampaignCreator {
     struct CampaignParameters {
         // POPULATED ONCE CREATED
@@ -175,11 +177,14 @@ contract mipb46 is HybridProposal, Configs {
             ActionType.Moonbeam
         );
 
-        uint256 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
+        uint16 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
+
+        // find bridge cost from xWELLRouter
+        uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
 
         _pushAction(
             router,
-            totalCampaignAmount,
+            bridgeCost * 4, // 4x to have enough gas to bridge
             abi.encodeWithSignature(
                 "bridgeToRecipient(address,uint256,uint16)",
                 addresses.getAddress("TEMPORAL_GOVERNOR", BASE_CHAIN_ID),

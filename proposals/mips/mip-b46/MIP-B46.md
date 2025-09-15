@@ -1,72 +1,86 @@
 # MIP-B46: WELL Token Rewards for Morpho Vaults
 
+## Author(s): 0xMims, BlockAnalitica & B.Protocol, Moonwell Contributors
+
 ## Summary
 
 This proposal distributes 3.33 million WELL tokens as rewards to users who
 deposit assets into Moonwell's Morpho vaults on Base. The tokens will be
-distributed proportionally across four popular vaults based on their strategic
-importance: USDC (50%), WETH (24%), EURC (13%), and cbBTC (13%).
+distributed equally across four popular vaults: cbBTC, USDC, WETH, and EURC.
 
-## What Are Morpho Vaults?
+Following recommendations from Moonwell Contributors and Risk Managers, we
+foresee four Morpho vaults on Base that could benefit from additional
+incentives:
 
-Morpho vaults are advanced lending pools that help users earn higher yields on
-their crypto assets. When you deposit tokens into these vaults, they
-automatically optimize your lending positions to maximize returns while managing
-risk.
+- USDC: 50%
+- ETH: 24%
+- EURC: 13%
+- cbBTC: 13%
 
-## Why This Proposal?
+These WELL rewards will be transferred from the Foundation multisig.
 
-Currently, Moonwell has four Morpho vaults on Base that could benefit from
-additional incentives:
+## Success of the Ongoing Program
 
-- **cbBTC Vault** - For Bitcoin holders
-- **USDC Vault** - For stablecoin holders
-- **WETH Vault** - For Ethereum holders
-- **EURC Vault** - For Euro stablecoin holders
+The Moonwell Morpho Vaults have established themselves as the dominant market  
+leader on Morpho's Base deployment, consistently attracting Total  
+Value Locked (TVL) and a large, active user base. The program's achievements  
+underscore the a strong appetite for lending solutions and  
+the effectiveness of the incentives provided.
 
-By adding WELL token rewards, we can:
+The continued growth and high levels of adoption across the USDC, ETH, EURC,
+and  
+cbBTC vaults validate the success of this initiative. The dynamic allocation  
+model and robust risk management have provided risk-adjusted returns for  
+suppliers and competitive rates for borrowers, showing Moonwell's leadership  
+position within the Base ecosystem. Renewing these incentives is necessary to  
+sustain this performance.
 
-- Attract more users to deposit into these vaults
-- Increase the total value locked (TVL) across all vaults
-- Strengthen Moonwell's position in the lending market on Base
-- Provide extra value to our community members
+## Current Vault TVL
 
-## Reward Distribution
+- As of September 2025, the vaults maintain a significant amount of Morpho TVL:
+  - Moonwell Flagship ETH Vault (Base): $39.6M
+  - Moonwell Flagship EURC Vault (Base): $9.88M
+  - Moonwell Flagship USDC Vault (Base): $65.6M
+  - Moonwell Flagship cbBTC Vault (Base): $21.28M
+  - Moonwell Flagship USDC Vault (OP Mainnet): $1.6M
+  - Total Vault TVL: $137.88M
 
-- **Total WELL Rewards**: 3,333,333 WELL tokens
-- **USDC Vault**: ~1,667,000 WELL tokens (50% - highest allocation)
-- **WETH Vault**: ~800,000 WELL tokens (24% - significant allocation)
-- **EURC Vault**: ~433,000 WELL tokens (13% - moderate allocation)
-- **cbBTC Vault**: ~433,000 WELL tokens (13% - moderate allocation)
-- **Who Gets Rewards**: Users who deposit assets into any of the four Morpho
-  vaults
-- **How Rewards Work**: Distributed proportionally based on your vault deposits
-- **Campaign Duration**: 26 days of rewards distribution
+## Proposed Incentive Renewal Terms
 
-## What Happens When This Passes?
+- Total WELL Tokens: 3.33M WELL
+- Incentivized Vaults & Allocation:
+  - Moonwell Flagship USDC Vault: 1.6M WELL (50%)
+  - Moonwell Flagship ETH Vault: 800K WELL (24%)
+  - Moonwell Flagship EURC Vault 433K WELL (13%)
+  - Moonwell Frontier cbBTC Vault: 433K WELL (13%)
 
-1. WELL tokens are moved from Moonbeam to Base network
-2. Reward campaigns are created for each of the four vaults
-3. Users who deposit into these vaults start earning WELL token rewards
-4. Rewards are distributed through Merkle (a proven rewards distribution system)
+## Implementation
 
-## Benefits to WELL Holders
+Upon the successful passage of this proposal, the following action will be  
+executed:
 
-- Increases utility and demand for WELL tokens
-- Grows Moonwell's market share in DeFi lending
-- Attracts new users to the Moonwell ecosystem
-- Strengthens our competitive position against other lending protocols
+- Transfer 3.3M WELL from the F-BASE (Foundation on Base) multisig:  
+  `0x74Cbb1E8B68dDD13B28684ECA202a351afD45EAa` to the Morpho URD contract:  
+  `0x9e3380f8B29E8f85cA19EFFA80Fb41149417D943`.
 
-## Risk Assessment
+The Foundation will be responsible for bridging the 3.3M WELL to Base and  
+approving the Temporal Governor to spend the 3.3M WELL before the proposal's  
+passage to ensure a seamless transition.
 
-This is a low-risk proposal that uses:
+## Voting Options
 
-- Established token bridging systems already in use by Moonwell
-- Proven reward distribution methods
-- Existing vault infrastructure that's already operational
+- Yay: Approve the grant of 3.3M WELL token incentives for the Moonwell  
+  Flagship and Frontier Vaults
+- Nay: Reject the renewal of the WELL token incentives.
+- Abstain: Choose to participate in the vote without expressing support for  
+  or opposition to the proposal.
 
 ## Conclusion
 
-This proposal helps grow Moonwell by making our Morpho vaults more attractive to
-depositors. By offering WELL token rewards, we can increase our market share and
-provide additional value to both new and existing users.
+The renewal of the Moonwell Vaults incentives program is of utmost strategic  
+importance to build upon our established market leadership and continue  
+delivering value to our customers. By allocating 3.3M WELL, we can  
+ensure that our key vaults remain highly attractive to liquidity providers,  
+thereby sustaining the growth and dynamism of the Moonwell ecosystem on Base.  
+This proposal reaffirms our commitment to providing secure, simple, and  
+accessible onchain finance for all.

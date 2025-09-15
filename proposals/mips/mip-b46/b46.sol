@@ -43,7 +43,19 @@ interface IMerkleCampaignCreator {
 
     function campaign(
         bytes32 campaignId
-    ) external view returns (CampaignParameters memory);
+    )
+        external
+        view
+        returns (
+            bytes32,
+            address,
+            address,
+            uint256,
+            uint32,
+            uint32,
+            uint32,
+            bytes memory
+        );
 }
 
 /// @notice MIP-B46: Moonwell Morpho Vault Incentive Campaigns
@@ -65,7 +77,14 @@ contract mipb46 is HybridProposal, Configs {
     uint32 public constant MORPHOVAULT_CAMPAIGN_TYPE = 56;
 
     // Empty campaign data for all vaults
-    bytes public constant CAMPAIGN_DATA = hex"";
+    bytes public constant CAMPAIGN_DATA_EURC =
+        hex"000000000000000000000000f24608e0ccb972b0b0f4a6446a0bbf58c701a0260000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    bytes public constant CAMPAIGN_DATA_CBBTC =
+        hex"000000000000000000000000543257ef2161176d7c8cd90ba65c2d4caef5a7960000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    bytes public constant CAMPAIGN_DATA_ETH =
+        hex"000000000000000000000000a0e430870c4604ccfc7b38ca7845b1ff653d0ff10000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    bytes public constant CAMPAIGN_DATA_USDC =
+        hex"000000000000000000000000c1256ae5ff1cf2719d4937adb3bbccab2e00a2ca0000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001a000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
@@ -204,37 +223,17 @@ contract mipb46 is HybridProposal, Configs {
         );
 
         // Create campaigns for all MetaMorpho vaults with proportional distribution
-        _createCampaign(
-            addresses,
-            "cbBTC_METAMORPHO_VAULT",
-            "cbBTC",
-            cbBTC_AMOUNT
-        );
-        _createCampaign(
-            addresses,
-            "USDC_METAMORPHO_VAULT",
-            "USDC",
-            USDC_AMOUNT
-        );
-        _createCampaign(
-            addresses,
-            "WETH_METAMORPHO_VAULT",
-            "WETH",
-            WETH_AMOUNT
-        );
-        _createCampaign(
-            addresses,
-            "EURC_METAMORPHO_VAULT",
-            "EURC",
-            EURC_AMOUNT
-        );
+        _createCampaign(addresses, "cbBTC", cbBTC_AMOUNT, CAMPAIGN_DATA_CBBTC);
+        _createCampaign(addresses, "USDC", USDC_AMOUNT, CAMPAIGN_DATA_USDC);
+        _createCampaign(addresses, "WETH", WETH_AMOUNT, CAMPAIGN_DATA_ETH);
+        _createCampaign(addresses, "EURC", EURC_AMOUNT, CAMPAIGN_DATA_EURC);
     }
 
     function _createCampaign(
         Addresses addresses,
-        string memory _vaultName,
         string memory assetName,
-        uint256 campaignAmount
+        uint256 campaignAmount,
+        bytes memory campaignData
     ) internal {
         IMerkleCampaignCreator.CampaignParameters
             memory campaign = IMerkleCampaignCreator.CampaignParameters({
@@ -245,7 +244,7 @@ contract mipb46 is HybridProposal, Configs {
                 campaignType: MORPHOVAULT_CAMPAIGN_TYPE,
                 startTimestamp: 1757975452, // 2025-09-15
                 duration: campaignDuration,
-                campaignData: CAMPAIGN_DATA
+                campaignData: campaignData
             });
 
         _pushAction(
@@ -288,18 +287,25 @@ contract mipb46 is HybridProposal, Configs {
             EURC_AMOUNT
         ];
 
+        bytes[4] memory campaignDatas = [
+            CAMPAIGN_DATA_CBBTC,
+            CAMPAIGN_DATA_USDC,
+            CAMPAIGN_DATA_ETH,
+            CAMPAIGN_DATA_EURC
+        ];
+
         for (uint256 i = 0; i < vaultNames.length; i++) {
             IMerkleCampaignCreator.CampaignParameters
                 memory campaignParams = IMerkleCampaignCreator
                     .CampaignParameters({
                         campaignId: bytes32(0),
-                        creator: address(0),
+                        creator: addresses.getAddress("TEMPORAL_GOVERNOR"),
                         rewardToken: addresses.getAddress("xWELL_PROXY"),
                         amount: vaultAmounts[i],
                         campaignType: MORPHOVAULT_CAMPAIGN_TYPE,
                         startTimestamp: uint32(block.timestamp),
                         duration: 3600,
-                        campaignData: CAMPAIGN_DATA
+                        campaignData: campaignDatas[i]
                     });
 
             bytes32 campaignId = IMerkleCampaignCreator(
@@ -316,17 +322,51 @@ contract mipb46 is HybridProposal, Configs {
                     )
                 )
             );
-        }
 
-        // Validate that the total amount was properly approved and distributed
-        uint256 expectedTotalAmount = USDC_AMOUNT +
-            WETH_AMOUNT +
-            EURC_AMOUNT +
-            cbBTC_AMOUNT;
-        assertEq(
-            expectedTotalAmount,
-            totalCampaignAmount,
-            "Total campaign amount should match expected"
-        );
+            // Validate that the campaign data is correct
+            (
+                ,
+                address creator,
+                address rewardToken,
+                uint256 amount,
+                uint32 campaignType,
+                uint32 startTimestamp,
+                uint32 duration,
+                bytes memory campaignData
+            ) = IMerkleCampaignCreator(
+                    addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
+                ).campaign(campaignId);
+            assertEq(
+                creator,
+                campaignParams.creator,
+                "Creator should be correct"
+            );
+            assertEq(
+                rewardToken,
+                campaignParams.rewardToken,
+                "Reward token should be correct"
+            );
+            assertEq(amount, campaignParams.amount, "Amount should be correct");
+            assertEq(
+                campaignType,
+                campaignParams.campaignType,
+                "Campaign type should be correct"
+            );
+            assertEq(
+                startTimestamp,
+                campaignParams.startTimestamp,
+                "Start timestamp should be correct"
+            );
+            assertEq(
+                duration,
+                campaignParams.duration,
+                "Duration should be correct"
+            );
+            assertEq(
+                campaignData,
+                campaignDatas[i],
+                "Campaign data should be correct"
+            );
+        }
     }
 }

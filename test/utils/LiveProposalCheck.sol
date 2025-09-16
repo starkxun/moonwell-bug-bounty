@@ -292,10 +292,10 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
 
         proposal.beforeSimulationHook(addresses);
 
-        console.log("wormholeCore");
-        console.log(wormholeCore);
-        console.log("governor");
-        console.log(address(governor));
+        if (vm.activeFork() != MOONBEAM_FORK_ID) {
+            vm.selectFork(MOONBEAM_FORK_ID);
+        }
+
         uint64 nextSequence = IWormhole(wormholeCore).nextSequence(
             address(governor)
         );

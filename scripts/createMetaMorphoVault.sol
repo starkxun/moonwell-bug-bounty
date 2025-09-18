@@ -6,19 +6,36 @@ import "@forge-std/Script.sol";
 
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {IMetaMorphoFactory} from "@protocol/morpho/IMetaMorphoFactory.sol";
-import {IMetaMorpho, MarketParams} from "@protocol/morpho/IMetaMorpho.sol";
+import {IMetaMorpho, MarketParams, IMetaMorphoStaticTyping} from "@protocol/morpho/IMetaMorpho.sol";
 import {IMorphoBlue} from "@protocol/morpho/IMorphoBlue.sol";
 import "@protocol/utils/ChainIds.sol";
+import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 /// @notice Script to create a new MetaMorpho vault using the Morpho factory
 contract CreateMetaMorphoVault is Script, Test {
     using ChainIds for uint256;
 
     /// @notice The created MetaMorpho vault address
-    IMetaMorpho public createdVault;
+    IMetaMorpho public usdcVault;
 
     /// @notice The created market parameters
-    MarketParams public createdMarket;
+    MarketParams public market;
+
+    uint256 public constant SUPPLY_CAP = 10e18;
+
+    uint256 public constant LLTV = 860000000000000000;
+
+    string public constant VAULT_NAME = "Moonwell Growth/Underperform USDC";
+
+    string public constant VAULT_SYMBOL = "USDC";
+
+    bytes32 public constant SALT = keccak256(abi.encodePacked("test_2"));
+
+    uint256 public constant USDC_VAULT_DEPOSIT = 0.1e6;
+
+    uint256 public constant WELL_COLLATERAL = 1e18;
+
+    uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
 
     function run() public {
         // Setup fork for Base chain
@@ -34,55 +51,83 @@ contract CreateMetaMorphoVault is Script, Test {
         // Hardcoded vault parameters
         address initialOwner = msg.sender;
         uint256 initialTimelock = 0;
-        address asset = addresses.getAddress("xWELL_PROXY");
-        string memory vaultName = "Moonwell Growth/Outperform USDC";
-        string memory vaultSymbol = "vWELL";
-        bytes32 salt = keccak256(abi.encodePacked("test"));
-
-        console.log("Creating MetaMorpho vault with the following parameters:");
-        console.log("Factory address:", factoryAddress);
-        console.log("Initial owner:", initialOwner);
-        console.log("Initial timelock:", initialTimelock);
-        console.log("Asset:", asset);
-        console.log("Vault name:", vaultName);
-        console.log("Vault symbol:", vaultSymbol);
-        console.log("Salt:");
-        console.logBytes32(salt);
+        address asset = addresses.getAddress("USDC");
 
         vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
-        createMarket(addresses);
+        //createMarket(addresses);
 
         // Then create the MetaMorpho vault
         address vaultAddress = factory.createMetaMorpho(
             initialOwner,
             initialTimelock,
             asset,
-            vaultName,
-            vaultSymbol,
-            salt
+            VAULT_NAME,
+            VAULT_SYMBOL,
+            SALT
         );
 
         vm.stopBroadcast();
 
-        createdVault = IMetaMorpho(vaultAddress);
+        usdcVault = IMetaMorpho(vaultAddress);
 
         console.log("MetaMorpho vault created at:", vaultAddress);
 
         // Add the created vault to the addresses registry
         string memory addressName = string(
-            abi.encodePacked(vaultSymbol, "_METAMORPHO_VAULT")
+            abi.encodePacked(VAULT_SYMBOL, "_METAMORPHO_VAULT_TEST")
         );
         addresses.addAddress(addressName, vaultAddress);
 
-        console.log(
-            "Added vault to addresses registry with name:",
-            addressName
+        vm.startBroadcast();
+
+        // Set msg.sender as curator role for now
+        usdcVault.setCurator(initialOwner);
+
+        // Market parameters for USDC/WELL market
+        market = MarketParams({
+            loanToken: addresses.getAddress("USDC"),
+            collateralToken: addresses.getAddress("xWELL_PROXY"),
+            oracle: addresses.getAddress("CHAINLINK_WELL_USD_OEV_WRAPPER"),
+            irm: addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
+            lltv: LLTV // 86% LLTV (Loan to Loan-Token Value)
+        });
+
+        // Then submit the supply cap to the market
+        submitAndAcceptCap(addresses);
+
+        bytes32[] memory newSupplyQueue = new bytes32[](1);
+        newSupplyQueue[0] = computeMarketId();
+
+        usdcVault.setSupplyQueue(newSupplyQueue);
+
+        vm.stopBroadcast();
+
+        // Validate the created vault and market
+        validate(addresses);
+
+        vm.startBroadcast();
+
+        // Deposit into the vault
+        depositIntoVault(addresses.getAddress("USDC"), vaultAddress);
+
+        // Supply collateral to the market
+        supplyCollateralToMorpho(
+            addresses.getAddress("xWELL_PROXY"),
+            addresses.getAddress("MORPHO_BLUE")
         );
 
-        // Validate the created vault
-        validate();
+        // Borrow from the market
+        borrowFromMorpho(addresses.getAddress("MORPHO_BLUE"));
+
+        // Display final balances
+        displayFinalBalances(
+            addresses.getAddress("xWELL_PROXY"),
+            addresses.getAddress("USDC")
+        );
+
+        vm.stopBroadcast();
     }
 
     function createMarket(Addresses addresses) internal {
@@ -90,99 +135,185 @@ contract CreateMetaMorphoVault is Script, Test {
         IMorphoBlue morphoBlue = IMorphoBlue(
             addresses.getAddress("MORPHO_BLUE")
         );
-
-        // Market parameters for USDC/WELL market
-        MarketParams memory marketParams = MarketParams({
-            loanToken: addresses.getAddress("USDC"),
-            collateralToken: addresses.getAddress("xWELL_PROXY"),
-            oracle: addresses.getAddress("CHAINLINK_WELL_USD_OEV_WRAPPER"),
-            irm: addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
-            lltv: 860000000000000000 // 86% LLTV (Loan to Loan-Token Value)
-        });
-
-        createdMarket = marketParams;
-
         console.log(
             "Creating USDC/WELL market on Morpho Blue with parameters:"
         );
-        console.log("Loan token (USDC):", marketParams.loanToken);
-        console.log("Collateral token (WELL):", marketParams.collateralToken);
-        console.log("Oracle:", marketParams.oracle);
-        console.log("IRM:", marketParams.irm);
-        console.log("LLTV:", marketParams.lltv);
+        console.log("Loan token (USDC):", market.loanToken);
+        console.log("Collateral token (WELL):", market.collateralToken);
+        console.log("Oracle:", market.oracle);
+        console.log("IRM:", market.irm);
+        console.log("LLTV:", market.lltv);
 
         // Create the market
-        morphoBlue.createMarket(marketParams);
+        morphoBlue.createMarket(market);
 
         console.log("USDC/WELL market created on Morpho Blue");
     }
 
-    function validate() internal {
+    function submitAndAcceptCap(Addresses addresses) internal {
+        // Get Morpho Blue contract
+        IMetaMorpho vault = IMetaMorpho(
+            addresses.getAddress("USDC_METAMORPHO_VAULT_TEST")
+        );
+
+        vault.submitCap(market, SUPPLY_CAP);
+        vault.acceptCap(market);
+    }
+
+    function validate(Addresses addresses) internal view {
         // Validate vault creation
         assertTrue(
-            address(createdVault) != address(0),
+            address(usdcVault) != address(0),
             "MetaMorpho vault should be created"
         );
 
         // Get addresses for validation
-        Addresses addresses = new Addresses();
-        address expectedAsset = addresses.getAddress("xWELL_PROXY");
+        address expectedAsset = addresses.getAddress("USDC");
 
         // Verify the vault parameters
         assertEq(
-            createdVault.owner(),
+            usdcVault.owner(),
             msg.sender,
             "Vault owner should match msg.sender"
         );
         assertEq(
-            createdVault.asset(),
+            usdcVault.asset(),
             expectedAsset,
-            "Vault asset should match xWELL_PROXY"
+            "Vault asset should match USDC"
         );
         assertEq(
-            createdVault.name(),
-            "Moonwell Growth/Outperform USDC",
+            usdcVault.name(),
+            VAULT_NAME,
             "Vault name should match specified name"
         );
         assertEq(
-            createdVault.symbol(),
-            "vWELL",
+            usdcVault.symbol(),
+            VAULT_SYMBOL,
             "Vault symbol should match specified symbol"
         );
 
         // Validate market creation
         assertEq(
-            createdMarket.loanToken,
+            market.loanToken,
             addresses.getAddress("USDC"),
             "Market loan token should be USDC"
         );
         assertEq(
-            createdMarket.collateralToken,
+            market.collateralToken,
             addresses.getAddress("xWELL_PROXY"),
             "Market collateral should be WELL"
         );
         assertEq(
-            createdMarket.oracle,
+            market.oracle,
             addresses.getAddress("CHAINLINK_WELL_USD_OEV_WRAPPER"),
             "Market oracle should match"
         );
         assertEq(
-            createdMarket.irm,
+            market.irm,
             addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
             "Market IRM should match"
         );
-        assertEq(createdMarket.lltv, 0.86e18, "Market LLTV should be 86%");
+        assertEq(market.lltv, LLTV, "Market LLTV should be 86%");
+
+        assertEq(usdcVault.curator(), msg.sender, "Curator should match");
+
+        (
+            uint184 cap,
+            bool accepted,
+            uint64 removableAt
+        ) = IMetaMorphoStaticTyping(address(usdcVault)).config(
+                computeMarketId()
+            );
+        assertEq(cap, SUPPLY_CAP, "Market cap should match");
+        assertEq(accepted, true, "Market cap should be accepted");
+        assertEq(removableAt, 0, "Market cap should not be removable");
 
         console.log("Validation completed successfully");
-        console.log("Created vault address:", address(createdVault));
-        console.log("Vault owner:", createdVault.owner());
-        console.log("Vault asset:", createdVault.asset());
-        console.log("Vault name:", createdVault.name());
-        console.log("Vault symbol:", createdVault.symbol());
-        console.log("Market loan token:", createdMarket.loanToken);
-        console.log("Market collateral token:", createdMarket.collateralToken);
-        console.log("Market oracle:", createdMarket.oracle);
-        console.log("Market IRM:", createdMarket.irm);
-        console.log("Market LLTV:", createdMarket.lltv);
+        console.log("Vault owner:", usdcVault.owner());
+        console.log("Vault asset:", usdcVault.asset());
+        console.log("Vault name:", usdcVault.name());
+        console.log("Vault symbol:", usdcVault.symbol());
+        console.log("Market loan token:", market.loanToken);
+        console.log("Market collateral token:", market.collateralToken);
+        console.log("Market oracle:", market.oracle);
+        console.log("Market IRM:", market.irm);
+        console.log("Market LLTV:", market.lltv);
+    }
+
+    function depositIntoVault(address usdcToken, address vault) internal {
+        console.log("=== Step 1: Depositing into Vault ===");
+
+        // Approve vault to spend WELL tokens
+        IERC20(usdcToken).approve(vault, USDC_VAULT_DEPOSIT);
+
+        // Deposit into the vault
+        IMetaMorpho metaMorphoVault = IMetaMorpho(vault);
+        uint256 sharesMinted = metaMorphoVault.deposit(
+            USDC_VAULT_DEPOSIT,
+            msg.sender
+        );
+
+        console.log("Deposited WELL into vault:", USDC_VAULT_DEPOSIT / 1e18);
+        console.log("Shares minted:", sharesMinted / 1e18);
+    }
+
+    function supplyCollateralToMorpho(
+        address wellToken,
+        address morphoBlue
+    ) internal {
+        console.log("=== Step 2: Supplying Collateral to Morpho ===");
+
+        // Approve Morpho Blue to spend WELL tokens
+        IERC20(wellToken).approve(morphoBlue, WELL_COLLATERAL);
+
+        // Supply WELL as collateral
+        IMorphoBlue(morphoBlue).supplyCollateral(
+            market,
+            WELL_COLLATERAL,
+            msg.sender,
+            ""
+        );
+
+        console.log("Supplied WELL as collateral:", WELL_COLLATERAL / 1e18);
+    }
+
+    function borrowFromMorpho(address morphoBlue) internal {
+        console.log("=== Step 3: Borrowing USDC ===");
+
+        // Borrow USDC against WELL collateral
+        (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(
+            morphoBlue
+        ).borrow(
+                market,
+                USDC_VAULT_DEPOSIT,
+                0, // shares = 0 means we want to borrow exact assets
+                msg.sender,
+                msg.sender
+            );
+
+        console.log("Borrowed USDC:", assetsBorrowed / 1e6);
+        console.log("Borrow shares:", sharesBorrowed);
+    }
+
+    function displayFinalBalances(
+        address wellToken,
+        address usdcToken
+    ) internal view {
+        uint256 wellBalanceAfter = IERC20(wellToken).balanceOf(msg.sender);
+        uint256 usdcBalanceAfter = IERC20(usdcToken).balanceOf(msg.sender);
+
+        console.log("=== Final Balances ===");
+        console.log("WELL:", wellBalanceAfter / 1e18);
+        console.log("USDC:", usdcBalanceAfter / 1e6);
+    }
+
+    function computeMarketId() internal view returns (bytes32 marketParamsId) {
+        MarketParams memory marketParams = market;
+        assembly ("memory-safe") {
+            marketParamsId := keccak256(
+                marketParams,
+                MARKET_PARAMS_BYTES_LENGTH
+            )
+        }
     }
 }

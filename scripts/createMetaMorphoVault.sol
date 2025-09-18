@@ -53,10 +53,19 @@ contract CreateMetaMorphoVault is Script, Test {
         uint256 initialTimelock = 0;
         address asset = addresses.getAddress("USDC");
 
+        // Market parameters for USDC/WELL market
+        market = MarketParams({
+            loanToken: asset,
+            collateralToken: addresses.getAddress("xWELL_PROXY"),
+            oracle: addresses.getAddress("CHAINLINK_WELL_USD"),
+            irm: addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
+            lltv: LLTV // 86% LLTV (Loan to Loan-Token Value)
+        });
+
         vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
-        //createMarket(addresses);
+        createMarket(addresses);
 
         // Then create the MetaMorpho vault
         address vaultAddress = factory.createMetaMorpho(
@@ -84,15 +93,6 @@ contract CreateMetaMorphoVault is Script, Test {
 
         // Set msg.sender as curator role for now
         usdcVault.setCurator(initialOwner);
-
-        // Market parameters for USDC/WELL market
-        market = MarketParams({
-            loanToken: addresses.getAddress("USDC"),
-            collateralToken: addresses.getAddress("xWELL_PROXY"),
-            oracle: addresses.getAddress("CHAINLINK_WELL_USD_OEV_WRAPPER"),
-            irm: addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
-            lltv: LLTV // 86% LLTV (Loan to Loan-Token Value)
-        });
 
         // Then submit the supply cap to the market
         submitAndAcceptCap(addresses);
@@ -205,7 +205,7 @@ contract CreateMetaMorphoVault is Script, Test {
         );
         assertEq(
             market.oracle,
-            addresses.getAddress("CHAINLINK_WELL_USD_OEV_WRAPPER"),
+            addresses.getAddress("CHAINLINK_WELL_USD"),
             "Market oracle should match"
         );
         assertEq(
@@ -253,7 +253,7 @@ contract CreateMetaMorphoVault is Script, Test {
             msg.sender
         );
 
-        console.log("Deposited WELL into vault:", USDC_VAULT_DEPOSIT / 1e18);
+        console.log("Deposited USDC into vault:", USDC_VAULT_DEPOSIT / 1e18);
         console.log("Shares minted:", sharesMinted / 1e18);
     }
 

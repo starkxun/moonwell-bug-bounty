@@ -1098,5 +1098,10 @@
         "addr": "0x8BB4C975Ff3c250e0ceEA271728547f3802B36Fd",
         "isContract": true,
         "name": "MERKLE_CAMPAIGN_CREATOR"
+    },
+    {
+        "addr": "0xFf62A7c278C62eD665133147129245053Bbf5918",
+        "isContract": true,
+        "name": "MORPHO_FACTORY_V1_1"
     }
 ]

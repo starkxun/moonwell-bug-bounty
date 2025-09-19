@@ -1103,5 +1103,15 @@
         "addr": "0xFf62A7c278C62eD665133147129245053Bbf5918",
         "isContract": true,
         "name": "MORPHO_FACTORY_V1_1"
+    },
+    {
+        "addr": "0x2DC205F24BCb6B311E5cdf0745B0741648Aebd3d",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_ORACLE_FACTORY"
+    },
+    {
+        "addr": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        "isContract": true,
+        "name": "CHAINLINK_USDC_USD"
     }
 ]

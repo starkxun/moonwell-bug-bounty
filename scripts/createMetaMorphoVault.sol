@@ -10,6 +10,10 @@ import {IMetaMorpho, MarketParams, IMetaMorphoStaticTyping} from "@protocol/morp
 import {IMorphoBlue} from "@protocol/morpho/IMorphoBlue.sol";
 import "@protocol/utils/ChainIds.sol";
 import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IMorphoChainlinkOracleV2Factory} from "@protocol/morpho/IMorphoChainlinkOracleFactory.sol";
+import {IMorphoChainlinkOracleV2} from "@protocol/morpho/IMorphoChainlinkOracleV2.sol";
+import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
+import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
 
 /// @notice Script to create a new MetaMorpho vault using the Morpho factory
 contract CreateMetaMorphoVault is Script, Test {
@@ -23,7 +27,7 @@ contract CreateMetaMorphoVault is Script, Test {
 
     uint256 public constant SUPPLY_CAP = 10e18;
 
-    uint256 public constant LLTV = 860000000000000000;
+    uint256 public constant LLTV = 625_000_000_000_000_000;
 
     string public constant VAULT_NAME = "Moonwell Growth/Underperform USDC";
 
@@ -53,11 +57,13 @@ contract CreateMetaMorphoVault is Script, Test {
         uint256 initialTimelock = 0;
         address asset = addresses.getAddress("USDC");
 
+        IMorphoChainlinkOracleV2 oracle = deployOracle(addresses);
+
         // Market parameters for USDC/WELL market
         market = MarketParams({
             loanToken: asset,
             collateralToken: addresses.getAddress("xWELL_PROXY"),
-            oracle: addresses.getAddress("CHAINLINK_WELL_USD"),
+            oracle: address(oracle),
             irm: addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
             lltv: LLTV // 86% LLTV (Loan to Loan-Token Value)
         });
@@ -205,7 +211,7 @@ contract CreateMetaMorphoVault is Script, Test {
         );
         assertEq(
             market.oracle,
-            addresses.getAddress("CHAINLINK_WELL_USD"),
+            addresses.getAddress("CHAINLINK_USDC_WELL_ORACLE"),
             "Market oracle should match"
         );
         assertEq(
@@ -315,5 +321,40 @@ contract CreateMetaMorphoVault is Script, Test {
                 MARKET_PARAMS_BYTES_LENGTH
             )
         }
+    }
+
+    function deployOracle(
+        Addresses addresses
+    ) internal returns (IMorphoChainlinkOracleV2) {
+        // Get Morpho Chainlink Oracle Factory contract
+        IMorphoChainlinkOracleV2Factory oracleFactory = IMorphoChainlinkOracleV2Factory(
+                addresses.getAddress("MORPHO_CHAINLINK_ORACLE_FACTORY")
+            );
+
+        vm.startBroadcast();
+
+        IMorphoChainlinkOracleV2 oracle = oracleFactory
+            .createMorphoChainlinkOracleV2(
+                IERC4626(address(0)), // no base vault
+                1, // no conversion sample
+                AggregatorV3Interface(address(0)),
+                AggregatorV3Interface(
+                    addresses.getAddress("CHAINLINK_WELL_USD")
+                ), // no second base feed,
+                18,
+                IERC4626(address(0)), // no quote vault
+                1, // no conversion sample,
+                AggregatorV3Interface(
+                    addresses.getAddress("CHAINLINK_USDC_USD")
+                ),
+                AggregatorV3Interface(address(0)), // no second quote feed,
+                6,
+                bytes32(0) // no salt
+            );
+        vm.stopBroadcast();
+
+        addresses.addAddress("CHAINLINK_USDC_WELL_ORACLE", address(oracle));
+
+        return oracle;
     }
 }

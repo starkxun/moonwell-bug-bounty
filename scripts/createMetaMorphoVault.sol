@@ -221,7 +221,7 @@ contract CreateMetaMorphoVault is Script, Test {
         );
         assertEq(
             market.oracle,
-            addresses.getAddress("CHAINLINK_USDC_WELL_ORACLE"),
+            addresses.getAddress("MORPHO_CHAINLINK_WELL_USD_ORACLE"),
             "Market oracle should match"
         );
         assertEq(
@@ -363,7 +363,10 @@ contract CreateMetaMorphoVault is Script, Test {
             );
         vm.stopBroadcast();
 
-        addresses.addAddress("CHAINLINK_USDC_WELL_ORACLE", address(oracle));
+        addresses.addAddress(
+            "MORPHO_CHAINLINK_WELL_USD_ORACLE",
+            address(oracle)
+        );
 
         return oracle;
     }

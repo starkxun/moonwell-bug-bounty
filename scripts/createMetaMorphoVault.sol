@@ -25,19 +25,20 @@ contract CreateMetaMorphoVault is Script, Test {
     /// @notice The created market parameters
     MarketParams public market;
 
-    uint256 public constant SUPPLY_CAP = 10e18;
+    uint256 public constant SUPPLY_CAP = 10e18; // TODO change
+    // TODO add anthias address as the curator
 
     uint256 public constant LLTV = 625_000_000_000_000_000;
 
-    string public constant VAULT_NAME = "Moonwell Growth/Underperform USDC";
+    string public constant VAULT_NAME = "Moonwell Growth/Underperform USDC"; // TODO verify
 
-    string public constant VAULT_SYMBOL = "USDC";
+    string public constant VAULT_SYMBOL = "USDC"; // TODO verify
 
-    bytes32 public constant SALT = keccak256(abi.encodePacked("test_2"));
+    bytes32 public constant SALT = keccak256(abi.encodePacked("test_3")); // TODO change
 
-    uint256 public constant USDC_VAULT_DEPOSIT = 0.1e6;
+    uint256 public constant USDC_VAULT_DEPOSIT = 1e6;
 
-    uint256 public constant WELL_COLLATERAL = 1e18;
+    uint256 public constant WELL_COLLATERAL = 42e18; // arround 1$
 
     uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
 
@@ -65,13 +66,13 @@ contract CreateMetaMorphoVault is Script, Test {
             collateralToken: addresses.getAddress("xWELL_PROXY"),
             oracle: address(oracle),
             irm: addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM"),
-            lltv: LLTV // 86% LLTV (Loan to Loan-Token Value)
+            lltv: LLTV
         });
 
         vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
-        createMarket(addresses);
+        //createMarket(addresses);
 
         // Then create the MetaMorpho vault
         address vaultAddress = factory.createMetaMorpho(
@@ -134,6 +135,9 @@ contract CreateMetaMorphoVault is Script, Test {
         );
 
         vm.stopBroadcast();
+
+        // Print addresses
+        addresses.printAddresses();
     }
 
     function createMarket(Addresses addresses) internal {
@@ -291,7 +295,7 @@ contract CreateMetaMorphoVault is Script, Test {
             morphoBlue
         ).borrow(
                 market,
-                USDC_VAULT_DEPOSIT,
+                0.09e6, // TODO borrow 1$
                 0, // shares = 0 means we want to borrow exact assets
                 msg.sender,
                 msg.sender
@@ -309,8 +313,8 @@ contract CreateMetaMorphoVault is Script, Test {
         uint256 usdcBalanceAfter = IERC20(usdcToken).balanceOf(msg.sender);
 
         console.log("=== Final Balances ===");
-        console.log("WELL:", wellBalanceAfter / 1e18);
-        console.log("USDC:", usdcBalanceAfter / 1e6);
+        console.log("WELL:", wellBalanceAfter);
+        console.log("USDC:", usdcBalanceAfter);
     }
 
     function computeMarketId() internal view returns (bytes32 marketParamsId) {

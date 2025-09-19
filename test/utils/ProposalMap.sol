@@ -224,7 +224,12 @@ contract ProposalMap is Script {
         proposal.afterDeploy(addresses, deployer);
         proposal.build(addresses);
         proposal.teardown(addresses, deployer);
+        proposal.beforeSimulationHook(addresses);
+        if (vm.activeFork() != proposal.primaryForkId()) {
+            vm.selectFork(proposal.primaryForkId());
+        }
         proposal.run(addresses, deployer);
+        proposal.afterSimulationHook(addresses);
         proposal.validate(addresses, deployer);
     }
 

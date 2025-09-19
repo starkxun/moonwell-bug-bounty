@@ -57,8 +57,14 @@ contract CreateMetaMorphoVault is Script, Test {
         address initialOwner = msg.sender;
         uint256 initialTimelock = 0;
         address asset = addresses.getAddress("USDC");
-
-        IMorphoChainlinkOracleV2 oracle = deployOracle(addresses);
+        IMorphoChainlinkOracleV2 oracle;
+        if (!addresses.isAddressSet("MORPHO_CHAINLINK_WELL_USD_ORACLE")) {
+            oracle = deployOracle(addresses);
+        } else {
+            oracle = IMorphoChainlinkOracleV2(
+                addresses.getAddress("MORPHO_CHAINLINK_WELL_USD_ORACLE")
+            );
+        }
 
         // Market parameters for USDC/WELL market
         market = MarketParams({

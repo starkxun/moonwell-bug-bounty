@@ -34,7 +34,7 @@ contract CreateMetaMorphoVault is Script, Test {
 
     string public constant VAULT_SYMBOL = "USDC"; // TODO verify
 
-    bytes32 public constant SALT = keccak256(abi.encodePacked("test_3")); // TODO change
+    bytes32 public constant SALT = keccak256(abi.encodePacked("test_4")); // TODO change
 
     uint256 public constant USDC_VAULT_DEPOSIT = 1e6;
 
@@ -78,7 +78,7 @@ contract CreateMetaMorphoVault is Script, Test {
         vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
-        //createMarket(addresses);
+        createMarket(addresses);
 
         // Then create the MetaMorpho vault
         address vaultAddress = factory.createMetaMorpho(
@@ -347,10 +347,10 @@ contract CreateMetaMorphoVault is Script, Test {
             .createMorphoChainlinkOracleV2(
                 IERC4626(address(0)), // no base vault
                 1, // no conversion sample
-                AggregatorV3Interface(address(0)),
                 AggregatorV3Interface(
                     addresses.getAddress("CHAINLINK_WELL_USD")
-                ), // no second base feed,
+                ),
+                AggregatorV3Interface(address(0)), // no second base feed,
                 18,
                 IERC4626(address(0)), // no quote vault
                 1, // no conversion sample,

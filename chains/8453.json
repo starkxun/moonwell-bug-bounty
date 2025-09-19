@@ -1115,7 +1115,7 @@
         "name": "CHAINLINK_USDC_USD"
     },
     {
-        "addr": "0xc940a4633e4443c43adbf419339b854a70043373",
+        "addr": "0x245951c8a17Dd700a35a3CB6E2007C3E8D133F0b",
         "isContract": true,
         "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE"
     }

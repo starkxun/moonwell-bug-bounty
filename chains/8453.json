@@ -1118,5 +1118,15 @@
         "addr": "0x245951c8a17Dd700a35a3CB6E2007C3E8D133F0b",
         "isContract": true,
         "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE"
+    },
+    {
+        "addr": "0xd4669fCee3BE73b51438ad1f1debEB3505Eab308",
+        "isContract": false,
+        "name": "LUKE_EOA"
+    },
+    {
+        "addr": "0xF4d4fCDdE388408C7A295E1C34C7B204bC0b4BAC",
+        "isContract": true,
+        "name": "llUSDC_METAMORPHO_VAULT"
     }
 ]

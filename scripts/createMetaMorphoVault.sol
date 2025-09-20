@@ -12,6 +12,7 @@ import "@protocol/utils/ChainIds.sol";
 import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IMorphoChainlinkOracleV2Factory} from "@protocol/morpho/IMorphoChainlinkOracleFactory.sol";
 import {IMorphoChainlinkOracleV2} from "@protocol/morpho/IMorphoChainlinkOracleV2.sol";
+import {console} from "@forge-std/console.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
 
@@ -25,22 +26,23 @@ contract CreateMetaMorphoVault is Script, Test {
     /// @notice The created market parameters
     MarketParams public market;
 
-    uint256 public constant SUPPLY_CAP = 10e18; // TODO change
-    // TODO add anthias address as the curator
+    uint256 public constant SUPPLY_CAP = 100_000_000e6; // 100M USDC
 
-    uint256 public constant LLTV = 625_000_000_000_000_000;
+    uint256 public constant LLTV = 625_000_000_000_000_000; // 62.5%
 
-    string public constant VAULT_NAME = "Moonwell Growth/Underperform USDC"; // TODO verify
+    string public constant VAULT_NAME = "Lunar Labs Treasury USDC Vault"; // TODO verify
 
-    string public constant VAULT_SYMBOL = "USDC"; // TODO verify
+    string public constant VAULT_SYMBOL = "llUSDC"; // TODO verify
 
-    bytes32 public constant SALT = keccak256(abi.encodePacked("test_4")); // TODO change
+    bytes32 public constant SALT = keccak256(abi.encodePacked("llUSDC")); // TODO change
 
     uint256 public constant USDC_VAULT_DEPOSIT = 1e6;
 
-    uint256 public constant WELL_COLLATERAL = 42e18; // arround 1$
+    uint256 public constant WELL_COLLATERAL = 100e18;
 
     uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
+
+    string public constant ADDRESS_NAME = "llUSDC_METAMORPHO_VAULT";
 
     function run() public {
         // Setup fork for Base chain
@@ -75,10 +77,15 @@ contract CreateMetaMorphoVault is Script, Test {
             lltv: LLTV
         });
 
+        bytes32 marketId = computeMarketId();
+
+        console.log("market id:");
+        console.logBytes32(marketId);
+
         vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
-        createMarket(addresses);
+        //        createMarket(addresses);
 
         // Then create the MetaMorpho vault
         address vaultAddress = factory.createMetaMorpho(
@@ -97,10 +104,7 @@ contract CreateMetaMorphoVault is Script, Test {
         console.log("MetaMorpho vault created at:", vaultAddress);
 
         // Add the created vault to the addresses registry
-        string memory addressName = string(
-            abi.encodePacked(VAULT_SYMBOL, "_METAMORPHO_VAULT_TEST")
-        );
-        addresses.addAddress(addressName, vaultAddress);
+        addresses.addAddress(ADDRESS_NAME, vaultAddress);
 
         vm.startBroadcast();
 
@@ -111,9 +115,11 @@ contract CreateMetaMorphoVault is Script, Test {
         submitAndAcceptCap(addresses);
 
         bytes32[] memory newSupplyQueue = new bytes32[](1);
-        newSupplyQueue[0] = computeMarketId();
+        newSupplyQueue[0] = marketId;
 
         usdcVault.setSupplyQueue(newSupplyQueue);
+
+        usdcVault.setCurator(addresses.getAddress("LUKE_EOA"));
 
         vm.stopBroadcast();
 
@@ -168,9 +174,7 @@ contract CreateMetaMorphoVault is Script, Test {
 
     function submitAndAcceptCap(Addresses addresses) internal {
         // Get Morpho Blue contract
-        IMetaMorpho vault = IMetaMorpho(
-            addresses.getAddress("USDC_METAMORPHO_VAULT_TEST")
-        );
+        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(ADDRESS_NAME));
 
         vault.submitCap(market, SUPPLY_CAP);
         vault.acceptCap(market);
@@ -231,7 +235,11 @@ contract CreateMetaMorphoVault is Script, Test {
         );
         assertEq(market.lltv, LLTV, "Market LLTV should be 86%");
 
-        assertEq(usdcVault.curator(), msg.sender, "Curator should match");
+        assertEq(
+            usdcVault.curator(),
+            addresses.getAddress("LUKE_EOA"),
+            "Curator should match"
+        );
 
         (
             uint184 cap,
@@ -269,8 +277,8 @@ contract CreateMetaMorphoVault is Script, Test {
             msg.sender
         );
 
-        console.log("Deposited USDC into vault:", USDC_VAULT_DEPOSIT / 1e18);
-        console.log("Shares minted:", sharesMinted / 1e18);
+        console.log("Deposited USDC into vault:", USDC_VAULT_DEPOSIT);
+        console.log("Shares minted:", sharesMinted);
     }
 
     function supplyCollateralToMorpho(
@@ -301,7 +309,7 @@ contract CreateMetaMorphoVault is Script, Test {
             morphoBlue
         ).borrow(
                 market,
-                0.09e6, // TODO borrow 1$
+                1e6,
                 0, // shares = 0 means we want to borrow exact assets
                 msg.sender,
                 msg.sender

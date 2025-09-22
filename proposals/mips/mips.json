@@ -31,7 +31,7 @@
         "envpath": "proposals/mips/mip-x26/x26.sh",
         "governor": "MultichainGovernor",
         "id": 107,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -66,7 +66,7 @@
         "envpath": "proposals/mips/mip-x23/x23.sh",
         "governor": "MultichainGovernor",
         "id": 100,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -87,7 +87,7 @@
         "envpath": "proposals/mips/mip-x21/x21.sh",
         "governor": "MultichainGovernor",
         "id": 97,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -108,7 +108,7 @@
         "envPath": "proposals/mips/mip-x19/x19.sh",
         "governor": "MultichainGovernor",
         "id": 92,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -129,7 +129,7 @@
         "envPath": "proposals/mips/mip-x16/x16.sh",
         "governor": "MultichainGovernor",
         "id": 85,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -157,7 +157,7 @@
         "envPath": "proposals/mips/mip-x13/x13.sh",
         "governor": "MultichainGovernor",
         "id": 81,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -220,7 +220,7 @@
         "envPath": "proposals/mips/mip-x09/x09.sh",
         "governor": "MultichainGovernor",
         "id": 71,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -243,7 +243,7 @@
         "envPath": "proposals/mips/mip-x06/x06.sh",
         "governor": "MultichainGovernor",
         "id": 68,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -299,7 +299,7 @@
         "envPath": "proposals/mips/mip-x04/x04.sh",
         "governor": "MultichainGovernor",
         "id": 60,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {
@@ -341,7 +341,7 @@
         "envPath": "proposals/mips/mip-x02/x02.sh",
         "governor": "MultichainGovernor",
         "id": 54,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
+        "path": "RewardsDistributionDeprecated.sol/RewardsDistributionDeprecated.json",
         "proposalType": "HybridProposal"
     },
     {

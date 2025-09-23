@@ -201,7 +201,8 @@
             }
         ],
         "withdrawWell": [],
-        "multiRewarder": []
+        "multiRewarder": [],
+        "merkleCampaigns": []
     },
     "1284": {
         "bridgeToRecipient": [
@@ -650,7 +651,8 @@
                 "to": "RESERVE_AUTOMATION_DAI"
             }
         ],
-        "withdrawWell": []
+        "withdrawWell": [],
+        "merkleCampaigns": []
     },
     "endTimeSTamp": 1742527800,
     "startTimeStamp": 1740108600

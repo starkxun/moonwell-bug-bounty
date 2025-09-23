@@ -188,7 +188,7 @@ contract mipb46 is HybridProposal, Configs {
 
         _pushAction(
             router,
-            bridgeCost * 4, // 4x to have enough gas to bridge
+            bridgeCost,
             abi.encodeWithSignature(
                 "bridgeToRecipient(address,uint256,uint16)",
                 addresses.getAddress("TEMPORAL_GOVERNOR", BASE_CHAIN_ID),

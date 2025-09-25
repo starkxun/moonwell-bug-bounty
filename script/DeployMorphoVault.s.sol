@@ -361,20 +361,22 @@ contract CreateMetaMorphoVault is Script, Test {
     }
 
     function createVault(Addresses addresses) internal returns (address) {
-           vm.startBroadcast();
+        vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
         //        createMarket(addresses);
 
         // Then create the MetaMorpho vault
-        address vaultAddress = IMetaMorphoFactory(addresses.getAddress("MORPHO_FACTORY_V1_1")).createMetaMorpho(
-            initialOwner,
-            initialTimelock,
-            asset,
-            VAULT_NAME,
-            VAULT_SYMBOL,
-            SALT
-        );
+        address vaultAddress = IMetaMorphoFactory(
+            addresses.getAddress("MORPHO_FACTORY_V1_1")
+        ).createMetaMorpho(
+                initialOwner,
+                initialTimelock,
+                asset,
+                VAULT_NAME,
+                VAULT_SYMBOL,
+                SALT
+            );
 
         vm.stopBroadcast();
 

@@ -17,7 +17,7 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
 
 /// @notice Script to create a new MetaMorpho vault using the Morpho factory
-contract CreateMetaMorphoVault is Script, Test {
+contract DeployMorphoVault is Script, Test {
     using ChainIds for uint256;
 
     /// @notice The created MetaMorpho vault address
@@ -78,7 +78,15 @@ contract CreateMetaMorphoVault is Script, Test {
         console.log("market id:");
         console.logBytes32(marketId);
 
-        address vaultAddress = createVault(addresses);
+        address vaultAddress = createVault(
+            addresses,
+            initialOwner,
+            asset,
+            initialTimelock,
+            VAULT_NAME,
+            VAULT_SYMBOL,
+            SALT
+        );
 
         usdcVault = IMetaMorpho(vaultAddress);
 
@@ -360,11 +368,20 @@ contract CreateMetaMorphoVault is Script, Test {
         return oracle;
     }
 
-    function createVault(Addresses addresses) internal returns (address) {
+    function createVault(
+        Addresses addresses,
+        address initialOwner,
+        address asset,
+        uint256 initialTimelock,
+        string memory vaultName,
+        string memory vaultSymbol,
+        bytes32 salt
+    ) public returns (address) {
+        string memory vaultAddressName = string.concat(
+            vaultName,
+            "_METAMORPHO_VAULT"
+        );
         vm.startBroadcast();
-
-        // First create the USDC/WELL market on Morpho Blue
-        //        createMarket(addresses);
 
         // Then create the MetaMorpho vault
         address vaultAddress = IMetaMorphoFactory(
@@ -373,12 +390,14 @@ contract CreateMetaMorphoVault is Script, Test {
                 initialOwner,
                 initialTimelock,
                 asset,
-                VAULT_NAME,
-                VAULT_SYMBOL,
-                SALT
+                vaultName,
+                vaultSymbol,
+                salt
             );
 
         vm.stopBroadcast();
+
+        addresses.addAddress(vaultAddressName, vaultAddress);
 
         return vaultAddress;
     }

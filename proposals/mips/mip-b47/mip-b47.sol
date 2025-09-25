@@ -12,6 +12,7 @@ import {IMetaMorphoBase, IMetaMorpho} from "@protocol/morpho/IMetaMorpho.sol";
 import {IMetaMorphoFactory} from "@protocol/morpho/IMetaMorphoFactory.sol";
 import {ParameterValidation} from "@proposals/utils/ParameterValidation.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {DeployMorphoVault} from "@script/DeployMorphoVault.s.sol";
 
 /// DO_VALIDATE=true DO_PRINT=true DO_BUILD=true DO_RUN=true forge script
 /// proposals/mips/mip-b47/mip-b47.sol:mipb47
@@ -39,17 +40,17 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
     }
 
     function deploy(Addresses addresses, address) public override {
+        DeployMorphoVault deployMorphoVault = new DeployMorphoVault();
         // Deploy the new MetaMorpho vault with msg.sender as initial owner
-        address vaultAddress = IMetaMorphoFactory(
-            addresses.getAddress("MORPHO_FACTORY_V1_1")
-        ).createMetaMorpho(
-                msg.sender, // initial owner
-                0, // initial timelock
-                addresses.getAddress("USDC"), // asset
-                VAULT_NAME,
-                VAULT_SYMBOL,
-                SALT
-            );
+        address vaultAddress = deployMorphoVault.createVault(
+            addresses,
+            msg.sender,
+            addresses.getAddress("USDC"),
+            0,
+            VAULT_NAME,
+            VAULT_SYMBOL,
+            SALT
+        );
 
         // Transfer ownership to temporal governor
         IMetaMorpho(vaultAddress).transferOwnership(

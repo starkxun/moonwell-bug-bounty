@@ -56,9 +56,6 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
         IMetaMorpho(vaultAddress).transferOwnership(
             addresses.getAddress("TEMPORAL_GOVERNOR")
         );
-
-        // Add the created vault to the addresses registry
-        addresses.addAddress(VAULT_ADDRESS_NAME, vaultAddress);
     }
 
     function build(Addresses addresses) public override {
@@ -82,7 +79,10 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
         // Set curator timelock to 4 days
         _pushAction(
             addresses.getAddress(VAULT_ADDRESS_NAME),
-            abi.encodeWithSignature("setTimelock(uint256)", CURATOR_TIMELOCK),
+            abi.encodeWithSignature(
+                "submitTimelock(uint256)",
+                CURATOR_TIMELOCK
+            ),
             "Set curator timelock to 4 days"
         );
     }

@@ -378,10 +378,9 @@ contract DeployMorphoVault is Script, Test {
         bytes32 salt
     ) public returns (address) {
         string memory vaultAddressName = string.concat(
-            vaultName,
+            vaultSymbol,
             "_METAMORPHO_VAULT"
         );
-        vm.startBroadcast();
 
         // Then create the MetaMorpho vault
         address vaultAddress = IMetaMorphoFactory(
@@ -394,8 +393,6 @@ contract DeployMorphoVault is Script, Test {
                 vaultSymbol,
                 salt
             );
-
-        vm.stopBroadcast();
 
         addresses.addAddress(vaultAddressName, vaultAddress);
 

@@ -63,6 +63,9 @@ contract mipb46 is HybridProposal, Configs {
     uint256 public constant EURC_AMOUNT = 433333333290000000000000; // ~433K WELL (13%)
     uint256 public constant cbBTC_AMOUNT = 433333333290000000000000; // ~433K WELL (13%)
 
+    // Hardcoded bridge cost from onchain transaction
+    uint256 public constant BRIDGE_COST = 14059583765471401896;
+
     // Campaign type for MORPHOVAULT
     uint32 public constant MORPHOVAULT_CAMPAIGN_TYPE = 56;
 
@@ -180,11 +183,12 @@ contract mipb46 is HybridProposal, Configs {
         uint16 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
 
         // find bridge cost from xWELLRouter
-        uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
+        //uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
+        uint256 bridgeCost = BRIDGE_COST;
 
         _pushAction(
             router,
-            bridgeCost * 4, // 4x to have enough gas to bridge
+            bridgeCost,
             abi.encodeWithSignature(
                 "bridgeToRecipient(address,uint256,uint16)",
                 addresses.getAddress("TEMPORAL_GOVERNOR", BASE_CHAIN_ID),

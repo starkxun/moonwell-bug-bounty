@@ -10,7 +10,7 @@ import {SafeCast} from "@openzeppelin-contracts/contracts/utils/math/SafeCast.so
 
 import {MErc20} from "@protocol/MErc20.sol";
 import {MToken} from "@protocol/MToken.sol";
-import {OPTIMISM_CHAIN_ID, BASE_CHAIN_ID} from "@utils/ChainIds.sol";
+import {OPTIMISM_CHAIN_ID} from "@utils/ChainIds.sol";
 import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {Networks} from "@proposals/utils/Networks.sol";
 import {xWELLRouter} from "@protocol/xWELL/xWELLRouter.sol";
@@ -30,41 +30,7 @@ import {MultiRewardDistributorCommon} from "@protocol/rewards/MultiRewardDistrib
 import {IERC20Metadata as IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IMultiRewards} from "@crv-rewards/IMultiRewards.sol";
 
-interface IMerkleCampaignCreator {
-    struct CampaignParameters {
-        // POPULATED ONCE CREATED
-        // ID of the campaign. This can be left as a null bytes32 when creating campaigns
-        // on Merkl.
-        bytes32 campaignId;
-        // CHOSEN BY CAMPAIGN CREATOR
-        // Address of the campaign creator, if marked as address(0), it will be overriden with the
-        // address of the `msg.sender` creating the campaign
-        address creator;
-        // Address of the token used as a reward
-        address rewardToken;
-        // Amount of `rewardToken` to distribute across all the epochs
-        // Amount distributed per epoch is `amount/numEpoch`
-        uint256 amount;
-        // Type of campaign
-        uint32 campaignType;
-        // Timestamp at which the campaign should start
-        uint32 startTimestamp;
-        // Duration of the campaign in seconds. Has to be a multiple of EPOCH = 3600
-        uint32 duration;
-        // Extra data to pass to specify the campaign
-        bytes campaignData;
-    }
-
-    function campaignId(
-        CampaignParameters memory campaignData
-    ) external view returns (bytes32);
-
-    function campaign(
-        bytes32 campaignId
-    ) external view returns (CampaignParameters memory);
-}
-
-contract RewardsDistributionTemplate is HybridProposal, Networks {
+contract RewardsDistributionDeprecated is HybridProposal, Networks {
     using SafeCast for *;
     using String for string;
     using stdJson for string;
@@ -137,18 +103,11 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         string[] reserveAutomationContracts;
     }
 
-    struct MekleCampaign {
-        uint256 amount;
-        uint32 duration;
-        string rewardToken;
-        uint32 startTimestamp;
-    }
-
     struct JsonSpecMoonbeam {
         AddRewardInfo addRewardInfo;
         BridgeWell[] bridgeWells;
         SetRewardSpeed[] setRewardSpeed;
-        uint256 stkWellEmissionsPerSecond;
+        int256 stkWellEmissionsPerSecond;
         TransferFrom[] transferFroms;
     }
 
@@ -156,11 +115,10 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         InitSale initSale;
         MultiRewarder[] multiRewarder;
         SetMRDRewardSpeed[] setRewardSpeed;
-        uint256 stkWellEmissionsPerSecond;
+        int256 stkWellEmissionsPerSecond;
         TransferFrom[] transferFroms;
         TransferReserves[] transferReserves;
         WithdrawWell[] withdrawWell;
-        MekleCampaign[] merkleCampaigns;
     }
 
     JsonSpecMoonbeam moonbeamActions;
@@ -200,7 +158,29 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             vm.envString("MIP_REWARDS_PATH")
         );
 
-        _parseTimestamps(encodedJson);
+        string memory filter = ".startTimeStamp";
+
+        bytes memory parsedJson = vm.parseJson(encodedJson, filter);
+
+        startTimeStamp = abi.decode(parsedJson, (uint256));
+
+        filter = ".endTimeSTamp";
+
+        parsedJson = vm.parseJson(encodedJson, filter);
+
+        endTimeStamp = abi.decode(parsedJson, (uint256));
+
+        assertGt(
+            endTimeStamp,
+            startTimeStamp,
+            "endTimeStamp must be greater than startTimeStamp"
+        );
+
+        assertGe(
+            endTimeStamp - startTimeStamp,
+            3 weeks,
+            "endTimeStamp - startTimeStamp must be greater than 3 weeks"
+        );
 
         for (uint256 i = 0; i < networks.length; i++) {
             chainId = networks[i].chainId;
@@ -208,7 +188,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 vm.selectFork(networks[i].forkId);
                 _saveExternalChainActions(addresses, encodedJson, chainId);
 
-                // save well balances before
                 IERC20 xwell = IERC20(addresses.getAddress("xWELL_PROXY"));
                 address mrd = addresses.getAddress("MRD_PROXY");
                 wellBalancesBefore[mrd] = xwell.balanceOf(mrd);
@@ -287,19 +266,19 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
     }
 
+    function validate(Addresses addresses, address) public override {
+        _validateMoonbeam(addresses);
+
+        for (uint256 i = 0; i < networks.length; i++) {
+            chainId = networks[i].chainId;
+            if (chainId != MOONBEAM_CHAIN_ID) {
+                vm.selectFork(networks[i].forkId);
+                _validateExternalChainActions(addresses, chainId);
+            }
+        }
+    }
+
     function beforeSimulationHook(Addresses addresses) public override {
-        _validateSafetyModuleActions();
-
-        vm.selectFork(MOONBEAM_FORK_ID);
-
-        // Mock approval for F-GLMR-DEVGRANT to allow the transfer to succeed
-        vm.startPrank(addresses.getAddress("F-GLMR-DEVGRANT"));
-        IERC20(addresses.getAddress("GOVTOKEN")).approve(
-            addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
-            11669037203603280000000000 // 1.166903720360328e25
-        );
-        vm.stopPrank();
-
         // mock relayer so we can simulate bridging well
         WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
         vm.makePersistent(address(wormholeRelayer));
@@ -328,6 +307,17 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             chainId = networks[i].chainId;
             if (chainId != MOONBEAM_CHAIN_ID) {
                 vm.selectFork(networks[i].forkId);
+                if (chainId == OPTIMISM_CHAIN_ID) {
+                    // mock foundation approval
+                    vm.startPrank(
+                        addresses.getAddress("FOUNDATION_OP_MULTISIG")
+                    );
+                    IERC20(addresses.getAddress("OP")).approve(
+                        addresses.getAddress("TEMPORAL_GOVERNOR"),
+                        60000e18
+                    );
+                    vm.stopPrank();
+                }
 
                 vm.store(
                     address(wormholeBridgeAdapter),
@@ -377,54 +367,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         );
     }
 
-    function validate(Addresses addresses, address) public override {
-        _validateMoonbeam(addresses);
-
-        for (uint256 i = 0; i < networks.length; i++) {
-            chainId = networks[i].chainId;
-            if (chainId != MOONBEAM_CHAIN_ID) {
-                vm.selectFork(networks[i].forkId);
-                _validateExternalChainActions(addresses, chainId);
-            }
-        }
-    }
-
-    function _validateSafetyModuleActions() private view {
-        // Check that no actions use the deprecated 'configureAsset' interface
-        // and that no Base actions use 'configureAssets'
-        for (uint256 i = 0; i < actions.length; i++) {
-            bytes4 selector = bytes4(actions[i].data);
-            bytes4 configureAssetSelector = bytes4(
-                keccak256("configureAsset(uint128,address)")
-            );
-
-            require(
-                selector != configureAssetSelector,
-                string.concat(
-                    "Action ",
-                    vm.toString(i),
-                    " uses deprecated configureAsset interface. Use configureAssets instead."
-                )
-            );
-
-            bytes4 configureAssetsSelector = bytes4(
-                keccak256("configureAssets(uint128[],uint256[],address[])")
-            );
-
-            // Base actions should not configure Safety Module assets
-            if (actions[i].actionType == ActionType.Base) {
-                require(
-                    selector != configureAssetsSelector,
-                    string.concat(
-                        "Base action ",
-                        vm.toString(i),
-                        " uses configureAssets. Safety Module on Base should not be configured."
-                    )
-                );
-            }
-        }
-    }
-
     function _saveMoonbeamActions(
         Addresses addresses,
         string memory data
@@ -444,17 +386,19 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             moonbeamActions.bridgeWells.push(spec.bridgeWells[i]);
         }
 
-        assertGe(
-            spec.stkWellEmissionsPerSecond,
-            0,
-            "stkWellEmissionsPerSecond must be greater than 0"
-        );
+        if (spec.stkWellEmissionsPerSecond != -1) {
+            assertGe(
+                spec.stkWellEmissionsPerSecond,
+                0,
+                "stkWellEmissionsPerSecond must be greater than 0"
+            );
 
-        assertLe(
-            spec.stkWellEmissionsPerSecond,
-            5e18,
-            "stkWellEmissionsPerSecond must be less than 1e18"
-        );
+            assertLe(
+                spec.stkWellEmissionsPerSecond,
+                5e18,
+                "stkWellEmissionsPerSecond must be less than 1e18"
+            );
+        }
 
         moonbeamActions.stkWellEmissionsPerSecond = spec
             .stkWellEmissionsPerSecond;
@@ -509,7 +453,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             moonbeamActions.setRewardSpeed.push(setRewardSpeed);
         }
 
-        // save transfer froms
         for (uint256 i = 0; i < spec.transferFroms.length; i++) {
             // check for duplications
             for (uint256 j = 0; j < moonbeamActions.transferFroms.length; j++) {
@@ -540,9 +483,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 addresses.getAddress("ECOSYSTEM_RESERVE_PROXY")
             ) {
                 assertApproxEqRel(
-                    spec.transferFroms[i].amount,
+                    int256(spec.transferFroms[i].amount),
                     spec.stkWellEmissionsPerSecond *
-                        (endTimeStamp - startTimeStamp),
+                        int256(endTimeStamp - startTimeStamp),
                     0.1e18,
                     "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
                 );
@@ -552,41 +495,31 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
     }
 
-    function _saveStkWellEmissionsPerSecond(
+    function _saveExternalChainActions(
+        Addresses addresses,
         string memory data,
-        string memory prefix,
         uint256 _chainId
     ) private {
-        require(
-            _chainId != BASE_CHAIN_ID,
-            "Safety Module on Base should not be configured"
-        );
+        string memory prefix = string.concat(".", vm.toString(_chainId));
 
-        uint256 stkWellEmissionsPerSecond = vm.parseJsonUint(
+        int256 stkWellEmissionsPerSecond = vm.parseJsonInt(
             data,
             string.concat(prefix, ".stkWellEmissionsPerSecond")
         );
+        if (stkWellEmissionsPerSecond != -1) {
+            assertLe(
+                stkWellEmissionsPerSecond,
+                10e18,
+                "stkWellEmissionsPerSecond must be less than 10e18"
+            );
 
-        assertLe(
-            stkWellEmissionsPerSecond,
-            10e18,
-            "stkWellEmissionsPerSecond must be less than 10e18"
-        );
+            externalChainActions[_chainId]
+                .stkWellEmissionsPerSecond = stkWellEmissionsPerSecond;
+        }
 
-        externalChainActions[_chainId]
-            .stkWellEmissionsPerSecond = stkWellEmissionsPerSecond;
-    }
+        uint256 totalWellEpochRewards = 0;
+        uint256 totalOpEpochRewards = 0;
 
-    function _saveMRDEmissionSpeeds(
-        Addresses addresses,
-        string memory data,
-        string memory prefix,
-        uint256 _chainId
-    )
-        private
-        returns (uint256 totalWellEpochRewards, uint256 totalOpEpochRewards)
-    {
-        // save MRD emission speeds for markets
         bytes memory setRewardSpeedsBytes = vm.parseJson(
             data,
             string.concat(prefix, ".setMRDSpeeds")
@@ -619,11 +552,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 );
             }
 
-            // save MRD emission speeds for markets
             int256 supplySpeed = setRewardSpeeds[i].newSupplySpeed;
             int256 borrowSpeed = setRewardSpeeds[i].newBorrowSpeed;
 
-            // check borrow speed
             if (borrowSpeed != -1) {
                 assertGe(
                     borrowSpeed,
@@ -632,52 +563,42 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 );
             }
 
-            // save end time
             uint256 endTime = uint256(setRewardSpeeds[i].newEndTime);
-
-            // when token is xWELL
             if (
                 addresses.getAddress(setRewardSpeeds[i].emissionToken) ==
                 addresses.getAddress("xWELL_PROXY")
             ) {
-                // check supply speed
                 assertLe(
                     supplySpeed,
                     10e18,
                     "Supply speed must be less than 10 WELL per second"
                 );
 
-                // calculate supply amount
                 uint256 supplyAmount = supplySpeed != int256(-1)
                     ? uint256(supplySpeed) * (endTime - startTimeStamp)
                     : 0;
 
-                // calculate borrow amount
                 uint256 borrowAmount = borrowSpeed != int256(-1)
                     ? (uint256(borrowSpeed) * (endTime - startTimeStamp))
                     : 0;
 
-                // add to total well epoch rewards
                 totalWellEpochRewards += supplyAmount + borrowAmount;
             }
 
-            // when token is OP
+            // TODO add USDC assertion in the future
             if (
                 chainId == OPTIMISM_CHAIN_ID &&
                 addresses.getAddress(setRewardSpeeds[i].emissionToken) ==
                 addresses.getAddress("OP", OPTIMISM_CHAIN_ID)
             ) {
-                // calculate supply amount
                 uint256 supplyAmount = supplySpeed != int256(-1)
                     ? uint256(supplySpeed) * (endTime - startTimeStamp)
                     : 0;
 
-                // calculate borrow amount
                 uint256 borrowAmount = borrowSpeed != int256(-1)
                     ? (uint256(borrowSpeed) * (endTime - startTimeStamp))
                     : 0;
 
-                // add to total op epoch rewards
                 totalOpEpochRewards += supplyAmount + borrowAmount;
             }
 
@@ -685,210 +606,124 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 setRewardSpeeds[i]
             );
         }
-    }
+        uint256 ecosystemReserveProxyAmount = 0;
+        {
+            bytes memory transferFromsBytes = vm.parseJson(
+                data,
+                string.concat(prefix, ".transferFrom")
+            );
+            TransferFrom[] memory transferFroms = abi.decode(
+                transferFromsBytes,
+                (TransferFrom[])
+            );
 
-    function _saveTransferFroms(
-        Addresses addresses,
-        string memory data,
-        string memory prefix,
-        uint256 _chainId,
-        uint256 totalWellEpochRewards,
-        uint256 totalOpEpochRewards
-    ) private returns (uint256 ecosystemReserveProxyAmount) {
-        bytes memory transferFromsBytes = vm.parseJson(
-            data,
-            string.concat(prefix, ".transferFrom")
-        );
-        TransferFrom[] memory transferFroms = abi.decode(
-            transferFromsBytes,
-            (TransferFrom[])
-        );
+            for (uint256 i = 0; i < transferFroms.length; i++) {
+                if (
+                    addresses.getAddress(transferFroms[i].to) ==
+                    addresses.getAddress("MRD_PROXY") &&
+                    addresses.getAddress(transferFroms[i].from) ==
+                    addresses.getAddress("TEMPORAL_GOVERNOR") &&
+                    addresses.getAddress(transferFroms[i].token) ==
+                    addresses.getAddress("xWELL_PROXY")
+                ) {
+                    assertApproxEqRel(
+                        transferFroms[i].amount,
+                        totalWellEpochRewards,
+                        0.1e18,
+                        "Transfer amount must be close to the total rewards for the epoch"
+                    );
+                }
 
-        for (uint256 i = 0; i < transferFroms.length; i++) {
-            if (
-                addresses.getAddress(transferFroms[i].to) ==
-                addresses.getAddress("MRD_PROXY") &&
-                addresses.getAddress(transferFroms[i].from) ==
-                addresses.getAddress("TEMPORAL_GOVERNOR") &&
-                addresses.getAddress(transferFroms[i].token) ==
-                addresses.getAddress("xWELL_PROXY")
-            ) {
-                assertApproxEqRel(
-                    transferFroms[i].amount,
-                    totalWellEpochRewards,
-                    0.1e18,
-                    "Transfer amount must be close to the total rewards for the epoch"
+                // check OP
+                if (
+                    chainId == OPTIMISM_CHAIN_ID &&
+                    addresses.getAddress(transferFroms[i].to) ==
+                    addresses.getAddress("MRD_PROXY") &&
+                    addresses.getAddress(transferFroms[i].from) ==
+                    addresses.getAddress(
+                        "FOUNDATION_OP_MULTISIG",
+                        OPTIMISM_CHAIN_ID
+                    ) &&
+                    addresses.getAddress(transferFroms[i].token) ==
+                    addresses.getAddress("OP", OPTIMISM_CHAIN_ID)
+                ) {
+                    assertApproxEqRel(
+                        transferFroms[i].amount,
+                        totalOpEpochRewards,
+                        0.01e18,
+                        "Transfer amount must be close to the total rewards for the epoch"
+                    );
+                }
+
+                // check for duplications
+                for (uint256 j = 0; j < transferFroms.length; j++) {
+                    TransferFrom memory existingTransferFrom = transferFroms[j];
+
+                    _validateTransferDestination(existingTransferFrom.to);
+                }
+
+                if (
+                    addresses.getAddress(transferFroms[i].to) ==
+                    addresses.getAddress("ECOSYSTEM_RESERVE_PROXY")
+                ) {
+                    ecosystemReserveProxyAmount += transferFroms[i].amount;
+                }
+
+                externalChainActions[_chainId].transferFroms.push(
+                    transferFroms[i]
                 );
             }
-
-            // check OP
-            if (
-                chainId == OPTIMISM_CHAIN_ID &&
-                addresses.getAddress(transferFroms[i].to) ==
-                addresses.getAddress("MRD_PROXY") &&
-                addresses.getAddress(transferFroms[i].from) ==
-                addresses.getAddress(
-                    "FOUNDATION_OP_MULTISIG",
-                    OPTIMISM_CHAIN_ID
-                ) &&
-                addresses.getAddress(transferFroms[i].token) ==
-                addresses.getAddress("OP", OPTIMISM_CHAIN_ID)
-            ) {
-                assertApproxEqRel(
-                    transferFroms[i].amount,
-                    totalOpEpochRewards,
-                    0.01e18,
-                    "Transfer amount must be close to the total rewards for the epoch"
-                );
-            }
-
-            // check for duplications
-            for (uint256 j = 0; j < transferFroms.length; j++) {
-                TransferFrom memory existingTransferFrom = transferFroms[j];
-
-                _validateTransferDestination(existingTransferFrom.to);
-            }
-
-            if (
-                addresses.getAddress(transferFroms[i].to) ==
-                addresses.getAddress("ECOSYSTEM_RESERVE_PROXY")
-            ) {
-                ecosystemReserveProxyAmount += transferFroms[i].amount;
-            }
-
-            externalChainActions[_chainId].transferFroms.push(transferFroms[i]);
-        }
-    }
-
-    function _saveWithdrawWell(
-        Addresses addresses,
-        string memory data,
-        string memory prefix,
-        uint256 _chainId
-    ) private returns (uint256 ecosystemReserveProxyAmount) {
-        bytes memory withdrawWellsBytes = vm.parseJson(
-            data,
-            string.concat(prefix, ".withdrawWell")
-        );
-        WithdrawWell[] memory withdrawWells = abi.decode(
-            withdrawWellsBytes,
-            (WithdrawWell[])
-        );
-
-        for (uint256 i = 0; i < withdrawWells.length; i++) {
-            WithdrawWell memory withdrawWell = withdrawWells[i];
-
-            _validateTransferDestination(withdrawWell.to);
-
-            if (
-                addresses.getAddress(withdrawWell.to) ==
-                addresses.getAddress("ECOSYSTEM_RESERVE_PROXY")
-            ) {
-                ecosystemReserveProxyAmount += withdrawWell.amount;
-            }
-
-            externalChainActions[_chainId].withdrawWell.push(withdrawWell);
         }
 
-        return ecosystemReserveProxyAmount;
-    }
-
-    function _saveMekleCampaigns(
-        string memory data,
-        string memory prefix,
-        uint256 _chainId
-    ) private {
-        bytes memory mekleCampaignsBytes = vm.parseJson(
-            data,
-            string.concat(prefix, ".merkleCampaigns")
-        );
-        MekleCampaign[] memory merkleCampaigns = abi.decode(
-            mekleCampaignsBytes,
-            (MekleCampaign[])
-        );
-
-        for (uint256 i = 0; i < merkleCampaigns.length; i++) {
-            MekleCampaign memory campaign = merkleCampaigns[i];
-
-            // Validate campaign parameters
-            require(
-                campaign.amount > 0,
-                "MekleCampaign: amount must be greater than 0"
+        {
+            bytes memory withdrawWellsBytes = vm.parseJson(
+                data,
+                string.concat(prefix, ".withdrawWell")
+            );
+            WithdrawWell[] memory withdrawWells = abi.decode(
+                withdrawWellsBytes,
+                (WithdrawWell[])
             );
 
-            require(
-                campaign.duration > 0,
-                "MekleCampaign: duration must be greater than 0"
-            );
+            for (uint256 i = 0; i < withdrawWells.length; i++) {
+                WithdrawWell memory withdrawWell = withdrawWells[i];
 
-            require(
-                bytes(campaign.rewardToken).length > 0,
-                "MekleCampaign: reward token cannot be empty"
-            );
+                _validateTransferDestination(withdrawWell.to);
 
-            //     require(
-            //         campaign.startTimestamp > block.timestamp,
-            //         "MekleCampaign: start timestamp must be in the future"
-            //     );
+                if (
+                    addresses.getAddress(withdrawWell.to) ==
+                    addresses.getAddress("ECOSYSTEM_RESERVE_PROXY")
+                ) {
+                    ecosystemReserveProxyAmount += withdrawWell.amount;
+                }
 
-            externalChainActions[_chainId].merkleCampaigns.push(campaign);
-        }
-    }
+                externalChainActions[_chainId].withdrawWell.push(withdrawWell);
+            }
 
-    function _saveExternalChainActions(
-        Addresses addresses,
-        string memory data,
-        uint256 _chainId
-    ) private {
-        string memory prefix = string.concat(".", vm.toString(_chainId));
-
-        if (_chainId != BASE_CHAIN_ID) {
-            _saveStkWellEmissionsPerSecond(data, prefix, _chainId);
-        }
-
-        (
-            uint256 totalWellEpochRewards,
-            uint256 totalOpEpochRewards
-        ) = _saveMRDEmissionSpeeds(addresses, data, prefix, _chainId);
-
-        uint256 ecosystemReserveProxyAmount = _saveTransferFroms(
-            addresses,
-            data,
-            prefix,
-            _chainId,
-            totalWellEpochRewards,
-            totalOpEpochRewards
-        );
-
-        ecosystemReserveProxyAmount =
-            ecosystemReserveProxyAmount +
-            _saveWithdrawWell(addresses, data, prefix, _chainId);
-
-        if (_chainId != BASE_CHAIN_ID) {
             assertApproxEqRel(
-                ecosystemReserveProxyAmount,
+                int256(ecosystemReserveProxyAmount),
                 externalChainActions[_chainId].stkWellEmissionsPerSecond *
-                    (endTimeStamp - startTimeStamp),
+                    int256(endTimeStamp - startTimeStamp),
                 1e18,
                 "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
             );
-        }
 
-        bytes memory transferReservesBytes = vm.parseJson(
-            data,
-            string.concat(prefix, ".transferReserves")
-        );
-        TransferReserves[] memory transferReserves = abi.decode(
-            transferReservesBytes,
-            (TransferReserves[])
-        );
-
-        for (uint256 i = 0; i < transferReserves.length; i++) {
-            TransferReserves memory transferReserve = transferReserves[i];
-
-            externalChainActions[_chainId].transferReserves.push(
-                transferReserve
+            bytes memory transferReservesBytes = vm.parseJson(
+                data,
+                string.concat(prefix, ".transferReserves")
             );
+            TransferReserves[] memory transferReserves = abi.decode(
+                transferReservesBytes,
+                (TransferReserves[])
+            );
+
+            for (uint256 i = 0; i < transferReserves.length; i++) {
+                TransferReserves memory transferReserve = transferReserves[i];
+
+                externalChainActions[_chainId].transferReserves.push(
+                    transferReserve
+                );
+            }
         }
 
         {
@@ -961,7 +796,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             }
         }
 
-        _saveMekleCampaigns(data, prefix, _chainId);
         _processMultiRewarder(data, prefix, _chainId);
     }
 
@@ -1109,18 +943,17 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
 
         AddRewardInfo memory stellaSwapReward = spec.addRewardInfo;
-        uint256 calculatedAmount = stellaSwapReward.amount;
         // first approve
         _pushAction(
             addresses.getAddress("GOVTOKEN"),
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 addresses.getAddress(stellaSwapReward.target),
-                calculatedAmount
+                uint256(stellaSwapReward.amount)
             ),
             string.concat(
                 "Approve StellaSwap spend ",
-                vm.toString(calculatedAmount / 1e18),
+                vm.toString(uint256(stellaSwapReward.amount) / 1e18),
                 " WELL"
             ),
             ActionType.Moonbeam
@@ -1144,22 +977,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             ActionType.Moonbeam
         );
 
-        if (spec.stkWellEmissionsPerSecond > 0) {
-            address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
-            uint128[] memory emissionPerSecond = new uint128[](1);
-            emissionPerSecond[0] = spec.stkWellEmissionsPerSecond.toUint128();
-            uint256[] memory totalStaked = new uint256[](1);
-            totalStaked[0] = 0;
-            address[] memory underlyingAsset = new address[](1);
-            underlyingAsset[0] = safetyModule;
-
+        if (spec.stkWellEmissionsPerSecond != -1) {
             _pushAction(
-                safetyModule,
+                addresses.getAddress("STK_GOVTOKEN_PROXY"),
                 abi.encodeWithSignature(
-                    "configureAssets(uint128[],uint256[],address[])",
-                    emissionPerSecond,
-                    totalStaked,
-                    underlyingAsset
+                    "configureAsset(uint128,address)",
+                    spec.stkWellEmissionsPerSecond.toUint256().toUint128(),
+                    addresses.getAddress("STK_GOVTOKEN_PROXY")
                 ),
                 string.concat(
                     "Set reward speed for the Safety Module on Moonbeam.\nEmissions per second: ",
@@ -1311,22 +1135,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             }
         }
 
-        if (spec.stkWellEmissionsPerSecond > 0) {
-            address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
-            uint128[] memory emissionPerSecond = new uint128[](1);
-            emissionPerSecond[0] = spec.stkWellEmissionsPerSecond.toUint128();
-            uint256[] memory totalStaked = new uint256[](1);
-            totalStaked[0] = 0;
-            address[] memory underlyingAsset = new address[](1);
-            underlyingAsset[0] = safetyModule;
-
+        if (spec.stkWellEmissionsPerSecond != -1) {
             _pushAction(
-                safetyModule,
+                addresses.getAddress("STK_GOVTOKEN_PROXY"),
                 abi.encodeWithSignature(
-                    "configureAssets(uint128[],uint256[],address[])",
-                    emissionPerSecond,
-                    totalStaked,
-                    underlyingAsset
+                    "configureAsset(uint128,address)",
+                    spec.stkWellEmissionsPerSecond.toUint256().toUint128(),
+                    addresses.getAddress("STK_GOVTOKEN_PROXY")
                 ),
                 string.concat(
                     "Set reward speed to ",
@@ -1560,69 +1375,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 )
             );
         }
-
-        // Process Merkle campaigns
-        for (uint256 i = 0; i < spec.merkleCampaigns.length; i++) {
-            MekleCampaign memory campaign = spec.merkleCampaigns[i];
-
-            address rewardTokenAddress = addresses.getAddress(
-                campaign.rewardToken
-            );
-
-            // Approve the merkle campaign creator to spend the reward token
-            _pushAction(
-                rewardTokenAddress,
-                abi.encodeWithSignature(
-                    "approve(address,uint256)",
-                    addresses.getAddress("MERKLE_CAMPAIGN_CREATOR"),
-                    campaign.amount
-                ),
-                "Approve merkle campaign creator"
-            );
-
-            // Accept conditions (required before creating campaigns)
-            _pushAction(
-                addresses.getAddress("MERKLE_CAMPAIGN_CREATOR"),
-                abi.encodeWithSignature("acceptConditions()"),
-                "Accept merkle campaign creator conditions"
-            );
-
-            // Create the campaign parameters struct
-            IMerkleCampaignCreator.CampaignParameters
-                memory campaignParams = IMerkleCampaignCreator
-                    .CampaignParameters({
-                        campaignId: bytes32(0),
-                        creator: address(0),
-                        rewardToken: rewardTokenAddress,
-                        amount: campaign.amount,
-                        campaignType: 18, // 4 is Token Holding Campaign
-                        startTimestamp: campaign.startTimestamp,
-                        duration: campaign.duration,
-                        campaignData: "" // Empty campaign data for now
-                    });
-
-            // Create the merkle campaign
-            _pushAction(
-                addresses.getAddress("MERKLE_CAMPAIGN_CREATOR"),
-                abi.encodeWithSignature(
-                    "createCampaign((bytes32,address,address,uint256,uint32,uint32,uint32,bytes))",
-                    campaignParams.campaignId,
-                    campaignParams.creator,
-                    campaignParams.rewardToken,
-                    campaignParams.amount,
-                    campaignParams.campaignType,
-                    campaignParams.startTimestamp,
-                    campaignParams.duration,
-                    campaignParams.campaignData
-                ),
-                string.concat(
-                    "Create merkle campaign for token ",
-                    vm.getLabel(rewardTokenAddress),
-                    " with amount ",
-                    vm.toString(campaign.amount)
-                )
-            );
-        }
     }
 
     function _validateMoonbeam(Addresses addresses) private {
@@ -1749,7 +1501,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         }
 
         {
-            if (spec.stkWellEmissionsPerSecond > 0) {
+            if (spec.stkWellEmissionsPerSecond != -1) {
                 address stkGovToken = addresses.getAddress(
                     "STK_GOVTOKEN_PROXY"
                 );
@@ -1758,7 +1510,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
 
                 (uint256 emissionsPerSecond, , ) = stkWell.assets(stkGovToken);
                 assertEq(
-                    emissionsPerSecond,
+                    int256(emissionsPerSecond),
                     spec.stkWellEmissionsPerSecond,
                     string.concat(
                         "Emissions per second for the Safety Module on Moonbeam is incorrect"
@@ -1788,10 +1540,11 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             )
         );
 
+        // validate that stellaswap receive the correct amount of well
         assertApproxEqAbs(
             well.balanceOf(stellaSwapRewarder),
             wellBalancesBefore[stellaSwapRewarder] + addRewardInfo.amount,
-            10e18,
+            1e18,
             string.concat(
                 "StellaSwap Rewarder should have received the correct amount of WELL"
             )
@@ -1971,19 +1724,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     }
                 }
 
-                bool isTempGov = to ==
-                    addresses.getAddress("TEMPORAL_GOVERNOR");
-
-                if (!alreadyChecked && !isTempGov) {
+                if (!alreadyChecked) {
                     assertEq(
                         IERC20(addresses.getAddress("xWELL_PROXY")).balanceOf(
                             to
                         ),
                         wellBalancesBefore[to] + spec.withdrawWell[i].amount,
-                        string.concat(
-                            "withdrawWell: balance wrong for ",
-                            vm.getLabel(to)
-                        )
+                        string.concat("balance wrong for ", vm.getLabel(to))
                     );
                 }
             }
@@ -1999,7 +1746,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 addresses.getAddress("STK_GOVTOKEN_PROXY")
             );
             assertEq(
-                emissionsPerSecond,
+                int256(emissionsPerSecond),
                 spec.stkWellEmissionsPerSecond,
                 "Emissions per second for the Safety Module is incorrect"
             );
@@ -2139,80 +1886,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 )
             );
         }
-
-        // Validate Merkle campaign configurations
-        for (uint256 i = 0; i < spec.merkleCampaigns.length; i++) {
-            MekleCampaign memory campaign = spec.merkleCampaigns[i];
-
-            IMerkleCampaignCreator.CampaignParameters
-                memory campaignParameters = IMerkleCampaignCreator
-                    .CampaignParameters({
-                        campaignId: bytes32(0),
-                        creator: address(0),
-                        rewardToken: addresses.getAddress(campaign.rewardToken),
-                        amount: campaign.amount,
-                        campaignType: 18, // 4 is Token Holding Campaign
-                        startTimestamp: campaign.startTimestamp,
-                        duration: campaign.duration,
-                        campaignData: "" // Empty campaign data for now
-                    });
-
-            // Check if the campaign is created
-            bytes32 campaignId = IMerkleCampaignCreator(
-                addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
-            ).campaignId(campaignParameters);
-
-            assertNotEq(
-                campaignId,
-                bytes32(0),
-                string.concat(
-                    "Merkle campaign should be created for token ",
-                    campaign.rewardToken
-                )
-            );
-            // Add back once custom error 0x9b35ed3b fixed
-            // Validate campaign exists and has correct parameters
-            //      IMerkleCampaignCreator.CampaignParameters
-            //          memory storedCampaign = IMerkleCampaignCreator(
-            //              addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
-            //          ).campaign(campaignId);
-
-            //      assertEq(
-            //          storedCampaign.rewardToken,
-            //          addresses.getAddress(campaign.rewardToken),
-            //          string.concat(
-            //              "Campaign reward token mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
-
-            //      assertEq(
-            //          storedCampaign.amount,
-            //          campaign.amount,
-            //          string.concat(
-            //              "Campaign amount mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
-
-            //      assertEq(
-            //          storedCampaign.duration,
-            //          campaign.duration,
-            //          string.concat(
-            //              "Campaign duration mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
-
-            //      assertEq(
-            //          storedCampaign.startTimestamp,
-            //          campaign.startTimestamp,
-            //          string.concat(
-            //              "Campaign start timestamp mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
-        }
     }
 
     function _validateTransferDestination(
@@ -2232,31 +1905,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             keccak256(abi.encodePacked(destination)) !=
                 keccak256("STK_GOVTOKEN_IMPL"),
             "should not transfer funds to Safety Module logic contract"
-        );
-    }
-
-    function _parseTimestamps(string memory encodedJson) private {
-        // parse start timestamp
-        string memory filter = ".startTimeStamp";
-        bytes memory parsedJson = vm.parseJson(encodedJson, filter);
-        startTimeStamp = abi.decode(parsedJson, (uint256));
-
-        // parse end timestamp
-        filter = ".endTimeSTamp";
-        parsedJson = vm.parseJson(encodedJson, filter);
-        endTimeStamp = abi.decode(parsedJson, (uint256));
-
-        // validate timestamps
-        assertGt(
-            endTimeStamp,
-            startTimeStamp,
-            "endTimeStamp must be greater than startTimeStamp"
-        );
-
-        assertGe(
-            endTimeStamp - startTimeStamp,
-            3 weeks,
-            "endTimeStamp - startTimeStamp must be greater than 3 weeks"
         );
     }
 }

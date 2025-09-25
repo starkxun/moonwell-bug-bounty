@@ -8,11 +8,10 @@ import "@forge-std/Test.sol";
 import {Configs} from "@proposals/Configs.sol";
 import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
-import {IMetaMorphoBase, IMetaMorpho} from "@protocol/morpho/IMetaMorpho.sol";
+import {IMetaMorphoBase, IMetaMorpho, IMetaMorphoStaticTyping} from "@protocol/morpho/IMetaMorpho.sol";
 import {IMetaMorphoFactory} from "@protocol/morpho/IMetaMorphoFactory.sol";
 import {ParameterValidation} from "@proposals/utils/ParameterValidation.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
-import {DeployMorphoVault} from "@script/DeployMorphoVault.s.sol";
 
 /// DO_VALIDATE=true DO_PRINT=true DO_BUILD=true DO_RUN=true forge script
 /// proposals/mips/mip-b47/mip-b47.sol:mipb47
@@ -40,9 +39,8 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
     }
 
     function deploy(Addresses addresses, address) public override {
-        DeployMorphoVault deployMorphoVault = new DeployMorphoVault();
         // Deploy the new MetaMorpho vault with msg.sender as initial owner
-        address vaultAddress = deployMorphoVault.createVault(
+        address vaultAddress = createVault(
             addresses,
             msg.sender,
             addresses.getAddress("USDC"),
@@ -129,11 +127,43 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
             "USDC Ecosystem Vault curator incorrect"
         );
 
+        address guardianOnChain = IMetaMorpho(vaultAddress).guardian();
         // Validate guardian should be Security Council
         assertEq(
-            IMetaMorphoBase(vaultAddress).guardian(),
+            guardianOnChain,
             addresses.getAddress("SECURITY_COUNCIL"),
-            "USDC Ecosystem Vault guardian incorrect"
+            "Pending guardian should be Security Council"
         );
+    }
+
+    function createVault(
+        Addresses addresses,
+        address initialOwner,
+        address asset,
+        uint256 initialTimelock,
+        string memory vaultName,
+        string memory vaultSymbol,
+        bytes32 salt
+    ) public returns (address) {
+        string memory vaultAddressName = string.concat(
+            vaultSymbol,
+            "_METAMORPHO_VAULT"
+        );
+
+        // Then create the MetaMorpho vault
+        address vaultAddress = IMetaMorphoFactory(
+            addresses.getAddress("MORPHO_FACTORY_V1_1")
+        ).createMetaMorpho(
+                initialOwner,
+                initialTimelock,
+                asset,
+                vaultName,
+                vaultSymbol,
+                salt
+            );
+
+        addresses.addAddress(vaultAddressName, vaultAddress);
+
+        return vaultAddress;
     }
 }

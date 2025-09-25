@@ -209,7 +209,8 @@
             }
         ],
         "withdrawWell": [],
-        "multiRewarder": []
+        "multiRewarder": [],
+        "merkleCampaigns": []
     },
     "1284": {
         "bridgeToRecipient": [
@@ -669,7 +670,8 @@
                 "to": "ECOSYSTEM_RESERVE_PROXY"
             }
         ],
-        "multiRewarder": []
+        "multiRewarder": [],
+        "merkleCampaigns": []
     },
     "endTimeSTamp": 1744947000,
     "startTimeStamp": 1742527800

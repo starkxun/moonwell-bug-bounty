@@ -201,7 +201,8 @@
             }
         ],
         "transferReserves": [],
-        "withdrawWell": []
+        "withdrawWell": [],
+        "merkleCampaigns": []
     },
     "1284": {
         "bridgeToRecipient": [
@@ -565,7 +566,8 @@
             }
         ],
         "transferReserves": [],
-        "withdrawWell": []
+        "withdrawWell": [],
+        "merkleCampaigns": []
     },
     "endTimeSTamp": 1732851000,
     "startTimeStamp": 1730431800

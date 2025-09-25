@@ -5,25 +5,22 @@
 ## Proposal Summary
 
 This proposal creates a new Moonwell Ecosystem USDC Vault (meUSDC), accepts
-ownership on behalf of the temporal governor, sets Anthias Labs as the curator,
-and configures a 4-day curator timelock. This proposal establishes a new
-MetaMorpho vault for USDC as part of the Moonwell ecosystem expansion. The vault
-will be managed by Anthias Labs as curator, providing professional vault
-management and risk oversight with a 4-day timelock for safety.
-
-This MIP proposes:
+ownership on behalf of the temporal governor and sets Anthias Labs as the
+curator. This proposal establishes a new Morpho vault for USDC as part of the
+Moonwell ecosystem expansion. The vault will be managed by Anthias Labs as
+curator, providing professional vault management and risk oversight. This MIP
+proposes:
 
 1. Accept the Moonwell Ecosystem USDC Vault ownership
 2. Set the curator as Anthias Labs
-3. Set the curator timelock for 4 days (96 hours)
 
 ## Background and Rationale
 
 Building on the successful collaboration between the Moonwell DAO, Anthias Labs,
-and Morpho, to establish a credit line for WELL tokens. This will be a new
-lending facility to finance the next large expansion of Moonwell through the
-Morpho market product. This new infrastructure will finance future operations
-without selling WELL or MAMO tokens on the market.
+and Morpho, this proposal introduces a credit line for WELL tokens. This
+facility establishes infrastructure to finance the next phase of Moonwell’s
+growth through Morpho, enabling the DAO to fund operations and expansion in a
+capital-efficient way that preserves long-term alignment.
 
 ## Vault Configuration and Roles
 
@@ -32,8 +29,9 @@ The Moonwell Ecosystem USDC Vault will be configured as follows:
 - **Owner:** Moonwell DAO (via the Moonwell Temporal Governor contract)
 - **Curator:** Anthias Labs
 - **Allocator:** Public allocator contract and Risk Manager Multisig
-- **Guardian:** Moonwell Security Council
-- **Timelock period:** 4 days
+  (0x08eDEbFFaE68970DCf751baa826182b3a4aCFC05)
+- **Guardian:** Moonwell Security Council (specifically, setting the guardian to
+  the security council multisig: 0x446342AF4F3bCD374276891C6bb3411bf2F8779E)
 - **Vault name:** Moonwell Ecosystem USDC
 - **Symbol:** meUSDC
 
@@ -48,7 +46,6 @@ If this proposal passes, the following onchain actions will be executed:
 
 1. Moonwell DAO will accept the Moonwell Ecosystem USDC Vault ownership
 2. Set the curator as Anthias Labs
-3. Set the curator timelock for 4 days (96 hours)
 
 ## Voting Options
 
@@ -60,8 +57,7 @@ If this proposal passes, the following onchain actions will be executed:
 
 ## Conclusion
 
-The addition of an Moonwell Ecosystem USDC Vault represents a strategic
-expansion of Moonwell on Base. By leveraging Morpho infrastructure and the risk
-management expertise of Anthias Labs, we can expand our strategic ability and
-double down on our success, adding new employees, office space, and other
-necessary expansions.
+The addition of a Moonwell Ecosystem USDC Vault represents a strategic expansion
+of Moonwell on Base. By leveraging Morpho infrastructure and the risk management
+expertise of Anthias Labs, this initiative supports the long-term growth of the
+protocol and its ecosystem.

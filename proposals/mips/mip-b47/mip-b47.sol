@@ -76,14 +76,14 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
             "Set curator as Anthias Labs"
         );
 
-        // Set curator timelock to 4 days
+        // Set guardian as Security Council
         _pushAction(
             addresses.getAddress(VAULT_ADDRESS_NAME),
             abi.encodeWithSignature(
-                "submitTimelock(uint256)",
-                CURATOR_TIMELOCK
+                "submitGuardian(address)",
+                addresses.getAddress("SECURITY_COUNCIL")
             ),
-            "Set curator timelock to 4 days"
+            "Set guardian as Security Council"
         );
     }
 
@@ -129,11 +129,11 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
             "USDC Ecosystem Vault curator incorrect"
         );
 
-        // Validate timelock should be 4 days
+        // Validate guardian should be Security Council
         assertEq(
-            IMetaMorphoBase(vaultAddress).timelock(),
-            CURATOR_TIMELOCK,
-            "USDC Ecosystem Vault timelock incorrect"
+            IMetaMorphoBase(vaultAddress).guardian(),
+            addresses.getAddress("SECURITY_COUNCIL"),
+            "USDC Ecosystem Vault guardian incorrect"
         );
     }
 }

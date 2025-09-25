@@ -51,10 +51,6 @@ contract CreateMetaMorphoVault is Script, Test {
         // Initialize addresses
         Addresses addresses = new Addresses();
 
-        // Get the Morpho factory address from the chain configuration
-        address factoryAddress = addresses.getAddress("MORPHO_FACTORY_V1_1");
-        IMetaMorphoFactory factory = IMetaMorphoFactory(factoryAddress);
-
         // Hardcoded vault parameters
         address initialOwner = msg.sender;
         uint256 initialTimelock = 0;
@@ -82,22 +78,7 @@ contract CreateMetaMorphoVault is Script, Test {
         console.log("market id:");
         console.logBytes32(marketId);
 
-        vm.startBroadcast();
-
-        // First create the USDC/WELL market on Morpho Blue
-        //        createMarket(addresses);
-
-        // Then create the MetaMorpho vault
-        address vaultAddress = factory.createMetaMorpho(
-            initialOwner,
-            initialTimelock,
-            asset,
-            VAULT_NAME,
-            VAULT_SYMBOL,
-            SALT
-        );
-
-        vm.stopBroadcast();
+        address vaultAddress = createVault(addresses);
 
         usdcVault = IMetaMorpho(vaultAddress);
 
@@ -377,5 +358,26 @@ contract CreateMetaMorphoVault is Script, Test {
         );
 
         return oracle;
+    }
+
+    function createVault(Addresses addresses) internal returns (address) {
+           vm.startBroadcast();
+
+        // First create the USDC/WELL market on Morpho Blue
+        //        createMarket(addresses);
+
+        // Then create the MetaMorpho vault
+        address vaultAddress = IMetaMorphoFactory(addresses.getAddress("MORPHO_FACTORY_V1_1")).createMetaMorpho(
+            initialOwner,
+            initialTimelock,
+            asset,
+            VAULT_NAME,
+            VAULT_SYMBOL,
+            SALT
+        );
+
+        vm.stopBroadcast();
+
+        return vaultAddress;
     }
 }

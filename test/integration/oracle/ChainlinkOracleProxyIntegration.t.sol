@@ -1,27 +1,26 @@
 pragma solidity 0.8.19;
 
-import "@forge-std/Test.sol";
-
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {DeployChainlinkOracleProxy} from "@script/DeployChainlinkOracleProxy.s.sol";
-import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {ChainIds, BASE_FORK_ID} from "@utils/ChainIds.sol";
 
-contract ChainlinkOracleProxyIntegrationTest is Test {
+contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
     using ChainIds for uint256;
 
     ChainlinkOracleProxy public proxy;
     AggregatorV3Interface public originalFeed;
-    Addresses public addresses;
     DeployChainlinkOracleProxy public deployer;
 
-    function setUp() public {
-        ChainIds.createForksAndSelect(BASE_FORK_ID);
+    function setUp() public override {
+        uint256 primaryForkId = vm.envUint("PRIMARY_FORK_ID");
 
-        addresses = new Addresses();
+        super.setUp();
+        vm.selectFork(primaryForkId);
+
         deployer = new DeployChainlinkOracleProxy();
 
         originalFeed = AggregatorV3Interface(
@@ -190,8 +189,8 @@ contract ChainlinkOracleProxyIntegrationTest is Test {
 
         assertEq(
             proxyOwner,
-            address(deployer),
-            "Proxy owner should be the deployer"
+            addresses.getAddress("MRD_PROXY_ADMIN"),
+            "Proxy owner should be MRD_PROXY_ADMIN"
         );
     }
 

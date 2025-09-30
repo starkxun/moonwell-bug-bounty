@@ -72,7 +72,9 @@ contract ChainlinkOracleProxy is
             uint80 answeredInRound
         )
     {
-        return priceFeed.getRoundData(_roundId);
+        (roundId, answer, startedAt, updatedAt, answeredInRound) = priceFeed
+            .getRoundData(_roundId);
+        _validateRoundData(roundId, answer, updatedAt, answeredInRound);
     }
 
     function latestRoundData()
@@ -87,10 +89,28 @@ contract ChainlinkOracleProxy is
             uint80 answeredInRound
         )
     {
-        return priceFeed.latestRoundData();
+        (roundId, answer, startedAt, updatedAt, answeredInRound) = priceFeed
+            .latestRoundData();
+        _validateRoundData(roundId, answer, updatedAt, answeredInRound);
     }
 
     function latestRound() external view override returns (uint256) {
         return priceFeed.latestRound();
+    }
+
+    /// @notice Validate the round data from Chainlink
+    /// @param roundId The round ID to validate
+    /// @param answer The price to validate
+    /// @param updatedAt The timestamp when the round was updated
+    /// @param answeredInRound The round ID in which the answer was computed
+    function _validateRoundData(
+        uint80 roundId,
+        int256 answer,
+        uint256 updatedAt,
+        uint80 answeredInRound
+    ) internal pure {
+        require(answer > 0, "Chainlink price cannot be lower or equal to 0");
+        require(updatedAt != 0, "Round is in incompleted state");
+        require(answeredInRound >= roundId, "Stale price");
     }
 }

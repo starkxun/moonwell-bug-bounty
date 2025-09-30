@@ -4,6 +4,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 
 import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
+import {MockChainlinkOracle} from "@test/mock/MockChainlinkOracle.sol";
 import {DeployChainlinkOracleProxy} from "@script/DeployChainlinkOracleProxy.s.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {ChainIds, BASE_FORK_ID} from "@utils/ChainIds.sol";
@@ -208,5 +209,160 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
             block.timestamp - updatedAt < 86400,
             "Price should be updated within 24 hours"
         );
+    }
+
+    function testLatestRoundDataRevertsOnZeroPrice() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(0, 8);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        vm.expectRevert("Chainlink price cannot be lower or equal to 0");
+        testProxy.latestRoundData();
+    }
+
+    function testLatestRoundDataRevertsOnNegativePrice() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(-1, 8);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        vm.expectRevert("Chainlink price cannot be lower or equal to 0");
+        testProxy.latestRoundData();
+    }
+
+    function testLatestRoundDataRevertsOnZeroUpdatedAt() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        mockFeed.set(1, 100e8, 1, 0, 1);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        vm.expectRevert("Round is in incompleted state");
+        testProxy.latestRoundData();
+    }
+
+    function testLatestRoundDataRevertsOnStalePrice() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        mockFeed.set(5, 100e8, 1, 1, 4);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        vm.expectRevert("Stale price");
+        testProxy.latestRoundData();
+    }
+
+    function testGetRoundDataRevertsOnZeroPrice() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        mockFeed.set(5, 0, 1, 1, 5);
+
+        vm.expectRevert("Chainlink price cannot be lower or equal to 0");
+        testProxy.getRoundData(5);
+    }
+
+    function testGetRoundDataRevertsOnZeroUpdatedAt() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        mockFeed.set(5, 100e8, 1, 0, 5);
+
+        vm.expectRevert("Round is in incompleted state");
+        testProxy.getRoundData(5);
+    }
+
+    function testGetRoundDataRevertsOnStalePrice() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        mockFeed.set(5, 100e8, 1, 1, 4);
+
+        vm.expectRevert("Stale price");
+        testProxy.getRoundData(5);
     }
 }

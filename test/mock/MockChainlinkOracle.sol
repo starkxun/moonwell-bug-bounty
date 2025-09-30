@@ -45,7 +45,7 @@ contract MockChainlinkOracle is AggregatorV3Interface {
             uint80 answeredInRound
         )
     {
-        return (_getRoundId, _value, 1620651856, 1620651856, _getRoundId);
+        return (_getRoundId, _value, _startedAt, _updatedAt, _answeredInRound);
     }
 
     function latestRoundData()
@@ -60,13 +60,7 @@ contract MockChainlinkOracle is AggregatorV3Interface {
             uint80 answeredInRound
         )
     {
-        return (
-            _roundId,
-            _value,
-            block.timestamp,
-            block.timestamp,
-            _answeredInRound
-        );
+        return (_roundId, _value, _startedAt, _updatedAt, _answeredInRound);
     }
 
     function set(

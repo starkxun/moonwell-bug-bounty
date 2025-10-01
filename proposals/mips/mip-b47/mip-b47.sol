@@ -161,8 +161,11 @@ contract mipb47 is HybridProposal, Configs, ParameterValidation {
                 vaultSymbol,
                 salt
             );
-
-        addresses.addAddress(vaultAddressName, vaultAddress);
+        if (addresses.isAddressSet(vaultAddressName)) {
+            addresses.changeAddress(vaultAddressName, vaultAddress, true);
+        } else {
+            addresses.addAddress(vaultAddressName, vaultAddress);
+        }
 
         return vaultAddress;
     }

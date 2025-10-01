@@ -30,11 +30,11 @@ contract CreateMetaMorphoVault is Script, Test {
 
     uint256 public constant LLTV = 625_000_000_000_000_000; // 62.5%
 
-    string public constant VAULT_NAME = "Lunar Labs Treasury USDC Vault"; // TODO verify
+    string public constant VAULT_NAME = "Lunar Labs Treasury USDC Vault";
 
-    string public constant VAULT_SYMBOL = "llUSDC"; // TODO verify
+    string public constant VAULT_SYMBOL = "llUSDC";
 
-    bytes32 public constant SALT = keccak256(abi.encodePacked("llUSDC")); // TODO change
+    bytes32 public constant SALT = keccak256(abi.encodePacked("llUSDC"));
 
     uint256 public constant USDC_VAULT_DEPOSIT = 1e6;
 
@@ -78,7 +78,12 @@ contract CreateMetaMorphoVault is Script, Test {
         console.log("market id:");
         console.logBytes32(marketId);
 
-        address vaultAddress = createVault(addresses);
+        address vaultAddress = createVault(
+            addresses,
+            initialOwner,
+            initialTimelock,
+            asset
+        );
 
         usdcVault = IMetaMorpho(vaultAddress);
 
@@ -360,21 +365,28 @@ contract CreateMetaMorphoVault is Script, Test {
         return oracle;
     }
 
-    function createVault(Addresses addresses) internal returns (address) {
-           vm.startBroadcast();
+    function createVault(
+        Addresses addresses,
+        address initialOwner,
+        uint256 initialTimelock,
+        address assetToken
+    ) internal returns (address) {
+        vm.startBroadcast();
 
         // First create the USDC/WELL market on Morpho Blue
         //        createMarket(addresses);
 
         // Then create the MetaMorpho vault
-        address vaultAddress = IMetaMorphoFactory(addresses.getAddress("MORPHO_FACTORY_V1_1")).createMetaMorpho(
-            initialOwner,
-            initialTimelock,
-            asset,
-            VAULT_NAME,
-            VAULT_SYMBOL,
-            SALT
-        );
+        address vaultAddress = IMetaMorphoFactory(
+            addresses.getAddress("MORPHO_FACTORY_V1_1")
+        ).createMetaMorpho(
+                initialOwner,
+                initialTimelock,
+                assetToken,
+                VAULT_NAME,
+                VAULT_SYMBOL,
+                SALT
+            );
 
         vm.stopBroadcast();
 

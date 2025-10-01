@@ -34,7 +34,6 @@
             }
         ],
         "irModels": [
-
             {
                 "baseRatePerYear": 0,
                 "jumpMultiplierPerYear": 9e18,

@@ -208,7 +208,8 @@ jobs:
                   : output;
 
                 // Only comment if the word 'failed' appears in the tail
-                if (/\bfailed\b/i.test(tailToCheck)) {
+                const didFail = /\bfailed\b/i.test(tailToCheck);
+                if (!didFail) {
                   // Truncate to last 65k characters if too long
                   const MAX_LEN = 65000;
                   if (output.length > MAX_LEN) {

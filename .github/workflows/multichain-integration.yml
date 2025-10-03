@@ -196,8 +196,19 @@ jobs:
             if (fs.existsSync('output.txt')) {
                 let output = fs.readFileSync('output.txt', 'utf8');
 
-                // Skip commenting if the word 'failed' is present
-                if (/\bfailed\b/i.test(output)) {
+                const lines = output.split(/\r?\n/);
+                let lastProposalEndIdx = -1;
+                for (let i = 0; i < lines.length; i++) {
+                  if (lines[i].trim().includes('PROPOSAL END')) {
+                    lastProposalEndIdx = i;
+                  }
+                }
+                const tailToCheck = lastProposalEndIdx >= 0 && lastProposalEndIdx + 1 < lines.length
+                  ? lines.slice(lastProposalEndIdx + 1).join('\n')
+                  : output;
+
+                // Skip commenting if the word 'failed' appears in the tail
+                if (/\bfailed\b/i.test(tailToCheck)) {
                   return;
                 }
 

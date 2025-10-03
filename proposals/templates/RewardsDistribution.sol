@@ -171,6 +171,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
 
     // leftover reward rate on USDC morpho vault from previous proposal
     uint256 leftoverRewardRate;
+    uint256 leftoverPeriodFinish;
 
     mapping(uint256 => JsonSpecExternalChain) externalChainActions;
 
@@ -339,10 +340,18 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 );
 
                 if (chainId == OPTIMISM_CHAIN_ID) {
-                    (, , , uint256 rewardRate, , ) = IMultiRewards(
-                        addresses.getAddress("USDC_MULTI_REWARDER")
-                    ).rewardData(addresses.getAddress("xWELL_PROXY"));
+                    (
+                        ,
+                        ,
+                        uint256 periodFinish,
+                        uint256 rewardRate,
+                        ,
+
+                    ) = IMultiRewards(
+                            addresses.getAddress("USDC_MULTI_REWARDER")
+                        ).rewardData(addresses.getAddress("xWELL_PROXY"));
                     leftoverRewardRate = rewardRate;
+                    leftoverPeriodFinish = periodFinish;
                 }
             }
         }
@@ -2127,8 +2136,19 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             );
 
             // Calculate expected reward rate and validate
-            uint256 expectedRewardRate = (rewarder.reward / rewardsDuration) +
-                leftoverRewardRate;
+            // Match MultiRewards.sol logic (lines 619-627):
+            // remaining = periodFinish - block.timestamp
+            // leftover = remaining * rewardRate
+            // newRewardRate = (reward + leftover) / duration
+            uint256 leftover = 0;
+            if (
+                leftoverRewardRate > 0 && block.timestamp < leftoverPeriodFinish
+            ) {
+                uint256 remaining = leftoverPeriodFinish - block.timestamp;
+                leftover = remaining * leftoverRewardRate;
+            }
+            uint256 expectedRewardRate = (rewarder.reward + leftover) /
+                rewardsDuration;
 
             // Validate reward rate
             assertApproxEqRel(

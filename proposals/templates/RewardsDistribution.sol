@@ -169,6 +169,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     uint256 startTimeStamp;
     uint256 endTimeStamp;
 
+    // leftover reward rate on USDC morpho vault from previous proposal
+    uint256 leftoverRewardRate;
+
     mapping(uint256 => JsonSpecExternalChain) externalChainActions;
 
     /// @notice we save this value to check if the transferFrom amount was successfully transferred
@@ -334,6 +337,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     bytes32(uint256(153)),
                     encodedData
                 );
+
+                if (chainId == OPTIMISM_CHAIN_ID) {
+                    (, , , uint256 rewardRate, , ) = IMultiRewards(
+                        addresses.getAddress("USDC_MULTI_REWARDER")
+                    ).rewardData(addresses.getAddress("xWELL_PROXY"));
+                    leftoverRewardRate = rewardRate;
+                }
             }
         }
 
@@ -1506,7 +1516,22 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     uint256,
                     uint256
                 ) {
-                    // No need to call setRewardsDuration because it's already set as 4 weeks and we don't need to set every month
+                    _pushAction(
+                        vault,
+                        abi.encodeWithSignature(
+                            "setRewardsDuration(address,uint256)",
+                            rewardToken,
+                            duration
+                        ),
+                        string.concat(
+                            "Set reward duration for ",
+                            vm.getLabel(rewardToken),
+                            " on ",
+                            multiRewarder.vault,
+                            " with duration ",
+                            vm.toString(duration)
+                        )
+                    );
                 } catch {
                     _pushAction(
                         vault,
@@ -2117,7 +2142,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             );
 
             // Calculate expected reward rate and validate
-            uint256 expectedRewardRate = rewarder.reward / rewardsDuration;
+            uint256 expectedRewardRate = (rewarder.reward / rewardsDuration) +
+                leftoverRewardRate;
 
             // Validate reward rate
             assertApproxEqRel(

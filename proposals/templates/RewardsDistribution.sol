@@ -1516,22 +1516,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     uint256,
                     uint256
                 ) {
-                    _pushAction(
-                        vault,
-                        abi.encodeWithSignature(
-                            "setRewardsDuration(address,uint256)",
-                            rewardToken,
-                            duration
-                        ),
-                        string.concat(
-                            "Set reward duration for ",
-                            vm.getLabel(rewardToken),
-                            " on ",
-                            multiRewarder.vault,
-                            " with duration ",
-                            vm.toString(duration)
-                        )
-                    );
+                    // No need to call setRewardsDuration because it's already set as 4 weeks and we don't need to set every month
                 } catch {
                     _pushAction(
                         vault,

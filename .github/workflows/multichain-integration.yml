@@ -207,23 +207,21 @@ jobs:
                   ? lines.slice(lastProposalEndIdx + 1).join('\n')
                   : output;
 
-                // Skip commenting if the word 'failed' appears in the tail
+                // Only comment if the word 'failed' appears in the tail
                 if (/\bfailed\b/i.test(tailToCheck)) {
-                  return;
-                }
+                  // Truncate to last 65k characters if too long
+                  const MAX_LEN = 65000;
+                  if (output.length > MAX_LEN) {
+                    output = output.slice(-MAX_LEN);
+                  }
 
-                // Truncate to last 65k characters if too long
-                const MAX_LEN = 65000;
-                if (output.length > MAX_LEN) {
-                  output = output.slice(-MAX_LEN);
+                  const prNumber = context.payload.pull_request.number;
+                  github.rest.issues.createComment({
+                     ...context.repo,
+                     issue_number: prNumber,
+                     body: `\`\`\`\n${output}\n\`\`\``
+                  });
                 }
-
-                const prNumber = context.payload.pull_request.number;
-                github.rest.issues.createComment({
-                   ...context.repo,
-                   issue_number: prNumber,
-                   body: `\`\`\`\n${output}\n\`\`\``
-                });
              }
 
   run-post-proposal-tests:

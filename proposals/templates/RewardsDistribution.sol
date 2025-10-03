@@ -2147,10 +2147,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 uint256 remaining = leftoverPeriodFinish - block.timestamp;
                 leftover = remaining * leftoverRewardRate;
             }
-            // TODO: fail on purpose to test multichain-integration.yaml
-            // uint256 expectedRewardRate = (rewarder.reward + leftover) /
-            //     rewardsDuration;
-            uint256 expectedRewardRate = 0;
+            uint256 expectedRewardRate = (rewarder.reward + leftover) /
+                rewardsDuration;
 
             // Validate reward rate
             assertApproxEqRel(

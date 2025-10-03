@@ -345,6 +345,24 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             bytes32(uint256(153)),
             encodedData
         );
+
+        vm.selectFork(BASE_FORK_ID);
+
+        // TODO remove this after testing
+        deal(
+            addresses.getAddress("xWELL_PROXY"),
+            addresses.getAddress("F-AERO_MULTISIG"),
+            600191928791850000000000
+        );
+
+        vm.startPrank(addresses.getAddress("F-AERO_MULTISIG"));
+        IERC20(addresses.getAddress("xWELL_PROXY")).approve(
+            addresses.getAddress("TEMPORAL_GOVERNOR"),
+            600191928791850000000000
+        );
+        vm.stopPrank();
+
+        vm.selectFork(MOONBEAM_FORK_ID);
     }
 
     function afterSimulationHook(Addresses addresses) public override {
@@ -1488,22 +1506,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     uint256,
                     uint256
                 ) {
-                    _pushAction(
-                        vault,
-                        abi.encodeWithSignature(
-                            "setRewardsDuration(address,uint256)",
-                            rewardToken,
-                            duration
-                        ),
-                        string.concat(
-                            "Set reward duration for ",
-                            vm.getLabel(rewardToken),
-                            " on ",
-                            multiRewarder.vault,
-                            " with duration ",
-                            vm.toString(duration)
-                        )
-                    );
+                    // No need to call setRewardsDuration because it's already set as 4 weeks and we don't need to set every month
                 } catch {
                     _pushAction(
                         vault,

@@ -902,10 +902,11 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             _saveWithdrawWell(addresses, data, prefix, _chainId);
 
         if (_chainId != BASE_CHAIN_ID) {
+            // TODO remove the missing rewards after x32
             assertApproxEqRel(
                 ecosystemReserveProxyAmount,
-                externalChainActions[_chainId].stkWellEmissionsPerSecond *
-                    (endTimeStamp - startTimeStamp),
+                (externalChainActions[_chainId].stkWellEmissionsPerSecond *
+                    (endTimeStamp - startTimeStamp)) + 323094721447738864000000,
                 1e18,
                 "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
             );

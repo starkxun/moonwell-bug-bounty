@@ -1,4 +1,4 @@
-name: Multichain 
+name: Multichain
 
 on: [pull_request]
 
@@ -86,7 +86,7 @@ jobs:
            retry_wait_seconds: 60
            max_attempts: 3
            command: time forge test --mc LiveProposalsIntegrationTest -vvv --ffi
-                    
+
 
   run-on-chain-calldata-check:
     name: On Chain Calldata Check
@@ -161,8 +161,8 @@ jobs:
               issue_number: issue_number
             });
 
-            const actionComments = comments.data.filter(comment => 
-                comment.user.login === 'github-actions[bot]' 
+            const actionComments = comments.data.filter(comment =>
+                comment.user.login === 'github-actions[bot]'
              );
 
             if (actionComments.length === 0) {
@@ -194,13 +194,35 @@ jobs:
           script: |
             const fs = require('fs');
             if (fs.existsSync('output.txt')) {
-                const output = fs.readFileSync('output.txt', 'utf8');
-                const prNumber = context.payload.pull_request.number;
-                github.rest.issues.createComment({
-                   ...context.repo,
-                   issue_number: prNumber,
-                   body: `\`\`\`\n${output}\n\`\`\``
-                   });
+                let output = fs.readFileSync('output.txt', 'utf8');
+
+                const lines = output.split(/\r?\n/);
+                let lastProposalEndIdx = -1;
+                for (let i = 0; i < lines.length; i++) {
+                  if (lines[i].trim().includes('PROPOSAL END')) {
+                    lastProposalEndIdx = i;
+                  }
+                }
+                const tailToCheck = lastProposalEndIdx >= 0 && lastProposalEndIdx + 1 < lines.length
+                  ? lines.slice(lastProposalEndIdx + 1).join('\n')
+                  : output;
+
+                // Only comment if the word 'failed' appears in the tail
+                const didFail = /\bfailed\b/i.test(tailToCheck);
+                if (!didFail) {
+                  // Truncate to last 65k characters if too long
+                  const MAX_LEN = 65000;
+                  if (output.length > MAX_LEN) {
+                    output = output.slice(-MAX_LEN);
+                  }
+
+                  const prNumber = context.payload.pull_request.number;
+                  github.rest.issues.createComment({
+                     ...context.repo,
+                     issue_number: prNumber,
+                     body: `\`\`\`\n${output}\n\`\`\``
+                  });
+                }
              }
 
   run-post-proposal-tests:
@@ -227,5 +249,3 @@ jobs:
            timeout_minutes: 20
            max_attempts: 1
            command: time forge test --match-contract PostProposalTest -vvvvv --ffi
-                    
-

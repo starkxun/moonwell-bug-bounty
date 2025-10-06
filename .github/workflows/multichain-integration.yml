@@ -194,36 +194,38 @@ jobs:
           script: |
             const fs = require('fs');
             if (fs.existsSync('output.txt')) {
-                let output = fs.readFileSync('output.txt', 'utf8');
+              let output = fs.readFileSync('output.txt', 'utf8');
 
-                const lines = output.split(/\r?\n/);
-                let lastProposalEndIdx = -1;
-                for (let i = 0; i < lines.length; i++) {
-                  if (lines[i].trim().includes('PROPOSAL END')) {
-                    lastProposalEndIdx = i;
-                  }
+              const lines = output.split(/\r?\n/);
+              let lastProposalEndIdx = -1;
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().includes('PROPOSAL END')) {
+                  lastProposalEndIdx = i;
                 }
-                const tailToCheck = lastProposalEndIdx >= 0 && lastProposalEndIdx + 1 < lines.length
-                  ? lines.slice(lastProposalEndIdx + 1).join('\n')
-                  : output;
+              }
+              const tailToCheck = lastProposalEndIdx >= 0 && lastProposalEndIdx + 1 < lines.length
+                ? lines.slice(lastProposalEndIdx + 1).join('\n')
+                : output;
 
-                // Only comment if the word 'failed' appears in the tail
-                const didFail = /\bfailed\b/i.test(tailToCheck);
-                if (!didFail) {
-                  // Truncate to last 65k characters if too long
-                  const MAX_LEN = 65000;
-                  if (output.length > MAX_LEN) {
-                    output = output.slice(-MAX_LEN);
-                  }
+              // only want to log the proposal + calldata when there are no failures, and there are no dev proposals
+              const failed = /\bfailed\b/i.test(tailToCheck);
+              const withDevProposals = /\bPROPOSAL START\b/i.test(output);
 
-                  const prNumber = context.payload.pull_request.number;
-                  github.rest.issues.createComment({
-                     ...context.repo,
-                     issue_number: prNumber,
-                     body: `\`\`\`\n${output}\n\`\`\``
-                  });
+              if (!failed && withDevProposals) {
+                // truncate to last 65k characters for github comment
+                const MAX_LEN = 65000;
+                if (output.length > MAX_LEN) {
+                  output = output.slice(-MAX_LEN);
                 }
-             }
+
+                const prNumber = context.payload.pull_request.number;
+                github.rest.issues.createComment({
+                    ...context.repo,
+                    issue_number: prNumber,
+                    body: `\`\`\`\n${output}\n\`\`\``
+                });
+              }
+            }
 
   run-post-proposal-tests:
     name: Post Proposal Integration Test

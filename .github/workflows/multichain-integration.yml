@@ -221,7 +221,7 @@ jobs:
                 : output;
 
               // only want to log the proposal + calldata when there are no failures, and there are no dev proposals
-              const failed = /\bfailed\b/i.test(tailToCheck);
+              const failed = /\b(failed|revert)\b/i.test(tailToCheck);
               const withDevProposals = /\bPROPOSAL START\b/i.test(output);
 
               if (!failed && withDevProposals) {

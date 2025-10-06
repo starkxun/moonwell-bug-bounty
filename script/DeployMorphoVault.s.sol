@@ -30,11 +30,11 @@ contract DeployMorphoVault is Script, Test {
 
     uint256 public constant LLTV = 625_000_000_000_000_000; // 62.5%
 
-    string public constant VAULT_NAME = "Lunar Labs Treasury USDC Vault"; // TODO verify
+    string public constant VAULT_NAME = "Lunar Labs Treasury USDC Vault";
 
-    string public constant VAULT_SYMBOL = "llUSDC"; // TODO verify
+    string public constant VAULT_SYMBOL = "llUSDC";
 
-    bytes32 public constant SALT = keccak256(abi.encodePacked("llUSDC")); // TODO change
+    bytes32 public constant SALT = keccak256(abi.encodePacked("llUSDC"));
 
     uint256 public constant USDC_VAULT_DEPOSIT = 1e6;
 

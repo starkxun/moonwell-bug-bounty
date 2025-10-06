@@ -1,4 +1,4 @@
-name: Multichain
+name: Multichain 
 
 on: [pull_request]
 
@@ -86,7 +86,7 @@ jobs:
            retry_wait_seconds: 60
            max_attempts: 3
            command: time forge test --mc LiveProposalsIntegrationTest -vvv --ffi
-
+                    
 
   run-on-chain-calldata-check:
     name: On Chain Calldata Check
@@ -161,8 +161,8 @@ jobs:
               issue_number: issue_number
             });
 
-            const actionComments = comments.data.filter(comment =>
-                comment.user.login === 'github-actions[bot]'
+            const actionComments = comments.data.filter(comment => 
+                comment.user.login === 'github-actions[bot]' 
              );
 
             if (actionComments.length === 0) {
@@ -194,25 +194,13 @@ jobs:
           script: |
             const fs = require('fs');
             if (fs.existsSync('output.txt')) {
-                let output = fs.readFileSync('output.txt', 'utf8');
-
-                // Skip commenting if the word 'failed' is present
-                if (/\bfailed\b/i.test(output)) {
-                  return;
-                }
-
-                // Truncate to last 65k characters if too long
-                const MAX_LEN = 65000;
-                if (output.length > MAX_LEN) {
-                  output = output.slice(-MAX_LEN);
-                }
-
+                const output = fs.readFileSync('output.txt', 'utf8');
                 const prNumber = context.payload.pull_request.number;
                 github.rest.issues.createComment({
                    ...context.repo,
                    issue_number: prNumber,
                    body: `\`\`\`\n${output}\n\`\`\``
-                });
+                   });
              }
 
   run-post-proposal-tests:
@@ -239,3 +227,5 @@ jobs:
            timeout_minutes: 20
            max_attempts: 1
            command: time forge test --match-contract PostProposalTest -vvvvv --ffi
+                    
+

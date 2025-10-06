@@ -181,6 +181,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     /// @notice Track reserve automation contract balances before proposal execution
     mapping(address => uint256) public reserveAutomationBalancesBefore;
 
+    bytes public constant payloadMerkleCampaignBase =
+        hex"000000000000000000000000a88594d404727625a9437c3f886c7643872296ae00000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
             vm.readFile(vm.envString("DESCRIPTION_PATH"))
@@ -1621,7 +1624,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                         campaignType: 18, // 4 is Token Holding Campaign
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
-                        campaignData: "" // Empty campaign data for now
+                        campaignData: payloadMerkleCampaignBase // Empty campaign data for now
                     });
 
             // Create the merkle campaign
@@ -2183,13 +2186,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 memory campaignParameters = IMerkleCampaignCreator
                     .CampaignParameters({
                         campaignId: bytes32(0),
-                        creator: address(0),
+                        creator: addresses.getAddress("TEMPORAL_GOVERNOR"),
                         rewardToken: addresses.getAddress(campaign.rewardToken),
                         amount: campaign.amount,
                         campaignType: 18, // 4 is Token Holding Campaign
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
-                        campaignData: "" // Empty campaign data for now
+                        campaignData: payloadMerkleCampaignBase
                     });
 
             // Check if the campaign is created
@@ -2205,48 +2208,56 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     campaign.rewardToken
                 )
             );
-            // Add back once custom error 0x9b35ed3b fixed
-            // Validate campaign exists and has correct parameters
-            //      IMerkleCampaignCreator.CampaignParameters
-            //          memory storedCampaign = IMerkleCampaignCreator(
-            //              addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
-            //          ).campaign(campaignId);
 
-            //      assertEq(
-            //          storedCampaign.rewardToken,
-            //          addresses.getAddress(campaign.rewardToken),
-            //          string.concat(
-            //              "Campaign reward token mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            // Validate that the campaign data is correct
+            IMerkleCampaignCreator.CampaignParameters
+                memory returnedCampaignParams = IMerkleCampaignCreator(
+                    addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
+                ).campaign(campaignId);
 
-            //      assertEq(
-            //          storedCampaign.amount,
-            //          campaign.amount,
-            //          string.concat(
-            //              "Campaign amount mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            assertEq(
+                returnedCampaignParams.creator,
+                campaignParameters.creator,
+                "Creator should be correct"
+            );
 
-            //      assertEq(
-            //          storedCampaign.duration,
-            //          campaign.duration,
-            //          string.concat(
-            //              "Campaign duration mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            assertEq(
+                returnedCampaignParams.rewardToken,
+                campaignParameters.rewardToken,
+                "Reward token should be correct"
+            );
 
-            //      assertEq(
-            //          storedCampaign.startTimestamp,
-            //          campaign.startTimestamp,
-            //          string.concat(
-            //              "Campaign start timestamp mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            assertApproxEqRel(
+                returnedCampaignParams.amount,
+                campaignParameters.amount -
+                    ((campaignParameters.amount * 1) / 100),
+                1e16,
+                "Amount should be correct"
+            ); // reduce the 1% fee
+
+            assertEq(
+                returnedCampaignParams.campaignType,
+                campaignParameters.campaignType,
+                "Campaign type should be correct"
+            );
+
+            assertEq(
+                returnedCampaignParams.startTimestamp,
+                campaignParameters.startTimestamp,
+                "Start timestamp should be correct"
+            );
+
+            assertEq(
+                returnedCampaignParams.duration,
+                campaignParameters.duration,
+                "Duration should be correct"
+            );
+
+            assertEq(
+                returnedCampaignParams.campaignData,
+                payloadMerkleCampaignBase,
+                "Campaign data should be correct"
+            );
         }
     }
 

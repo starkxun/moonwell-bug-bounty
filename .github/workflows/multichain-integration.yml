@@ -1,4 +1,4 @@
-name: Multichain 
+name: Multichain
 
 on: [pull_request]
 
@@ -86,7 +86,7 @@ jobs:
            retry_wait_seconds: 60
            max_attempts: 3
            command: time forge test --mc LiveProposalsIntegrationTest -vvv --ffi
-                    
+
 
   run-on-chain-calldata-check:
     name: On Chain Calldata Check
@@ -155,20 +155,33 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
+            let withDevProposals;
+            if (fs.existsSync('output.txt')) {
+              const output = fs.readFileSync('output.txt', 'utf8');
+              withDevProposals = /\bPROPOSAL START\b/i.test(output);
+            }
             const issue_number = context.payload.pull_request.number;
-            const comments = await github.rest.issues.listComments({
+            const { data: allComments } = await github.rest.issues.listComments({
               ...context.repo,
               issue_number: issue_number
             });
 
-            const actionComments = comments.data.filter(comment => 
-                comment.user.login === 'github-actions[bot]' 
-             );
-
-            if (actionComments.length === 0) {
+            const botComments = allComments.filter(c => c.user && c.user.login === 'github-actions[bot]');
+            if (botComments.length === 0) {
               return;
             }
-            for (const comment of actionComments) {
+
+            // Preserve the latest bot comment if it contains 'Proposal Calldata' and there are no dev proposals in the output
+            const latestBot = botComments[botComments.length - 1];
+            const keepId = latestBot && typeof latestBot.body === 'string' && latestBot.body.includes('Proposal Calldata') && !withDevProposals
+              ? latestBot.id
+              : null;
+
+            for (const comment of botComments) {
+              if (keepId && comment.id === keepId) {
+                continue;
+              }
               await github.rest.issues.deleteComment({
                 ...context.repo,
                 comment_id: comment.id,
@@ -251,5 +264,3 @@ jobs:
            timeout_minutes: 20
            max_attempts: 1
            command: time forge test --match-contract PostProposalTest -vvvvv --ffi
-                    
-

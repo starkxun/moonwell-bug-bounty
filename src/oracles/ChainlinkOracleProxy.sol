@@ -95,7 +95,13 @@ contract ChainlinkOracleProxy is
     }
 
     function latestRound() external view override returns (uint256) {
-        return priceFeed.latestRound();
+        try priceFeed.latestRound() returns (uint256 round) {
+            return round;
+        } catch {
+            // Fallback: extract round ID from latestRoundData
+            (uint80 roundId, , , , ) = priceFeed.latestRoundData();
+            return uint256(roundId);
+        }
     }
 
     /// @notice Validate the round data from Chainlink

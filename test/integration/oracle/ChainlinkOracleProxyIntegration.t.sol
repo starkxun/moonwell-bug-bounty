@@ -5,6 +5,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {MockChainlinkOracle} from "@test/mock/MockChainlinkOracle.sol";
+import {MockChainlinkOracleWithoutLatestRound} from "@test/mock/MockChainlinkOracleWithoutLatestRound.sol";
 import {DeployChainlinkOracleProxy} from "@script/DeployChainlinkOracleProxy.s.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {ChainIds, BASE_FORK_ID} from "@utils/ChainIds.sol";
@@ -364,5 +365,60 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
 
         vm.expectRevert("Stale price");
         testProxy.getRoundData(5);
+    }
+
+    function testLatestRoundFallbackWhenNotSupported() public {
+        // Create a mock feed that doesn't support latestRound()
+        MockChainlinkOracleWithoutLatestRound mockFeed = new MockChainlinkOracleWithoutLatestRound(
+                100e8,
+                8
+            );
+        mockFeed.set(12345, 100e8, 1, 1, 12345);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        // Call latestRound() - should fall back to getting roundId from latestRoundData()
+        uint256 round = testProxy.latestRound();
+
+        // Verify it returns the correct roundId from latestRoundData
+        assertEq(round, 12345, "Should return roundId from fallback");
+    }
+
+    function testLatestRoundReturnsDirectlyWhenSupported() public {
+        // Create a normal mock feed that supports latestRound()
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        mockFeed.set(99999, 100e8, 1, 1, 99999);
+
+        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
+                address(newProxy),
+                addresses.getAddress("MRD_PROXY_ADMIN"),
+                abi.encodeWithSignature(
+                    "initialize(address,address)",
+                    address(mockFeed),
+                    addresses.getAddress("MRD_PROXY_ADMIN")
+                )
+            );
+        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+            address(proxyContract)
+        );
+
+        // Call latestRound() - should use the direct call
+        uint256 round = testProxy.latestRound();
+
+        // Verify it returns the correct roundId
+        assertEq(round, 99999, "Should return roundId from direct call");
     }
 }

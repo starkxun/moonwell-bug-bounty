@@ -66,6 +66,8 @@ contract CreateMorphoMarket is Script, Test {
 
         _createMarket(morphoBlue, market, marketId, cfg);
 
+        // TODO: test the below after a valid market creation
+
         if (bytes(cfg.vaultAddressName).length != 0 && cfg.supplyCap > 0) {
             _configureVault(addresses, cfg.vaultAddressName, cfg.supplyCap, cfg.setSupplyQueue, marketId, market);
         }

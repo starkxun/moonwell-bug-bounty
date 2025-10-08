@@ -22,14 +22,11 @@ contract DeployMorphoVault is Script, Test {
         string assetName; // name key to resolve via Addresses.getAddress(), e.g. "USDC"
         string saltString; // arbitrary string to hash into a salt, e.g. "llUSDC"
         uint256 initialTimelock; // initial timelock duration
-        string curatorName; // optional: name key for initial curator to set
     }
 
     function run() external {
-        // TODO: BASE_FORK_ID.createForksAndSelect fails
         // Setup fork for Base chain
         BASE_FORK_ID.createForksAndSelect();
-        // vm.createSelectFork("base");
 
         string memory configPath = vm.envString("NEW_VAULT_PATH");
         string memory json = vm.readFile(configPath);
@@ -38,12 +35,7 @@ contract DeployMorphoVault is Script, Test {
 
         Addresses addresses = new Addresses();
 
-        // If already registered, skip
-        if (addresses.isAddressSet(cfg.addressName)) {
-            console.log("Vault already exists for name:", cfg.addressName);
-            console.log("Address:", addresses.getAddress(cfg.addressName));
-            return;
-        }
+        require(!addresses.isAddressSet(cfg.addressName), "Vault already exists");
 
         address asset = addresses.getAddress(cfg.assetName);
 
@@ -64,14 +56,11 @@ contract DeployMorphoVault is Script, Test {
 
         addresses.addAddress(cfg.addressName, vaultAddress);
 
-        // Set msg.sender as curator role as default
+        // Set msg.sender as initial curator; see SetFinalCurator
         IMetaMorpho(vaultAddress).setCurator(initialOwner);
 
-        // Optionally set initial curator on the vaultAddress
-        if (bytes(cfg.curatorName).length != 0) {
-            address curator = addresses.getAddress(cfg.curatorName);
-            IMetaMorpho(vaultAddress).setCurator(curator);
-        }
+        // Validate the created vault
+        _validate(addresses, vaultAddress, cfg);
 
         vm.stopBroadcast();
 
@@ -94,8 +83,75 @@ contract DeployMorphoVault is Script, Test {
         if (json.parseRaw(".initialTimelock").length != 0) {
             cfg.initialTimelock = json.readUint(".initialTimelock");
         }
-        if (json.parseRaw(".curatorName").length != 0) {
-            cfg.curatorName = json.readString(".curatorName");
-        }
+    }
+
+    function _validate(
+        Addresses addresses,
+        address vault,
+        VaultConfig memory cfg
+    ) internal view {
+        IMetaMorpho v = IMetaMorpho(vault);
+
+        // Verify the vault parameters
+        assertEq(v.owner(), msg.sender, "Vault owner should match msg.sender");
+        assertEq(
+            v.asset(),
+            addresses.getAddress(cfg.assetName),
+            "Vault asset should match config asset"
+        );
+        assertEq(v.name(), cfg.vaultName, "Vault name mismatch");
+        assertEq(v.symbol(), cfg.vaultSymbol, "Vault symbol mismatch");
+        assertEq(v.curator(), msg.sender, "Curator should match msg.sender");
+
+        console.log("Validation completed successfully");
+        console.log("Vault owner:", v.owner());
+        console.log("Vault asset:", v.asset());
+        console.log("Vault name:", v.name());
+        console.log("Vault symbol:", v.symbol());
+        console.log("Vault curator:", v.curator());
+    }
+}
+
+/// @notice Follow-up script to set the final curator on a deployed MetaMorpho vault
+contract SetFinalCurator is Script, Test {
+    using ChainIds for uint256;
+    using stdJson for string;
+
+    struct CuratorConfig {
+        string addressName; // name in Addresses registry for the vault
+        string curatorName; // name in Addresses registry for the final curator
+    }
+
+    function run() external {
+        // Setup fork for Base chain
+        BASE_FORK_ID.createForksAndSelect();
+
+        string memory configPath = vm.envString("NEW_VAULT_PATH");
+        string memory json = vm.readFile(configPath);
+
+        CuratorConfig memory cfg = _parseConfig(json);
+
+        Addresses addresses = new Addresses();
+
+        assertTrue(addresses.isAddressSet(cfg.addressName), "Vault is not deployed");
+        assertTrue(bytes(cfg.curatorName).length != 0, "curatorName required");
+
+        address vault = addresses.getAddress(cfg.addressName);
+        address curator = addresses.getAddress(cfg.curatorName);
+
+        vm.startBroadcast();
+        IMetaMorpho(vault).setCurator(curator);
+        vm.stopBroadcast();
+
+        address newCurator = IMetaMorpho(vault).curator();
+        console.log("Set final curator on vault:", vault);
+        console.log("Curator:", newCurator);
+    }
+
+    function _parseConfig(
+        string memory json
+    ) internal pure returns (CuratorConfig memory cfg) {
+        cfg.addressName = json.readString(".addressName");
+        cfg.curatorName = json.readString(".curatorName");
     }
 }

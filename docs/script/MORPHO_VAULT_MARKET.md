@@ -1,10 +1,10 @@
 # Deploying a Morpho Vault & Creating Markets
 
-This doc explains the overall process for deploying new Morpho vaults and creating new markets for it.
+This doc explains the overall process for deploying a new Morpho vault and creating new markets for it.
 
 This process involves several forge scripts found in two contracts
-- `DeployMorphoVault.s.sol`
-- `CreateMorphoMarket.s.sol`
+- `script/templates/DeployMorphoVault.s.sol`
+- `script/templates/CreateMorphoMarket.s.sol`
 
 Generally, the process is as follows:
 1. Create a market(s) on Morpho Blue

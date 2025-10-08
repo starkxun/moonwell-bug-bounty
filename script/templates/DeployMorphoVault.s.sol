@@ -56,7 +56,7 @@ contract DeployMorphoVault is Script, Test {
 
         addresses.addAddress(cfg.addressName, vaultAddress);
 
-        // Set msg.sender as initial curator; see SetFinalCurator
+        // Set msg.sender as initial curator; see SetFinalCurator where we set the final curator (ie anthias)
         IMetaMorpho(vaultAddress).setCurator(initialOwner);
 
         // Validate the created vault

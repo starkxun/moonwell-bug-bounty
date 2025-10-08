@@ -286,6 +286,9 @@ contract ConfigureMorphoMarketCaps is Script, Test {
 
         Addresses addresses = new Addresses();
 
+        // TODO: need to prank anthias for dry run; remove this line before merging
+        vm.prank(addresses.getAddress("ANTHIAS_MULTISIG"));
+
         MarketParams memory market = MarketParams({
             loanToken: addresses.getAddress(cfg.loanTokenName),
             collateralToken: addresses.getAddress(cfg.collateralTokenName),
@@ -380,19 +383,25 @@ contract MorphoSupplyBorrow is Script, Test {
         address morphoBlue = addresses.getAddress("MORPHO_BLUE");
         IMetaMorpho vault = IMetaMorpho(addresses.getAddress(cfg.vaultAddressName));
 
+        // Scale human-readable amounts by oracle decimals
+        uint256 depositAmount = _scaleByDecimals(cfg.vaultDepositAssets, cfg.oracle.quoteFeedDecimals);
+        uint256 supplyAmount = _scaleByDecimals(cfg.collateralAmount, cfg.oracle.baseFeedDecimals);
+        uint256 borrowAmount = _scaleByDecimals(cfg.borrowAssets, cfg.oracle.quoteFeedDecimals);
+
         vm.startBroadcast();
-        IERC20(market.loanToken).approve(address(vault), cfg.vaultDepositAssets);
-        uint256 sharesMinted = vault.deposit(cfg.vaultDepositAssets, msg.sender);
-        console.log("Deposited loan asset into vault:", cfg.vaultDepositAssets);
+
+        IERC20(market.loanToken).approve(address(vault), depositAmount);
+        uint256 sharesMinted = vault.deposit(depositAmount, msg.sender);
+        console.log("Deposited loan asset into vault:", depositAmount);
         console.log("Shares minted:", sharesMinted);
 
-        IERC20(market.collateralToken).approve(morphoBlue, cfg.collateralAmount);
-        IMorphoBlue(morphoBlue).supplyCollateral(market, cfg.collateralAmount, msg.sender, "");
-        console.log("Supplied collateral:", cfg.collateralAmount);
+        IERC20(market.collateralToken).approve(morphoBlue, supplyAmount);
+        IMorphoBlue(morphoBlue).supplyCollateral(market, supplyAmount, msg.sender, "");
+        console.log("Supplied collateral:", supplyAmount);
 
         (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(morphoBlue).borrow(
             market,
-            cfg.borrowAssets,
+            borrowAmount,
             0,
             msg.sender,
             msg.sender
@@ -416,5 +425,11 @@ contract MorphoSupplyBorrow is Script, Test {
         cfg.borrowAssets = json.readUint(".borrowAssets");
         // oracle nested
         cfg.oracle.addressName = json.readString(".oracle.addressName");
+        cfg.oracle.baseFeedDecimals = uint8(json.readUint(".oracle.baseFeedDecimals"));
+        cfg.oracle.quoteFeedDecimals = uint8(json.readUint(".oracle.quoteFeedDecimals"));
+    }
+
+    function _scaleByDecimals(uint256 amount, uint8 decimals) internal pure returns (uint256) {
+        return amount * (10 ** uint256(decimals));
     }
 }

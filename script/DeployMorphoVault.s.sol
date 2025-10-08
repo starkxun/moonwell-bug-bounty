@@ -16,6 +16,7 @@ import {console} from "@forge-std/console.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
 
+// TODO: DEPRECATED
 /// @notice Script to create a new MetaMorpho vault using the Morpho factory
 contract DeployMorphoVault is Script, Test {
     using ChainIds for uint256;

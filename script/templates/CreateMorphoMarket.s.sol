@@ -12,6 +12,7 @@ import {IMorphoBlue} from "@protocol/morpho/IMorphoBlue.sol";
 import {IMorphoChainlinkOracleV2Factory} from "@protocol/morpho/IMorphoChainlinkOracleFactory.sol";
 import {IMorphoChainlinkOracleV2} from "@protocol/morpho/IMorphoChainlinkOracleV2.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
+import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
 import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {console} from "@forge-std/console.sol";
 import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
@@ -27,12 +28,6 @@ contract CreateMorphoMarket is Script, Test {
         string collateralTokenName; // name key for collateral token (Addresses)
         string irmName; // name key for IRM (Addresses)
         uint256 lltv; // loan-to-value mantissa
-        uint256 supplyCap; // cap in loan token units
-        bool setSupplyQueue; // if true, update supply queue to only this market
-        bool autoDeposit; // if true, perform deposit/supply/borrow demo actions
-        uint256 vaultDepositAssets; // amount of assets to deposit into the vault
-        uint256 collateralAmount; // amount of collateral to supply to Morpho
-        uint256 borrowAssets; // amount of assets to borrow
         // Optional oracle deployment block: presence triggers deployment if missing
         bool oracleConfigPresent;
         OracleConfig oracle;
@@ -57,11 +52,6 @@ contract CreateMorphoMarket is Script, Test {
 
         Addresses addresses = new Addresses();
 
-        // Enforcing an immediate borrow and deposit: https://docs.morpho.org/curate/tutorials-market-v1/creating-market/#fill-all-attributes
-        assertGt(cfg.vaultDepositAssets, 0, "config.vaultDepositAssets must be greater than 0");
-        assertGt(cfg.collateralAmount, 0, "config.collateralAmount must be greater than 0");
-        assertGt(cfg.borrowAssets, 0, "config.borrowAssets must be greater than 0");
-
         vm.startBroadcast();
 
         // Ensure oracle is deployed or deploy it
@@ -75,13 +65,6 @@ contract CreateMorphoMarket is Script, Test {
 
         _validate(addresses, market, cfg, marketId, morphoBlue);
 
-        // TODO: is this ever optional?
-        if (bytes(cfg.vaultAddressName).length != 0 && cfg.supplyCap > 0) {
-            _configureVault(addresses, cfg.vaultAddressName, cfg.supplyCap, cfg.setSupplyQueue, marketId, market);
-        }
-
-        _supplyAndBorrow(addresses, cfg.vaultAddressName, morphoBlue, market, cfg.vaultDepositAssets, cfg.collateralAmount, cfg.borrowAssets);
-
         vm.stopBroadcast();
     }
 
@@ -89,7 +72,6 @@ contract CreateMorphoMarket is Script, Test {
         string memory json
     ) internal pure returns (MarketConfig memory cfg) {
         cfg = _parseCore(json);
-        cfg = _parseOptionals(json, cfg);
         (bool hasOracle, OracleConfig memory ocfg) = _maybeParseOracle(json);
         if (hasOracle) {
             cfg.oracleConfigPresent = true;
@@ -105,29 +87,6 @@ contract CreateMorphoMarket is Script, Test {
         cfg.collateralTokenName = json.readString(".collateralTokenName");
         cfg.irmName = json.readString(".irmName");
         cfg.lltv = json.readUint(".lltv");
-        cfg.supplyCap = json.readUint(".supplyCap");
-    }
-
-    function _parseOptionals(
-        string memory json,
-        MarketConfig memory cfg
-    ) internal pure returns (MarketConfig memory) {
-        if (json.parseRaw(".setSupplyQueue").length != 0) {
-            cfg.setSupplyQueue = json.readBool(".setSupplyQueue");
-        }
-        if (json.parseRaw(".autoDeposit").length != 0) {
-            cfg.autoDeposit = json.readBool(".autoDeposit");
-        }
-        if (json.parseRaw(".vaultDepositAssets").length != 0) {
-            cfg.vaultDepositAssets = json.readUint(".vaultDepositAssets");
-        }
-        if (json.parseRaw(".collateralAmount").length != 0) {
-            cfg.collateralAmount = json.readUint(".collateralAmount");
-        }
-        if (json.parseRaw(".borrowAssets").length != 0) {
-            cfg.borrowAssets = json.readUint(".borrowAssets");
-        }
-        return cfg;
     }
 
     function _maybeParseOracle(
@@ -232,19 +191,6 @@ contract CreateMorphoMarket is Script, Test {
         );
         assertEq(market.lltv, cfg.lltv, "Market LLTV mismatch");
 
-        // If a vault is configured, validate cap status
-        if (bytes(cfg.vaultAddressName).length != 0 && cfg.supplyCap > 0) {
-            IMetaMorpho vault = IMetaMorpho(
-                addresses.getAddress(cfg.vaultAddressName)
-            );
-            (uint184 cap, bool accepted, uint64 removableAt) = IMetaMorphoStaticTyping(
-                address(vault)
-            ).config(marketId);
-            assertEq(cap, cfg.supplyCap, "Market cap mismatch");
-            assertEq(accepted, true, "Market cap should be accepted");
-            assertEq(removableAt, 0, "Market cap should not be removable");
-        }
-
         console.log("Validation completed successfully");
         console.log("Market loan token:", market.loanToken);
         console.log("Market collateral token:", market.collateralToken);
@@ -255,73 +201,6 @@ contract CreateMorphoMarket is Script, Test {
         console.logBytes32(marketId);
     }
 
-    function _configureVault(
-        Addresses addresses,
-        string memory vaultAddressName,
-        uint256 supplyCap,
-        bool setSupplyQueue,
-        bytes32 marketId,
-        MarketParams memory market
-    ) internal {
-        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(vaultAddressName));
-        vault.submitCap(market, supplyCap);
-        vault.acceptCap(market);
-
-        if (setSupplyQueue) {
-            bytes32[] memory queue = new bytes32[](1);
-            queue[0] = marketId;
-            vault.setSupplyQueue(queue);
-        }
-
-        (uint184 cap, bool accepted, ) = IMetaMorphoStaticTyping(address(vault))
-            .config(marketId);
-        require(cap == supplyCap && accepted, "cap not set/accepted");
-    }
-
-    function _supplyAndBorrow(
-        Addresses addresses,
-        string memory vaultAddressName,
-        address morphoBlue,
-        MarketParams memory market,
-        uint256 vaultDepositAssets,
-        uint256 collateralAmount,
-        uint256 borrowAssets
-    ) internal {
-        console.log("=== Step 1: Depositing into Vault ===");
-
-        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(vaultAddressName));
-
-        IERC20(market.loanToken).approve(address(vault), vaultDepositAssets);
-        uint256 sharesMinted = vault.deposit(vaultDepositAssets, msg.sender);
-        console.log("Deposited loan asset into vault:", vaultDepositAssets);
-        console.log("Shares minted:", sharesMinted);
-
-        console.log("=== Step 2: Supplying Collateral to Morpho ===");
-        IERC20(market.collateralToken).approve(morphoBlue, collateralAmount);
-        IMorphoBlue(morphoBlue).supplyCollateral(
-            market,
-            collateralAmount,
-            msg.sender,
-            ""
-        );
-        console.log("Supplied collateral:", collateralAmount);
-
-        console.log("=== Step 3: Borrowing Loan Asset ===");
-        (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(
-            morphoBlue
-        ).borrow(market, borrowAssets, 0, msg.sender, msg.sender);
-        console.log("Borrowed:", assetsBorrowed);
-        console.log("Borrow shares:", sharesBorrowed);
-
-        uint256 collateralBal = IERC20(market.collateralToken).balanceOf(
-            msg.sender
-        );
-        uint256 loanBal = IERC20(market.loanToken).balanceOf(msg.sender);
-        console.log("=== Final Balances ===");
-        console.log("Collateral token:", collateralBal);
-        console.log("Loan token:", loanBal);
-    }
-
     function _deployAndRegisterOracle(
         Addresses addresses,
         CreateMorphoMarket.OracleConfig memory ocfg
@@ -329,31 +208,31 @@ contract CreateMorphoMarket is Script, Test {
         IMorphoChainlinkOracleV2Factory oracleFactory = IMorphoChainlinkOracleV2Factory(
             addresses.getAddress("MORPHO_CHAINLINK_ORACLE_FACTORY")
         );
-        (AggregatorV3Interface baseFeed, AggregatorV3Interface quoteFeed) = _getFeeds(
+        AggregatorV3Interface baseFeed = _getOrDeployBaseFeed(
             addresses,
             ocfg
         );
         IMorphoChainlinkOracleV2 oracle = _createOracle(
             oracleFactory,
             baseFeed, // TODO: deploy the new proxy contract to wrap the base feed
-            quoteFeed, // TODO: not wrapping this!!!
+            AggregatorV3Interface(addresses.getAddress(ocfg.quoteFeedName)), // assuming we don't deploy quote feeds (ie USDC)
             ocfg.baseFeedDecimals,
             ocfg.quoteFeedDecimals
         );
         addresses.addAddress(ocfg.addressName, address(oracle));
     }
 
-    function _getFeeds(
+    function _getOrDeployBaseFeed(
         Addresses addresses,
         CreateMorphoMarket.OracleConfig memory ocfg
-    ) internal view returns (AggregatorV3Interface, AggregatorV3Interface) {
-        AggregatorV3Interface baseFeed = AggregatorV3Interface(
-            addresses.getAddress(ocfg.baseFeedName)
-        );
-        AggregatorV3Interface quoteFeed = AggregatorV3Interface(
-            addresses.getAddress(ocfg.quoteFeedName)
-        );
-        return (baseFeed, quoteFeed);
+    ) internal returns (AggregatorV3Interface) {
+        if (addresses.isAddressSet(ocfg.addressName)) {
+            return AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
+        }
+        ChainlinkOracleProxy proxy = new ChainlinkOracleProxy();
+        proxy.initialize(addresses.getAddress(ocfg.baseFeedName), msg.sender);
+        addresses.addAddress(ocfg.addressName, address(proxy));
+        return AggregatorV3Interface(address(proxy));
     }
 
     function _createOracle(
@@ -378,5 +257,164 @@ contract CreateMorphoMarket is Script, Test {
                 bytes32(0) // no salt
             );
         return oracle;
+    }
+}
+
+/// @notice Follow-up script to set cap and queue on an existing vault for a given market
+contract ConfigureMorphoMarketCaps is Script, Test {
+    using ChainIds for uint256;
+    using stdJson for string;
+
+    struct CapsConfig {
+        string vaultAddressName;
+        string loanTokenName;
+        string collateralTokenName;
+        string irmName;
+        uint256 lltv;
+        uint256 supplyCap;
+        bool setSupplyQueue;
+        CreateMorphoMarket.OracleConfig oracle;
+    }
+
+    uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
+
+    function run() external {
+        BASE_FORK_ID.createForksAndSelect();
+
+        string memory json = vm.readFile(vm.envString("NEW_MARKET_PATH"));
+        CapsConfig memory cfg = _parse(json);
+
+        Addresses addresses = new Addresses();
+
+        MarketParams memory market = MarketParams({
+            loanToken: addresses.getAddress(cfg.loanTokenName),
+            collateralToken: addresses.getAddress(cfg.collateralTokenName),
+            oracle: addresses.getAddress(cfg.oracle.addressName),
+            irm: addresses.getAddress(cfg.irmName),
+            lltv: cfg.lltv
+        });
+
+        bytes32 marketId = _computeMarketId(market);
+        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(cfg.vaultAddressName));
+
+        vm.startBroadcast();
+        vault.submitCap(market, cfg.supplyCap);
+        vault.acceptCap(market);
+        if (cfg.setSupplyQueue) {
+            bytes32[] memory queue = new bytes32[](1);
+            queue[0] = marketId;
+            vault.setSupplyQueue(queue);
+        }
+        vm.stopBroadcast();
+
+        (uint184 cap, bool accepted, uint64 removableAt) = IMetaMorphoStaticTyping(address(vault)).config(marketId);
+        assertEq(cap, cfg.supplyCap, "cap mismatch");
+        assertEq(accepted, true, "cap not accepted");
+        assertEq(removableAt, 0, "cap should not be removable");
+
+        console.log("Configured cap/queue for market:");
+        console.logBytes32(marketId);
+    }
+
+    function _parse(string memory json) internal pure returns (CapsConfig memory cfg) {
+        cfg.vaultAddressName = json.readString(".vaultAddressName");
+        cfg.loanTokenName = json.readString(".loanTokenName");
+        cfg.collateralTokenName = json.readString(".collateralTokenName");
+        cfg.irmName = json.readString(".irmName");
+        cfg.lltv = json.readUint(".lltv");
+        cfg.supplyCap = json.readUint(".supplyCap");
+        if (json.parseRaw(".setSupplyQueue").length != 0) {
+            cfg.setSupplyQueue = json.readBool(".setSupplyQueue");
+        }
+        // oracle nested
+        cfg.oracle.addressName = json.readString(".oracle.addressName");
+    }
+
+    function _computeMarketId(MarketParams memory params) internal pure returns (bytes32 marketParamsId) {
+        assembly ("memory-safe") {
+            marketParamsId := keccak256(params, MARKET_PARAMS_BYTES_LENGTH)
+        }
+    }
+}
+
+/// @notice Follow-up script to deposit to vault, supply collateral and borrow on a market
+contract MorphoSupplyBorrow is Script, Test {
+    using ChainIds for uint256;
+    using stdJson for string;
+
+    struct SBConfig {
+        string vaultAddressName;
+        string loanTokenName;
+        string collateralTokenName;
+        string irmName;
+        uint256 lltv;
+        uint256 vaultDepositAssets;
+        uint256 collateralAmount;
+        uint256 borrowAssets;
+        CreateMorphoMarket.OracleConfig oracle;
+    }
+
+    uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
+
+    function run() external {
+        BASE_FORK_ID.createForksAndSelect();
+
+        string memory json = vm.readFile(vm.envString("NEW_MARKET_PATH"));
+        SBConfig memory cfg = _parse(json);
+
+        Addresses addresses = new Addresses();
+
+        // Enforcing an immediate borrow and deposit: https://docs.morpho.org/curate/tutorials-market-v1/creating-market/#fill-all-attributes
+        assertGt(cfg.vaultDepositAssets, 0, "config.vaultDepositAssets must be greater than 0");
+        assertGt(cfg.collateralAmount, 0, "config.collateralAmount must be greater than 0");
+        assertGt(cfg.borrowAssets, 0, "config.borrowAssets must be greater than 0");
+
+        MarketParams memory market = MarketParams({
+            loanToken: addresses.getAddress(cfg.loanTokenName),
+            collateralToken: addresses.getAddress(cfg.collateralTokenName),
+            oracle: addresses.getAddress(cfg.oracle.addressName),
+            irm: addresses.getAddress(cfg.irmName),
+            lltv: cfg.lltv
+        });
+
+        address morphoBlue = addresses.getAddress("MORPHO_BLUE");
+        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(cfg.vaultAddressName));
+
+        vm.startBroadcast();
+        IERC20(market.loanToken).approve(address(vault), cfg.vaultDepositAssets);
+        uint256 sharesMinted = vault.deposit(cfg.vaultDepositAssets, msg.sender);
+        console.log("Deposited loan asset into vault:", cfg.vaultDepositAssets);
+        console.log("Shares minted:", sharesMinted);
+
+        IERC20(market.collateralToken).approve(morphoBlue, cfg.collateralAmount);
+        IMorphoBlue(morphoBlue).supplyCollateral(market, cfg.collateralAmount, msg.sender, "");
+        console.log("Supplied collateral:", cfg.collateralAmount);
+
+        (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(morphoBlue).borrow(
+            market,
+            cfg.borrowAssets,
+            0,
+            msg.sender,
+            msg.sender
+        );
+        vm.stopBroadcast();
+
+        console.log("Borrowed:", assetsBorrowed);
+        console.log("Borrow shares:", sharesBorrowed);
+        console.log("Loan token balance:", IERC20(market.loanToken).balanceOf(msg.sender));
+        console.log("Collateral token balance:", IERC20(market.collateralToken).balanceOf(msg.sender));
+    }
+
+    function _parse(string memory json) internal pure returns (SBConfig memory cfg) {
+        cfg.vaultAddressName = json.readString(".vaultAddressName");
+        cfg.loanTokenName = json.readString(".loanTokenName");
+        cfg.collateralTokenName = json.readString(".collateralTokenName");
+        cfg.irmName = json.readString(".irmName");
+        cfg.lltv = json.readUint(".lltv");
+        cfg.vaultDepositAssets = json.readUint(".vaultDepositAssets");
+        cfg.collateralAmount = json.readUint(".collateralAmount");
+        cfg.borrowAssets = json.readUint(".borrowAssets");
+        // oracle nested
+        cfg.oracle.addressName = json.readString(".oracle.addressName");
     }
 }

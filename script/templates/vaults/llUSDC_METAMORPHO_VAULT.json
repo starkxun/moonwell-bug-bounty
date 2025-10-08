@@ -4,7 +4,7 @@
   "vaultSymbol": "llUSDC",
   "assetName": "USDC",
   "factoryName": "MORPHO_FACTORY_V1_1",
-  "initialOwnerName": "LUKE_EOA",
+  "curatorName": "LUKE_EOA",
   "saltString": "llUSDC",
   "initialTimelock": 0
 }

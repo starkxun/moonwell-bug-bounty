@@ -135,6 +135,10 @@ export NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_WELL_MARKET.json
 
 forge script script/templates/CreateMorphoMarket.s.sol:CreateMorphoMarket
 
+
+# if we are running on a forked network, we need to impersonate the anthias multisig
+cast rpc --rpc-url $BASE_RPC_URL anvil_autoImpersonateAccount true
+
 # we prank as the anthias multisig for this dry run
 forge script script/templates/CreateMorphoMarket.s.sol:ConfigureMorphoMarketCaps --broadcast --unlocked 0x08edebffae68970dcf751baa826182b3a4acfc05
 

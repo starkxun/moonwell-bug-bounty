@@ -228,9 +228,8 @@ contract CreateMorphoMarket is Script, Test {
         Addresses addresses,
         CreateMorphoMarket.OracleConfig memory ocfg
     ) internal returns (AggregatorV3Interface) {
-        string memory proxyName = string.concat(ocfg.baseFeedName, "_PROXY");
-        if (addresses.isAddressSet(proxyName)) {
-            return AggregatorV3Interface(addresses.getAddress(proxyName));
+        if (addresses.isAddressSet(ocfg.addressName)) {
+            return AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
         }
 
         ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
@@ -247,7 +246,7 @@ contract CreateMorphoMarket is Script, Test {
             msg.sender
         );
 
-        addresses.addAddress(proxyName, address(proxy));
+        addresses.addAddress(ocfg.addressName, address(proxy));
         return AggregatorV3Interface(address(proxy));
     }
 
@@ -303,7 +302,7 @@ contract ConfigureMorphoMarketCaps is Script, Test {
         Addresses addresses = new Addresses();
 
         // TODO: need to prank anthias for dry run; remove this line before merging
-        vm.prank(addresses.getAddress("ANTHIAS_MULTISIG"));
+        vm.startPrank(addresses.getAddress("ANTHIAS_MULTISIG"));
 
         MarketParams memory market = MarketParams({
             loanToken: addresses.getAddress(cfg.loanTokenName),
@@ -330,6 +329,8 @@ contract ConfigureMorphoMarketCaps is Script, Test {
         assertEq(cap, cfg.supplyCap, "cap mismatch");
         assertEq(accepted, true, "cap not accepted");
         assertEq(removableAt, 0, "cap should not be removable");
+
+        vm.stopPrank();
 
         console.log("Configured cap/queue for market:");
         console.logBytes32(marketId);

@@ -42,7 +42,7 @@ Generally, the process is as follows:
 2. export env for `NEW_MARKET_PATH` pointing to this file
 
 ```bash
-set NEW_MARKET_PATH=script/templates/markets/{LOAN_TOKEN_NAME_COLLATERAL_TOKEN_NAME}.json
+export NEW_MARKET_PATH=script/templates/markets/{LOAN_TOKEN_NAME_COLLATERAL_TOKEN_NAME}.json
 ```
 
 3. run the forge script
@@ -70,7 +70,7 @@ forge script script/templates/CreateMorphoMarket.s.sol:CreateMorphoMarket
 2. export env for `NEW_VAULT_PATH` pointing to this file
 
 ```bash
-set NEW_VAULT_PATH=script/templates/vaults/{VAULT_NAME}.json
+export NEW_VAULT_PATH=script/templates/vaults/{VAULT_NAME}.json
 ```
 
 3. run the forge script
@@ -115,8 +115,8 @@ forge script script/templates/DeployMorphoVault.s.sol:SetFinalCurator
 
 ### WELL
 ```bash
-set NEW_VAULT_PATH=script/templates/vaults/meUSDC_METAMORPHO_VAULT.json
-set NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_WELL_MARKET.json
+export NEW_VAULT_PATH=script/templates/vaults/meUSDC_METAMORPHO_VAULT.json
+export NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_WELL_MARKET.json
 
 forge script script/templates/CreateMorphoMarket.s.sol:CreateMorphoMarket
 
@@ -131,8 +131,8 @@ forge script script/templates/DeployMorphoVault.s.sol:SetFinalCurator
 
 ### MAMO
 ```bash
-set NEW_VAULT_PATH=script/templates/vaults/meUSDC_METAMORPHO_VAULT.json
-set NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_MAMO_MARKET.json
+export NEW_VAULT_PATH=script/templates/vaults/meUSDC_METAMORPHO_VAULT.json
+export NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_MAMO_MARKET.json
 
 forge script script/templates/CreateMorphoMarket.s.sol:CreateMorphoMarket
 

@@ -65,7 +65,7 @@ contract CreateMorphoMarket is Script, Test {
 
         _createMarket(morphoBlue, market, marketId, cfg);
 
-        _validate(addresses, market, cfg, marketId, morphoBlue);
+        _validate(addresses, market, cfg, marketId);
 
         vm.stopBroadcast();
     }
@@ -174,8 +174,7 @@ contract CreateMorphoMarket is Script, Test {
         Addresses addresses,
         MarketParams memory market,
         MarketConfig memory cfg,
-        bytes32 marketId,
-        address morphoBlue
+        bytes32 marketId
     ) internal view {
         // Market params match config
         assertEq(

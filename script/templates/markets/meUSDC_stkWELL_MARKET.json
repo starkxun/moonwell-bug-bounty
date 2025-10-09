@@ -4,7 +4,7 @@
     "collateralTokenName": "STK_GOVTOKEN_PROXY",
     "irmName": "MORPHO_ADAPTIVE_CURVE_IRM",
     "lltv": 385000000000000000,
-    "supplyCap": 1000000000000,
+    "supplyCap": 10000000000,
     "setSupplyQueue": true,
     "morphoBlueName": "MORPHO_BLUE",
     "oracle": {

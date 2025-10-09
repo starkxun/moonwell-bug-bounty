@@ -131,7 +131,7 @@ forge script script/templates/DeployMorphoVault.s.sol:SetFinalCurator
 
 ```bash
 export NEW_VAULT_PATH=script/templates/vaults/meUSDC_METAMORPHO_VAULT.json
-export NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_WELL_MARKET.json
+export NEW_MARKET_PATH=script/templates/markets/meUSDC_WELL_MARKET.json
 
 forge script script/templates/CreateMorphoMarket.s.sol:CreateMorphoMarket
 
@@ -152,7 +152,7 @@ forge script script/templates/DeployMorphoVault.s.sol:SetFinalCurator
 
 ```bash
 export NEW_VAULT_PATH=script/templates/vaults/meUSDC_METAMORPHO_VAULT.json
-export NEW_MARKET_MARKET_PATH=script/templates/markets/meUSDC_MAMO_MARKET.json
+export NEW_MARKET_PATH=script/templates/markets/meUSDC_MAMO_MARKET.json
 
 forge script script/templates/CreateMorphoMarket.s.sol:CreateMorphoMarket
 

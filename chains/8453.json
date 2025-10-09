@@ -1148,5 +1148,15 @@
         "addr": "0xeF7541b388a77C1709a3d44BfBfC5c1ED3F0Ac94",
         "isContract": true,
         "name": "CHAINLINK_MAMO_USD"
+    },
+    {
+        "addr": "0x4a761563cE4a0212AD79A931b82fB294f4e9a623",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0x800e0d168a44D864204dE811945065fc59935ab3",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE_PROXY"
     }
 ]

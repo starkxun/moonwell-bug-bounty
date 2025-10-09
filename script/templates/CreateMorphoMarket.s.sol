@@ -251,7 +251,6 @@ contract CreateMorphoMarket is Script, Test {
             msg.sender
         );
 
-        addresses.addAddress(ocfg.addressName, address(proxy));
         return AggregatorV3Interface(address(proxy));
     }
 

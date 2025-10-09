@@ -432,11 +432,7 @@ contract MorphoSupplyBorrow is Script, Test {
             cfg.collateralAmount,
             cfg.oracle.baseFeedDecimals
         );
-        uint256 borrowAmount = _scaleByDecimals(
-            cfg.borrowAssets,
-            cfg.oracle.quoteFeedDecimals
-        );
-
+        uint256 borrowAmount = cfg.borrowAssets;
         vm.startBroadcast();
 
         IERC20(market.loanToken).approve(address(vault), depositAmount);

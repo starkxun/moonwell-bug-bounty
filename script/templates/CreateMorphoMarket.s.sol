@@ -13,6 +13,8 @@ import {IMorphoChainlinkOracleV2Factory} from "@protocol/morpho/IMorphoChainlink
 import {IMorphoChainlinkOracleV2} from "@protocol/morpho/IMorphoChainlinkOracleV2.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {console} from "@forge-std/console.sol";
 import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
@@ -226,12 +228,27 @@ contract CreateMorphoMarket is Script, Test {
         Addresses addresses,
         CreateMorphoMarket.OracleConfig memory ocfg
     ) internal returns (AggregatorV3Interface) {
-        if (addresses.isAddressSet(ocfg.addressName)) {
-            return AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
+        string memory proxyName = string.concat(ocfg.baseFeedName, "_PROXY");
+        if (addresses.isAddressSet(proxyName)) {
+            return AggregatorV3Interface(addresses.getAddress(proxyName));
         }
-        ChainlinkOracleProxy proxy = new ChainlinkOracleProxy();
-        proxy.initialize(addresses.getAddress(ocfg.baseFeedName), msg.sender);
-        addresses.addAddress(ocfg.addressName, address(proxy));
+
+        ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+        bytes memory initData = abi.encodeWithSignature(
+            "initialize(address,address)",
+            addresses.getAddress(ocfg.baseFeedName),
+            msg.sender
+        );
+
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(logic),
+            address(proxyAdmin),
+            initData
+        );
+
+        addresses.addAddress(proxyName, address(proxy));
         return AggregatorV3Interface(address(proxy));
     }
 

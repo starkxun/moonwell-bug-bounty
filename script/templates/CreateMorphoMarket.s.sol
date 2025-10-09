@@ -236,16 +236,15 @@ contract CreateMorphoMarket is Script, Test {
         ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
-        bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address)",
-            addresses.getAddress(ocfg.baseFeedName),
-            msg.sender
-        );
-
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(logic),
             address(proxyAdmin),
-            initData
+            ""
+        );
+
+        ChainlinkOracleProxy(address(proxy)).initialize(
+            addresses.getAddress(ocfg.baseFeedName),
+            msg.sender
         );
 
         addresses.addAddress(proxyName, address(proxy));

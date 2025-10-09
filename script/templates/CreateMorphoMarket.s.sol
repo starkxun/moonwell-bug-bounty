@@ -305,7 +305,7 @@ contract ConfigureMorphoMarketCaps is Script, Test {
         Addresses addresses = new Addresses();
 
         // TODO: need to prank anthias for dry run; remove this line before merging
-        vm.startPrank(addresses.getAddress("ANTHIAS_MULTISIG"));
+        vm.startBroadcast(addresses.getAddress("ANTHIAS_MULTISIG"));
 
         MarketParams memory market = MarketParams({
             loanToken: addresses.getAddress(cfg.loanTokenName),

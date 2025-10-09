@@ -304,8 +304,7 @@ contract ConfigureMorphoMarketCaps is Script, Test {
 
         Addresses addresses = new Addresses();
 
-        // TODO: need to prank anthias for dry run; remove this line before merging
-        vm.startBroadcast(addresses.getAddress("ANTHIAS_MULTISIG"));
+        vm.startBroadcast();
 
         MarketParams memory market = MarketParams({
             loanToken: addresses.getAddress(cfg.loanTokenName),
@@ -327,7 +326,7 @@ contract ConfigureMorphoMarketCaps is Script, Test {
             queue[0] = marketId;
             vault.setSupplyQueue(queue);
         }
-        vm.stopPrank();
+        vm.stopBroadcast();
         (
             uint184 cap,
             bool accepted,

@@ -100,7 +100,9 @@ contract CreateMorphoMarket is Script, Test {
         }
         present = true;
         ocfg.baseFeedName = json.readString(".oracle.baseFeedName");
-        ocfg.baseFeedDecimals = uint8(json.readUint(".oracle.baseFeedDecimals"));
+        ocfg.baseFeedDecimals = uint8(
+            json.readUint(".oracle.baseFeedDecimals")
+        );
         ocfg.quoteFeedName = json.readString(".oracle.quoteFeedName");
         ocfg.quoteFeedDecimals = uint8(
             json.readUint(".oracle.quoteFeedDecimals")
@@ -124,7 +126,10 @@ contract CreateMorphoMarket is Script, Test {
         if (oracleConfigPresent && !addresses.isAddressSet(ocfg.addressName)) {
             _deployAndRegisterOracle(addresses, ocfg);
         } else {
-            require(addresses.isAddressSet(ocfg.addressName), "Oracle not found");
+            require(
+                addresses.isAddressSet(ocfg.addressName),
+                "Oracle not found"
+            );
         }
     }
 
@@ -148,11 +153,13 @@ contract CreateMorphoMarket is Script, Test {
         bytes32 marketId,
         MarketConfig memory cfg
     ) internal {
-        console.log(
-            "Creating market on Morpho Blue with parameters:"
-        );
+        console.log("Creating market on Morpho Blue with parameters:");
         console.log("Loan token (%s): %s", cfg.loanTokenName, market.loanToken);
-        console.log("Collateral token (%s): %s", cfg.collateralTokenName, market.collateralToken);
+        console.log(
+            "Collateral token (%s): %s",
+            cfg.collateralTokenName,
+            market.collateralToken
+        );
         console.log("Oracle (%s): %s", cfg.oracle.addressName, market.oracle);
         console.log("IRM (%s): %s", cfg.irmName, market.irm);
         console.log("LLTV: %s", market.lltv);
@@ -208,12 +215,9 @@ contract CreateMorphoMarket is Script, Test {
         CreateMorphoMarket.OracleConfig memory ocfg
     ) internal {
         IMorphoChainlinkOracleV2Factory oracleFactory = IMorphoChainlinkOracleV2Factory(
-            addresses.getAddress("MORPHO_CHAINLINK_ORACLE_FACTORY")
-        );
-        AggregatorV3Interface baseFeed = _getOrDeployBaseFeed(
-            addresses,
-            ocfg
-        );
+                addresses.getAddress("MORPHO_CHAINLINK_ORACLE_FACTORY")
+            );
+        AggregatorV3Interface baseFeed = _getOrDeployBaseFeed(addresses, ocfg);
         IMorphoChainlinkOracleV2 oracle = _createOracle(
             oracleFactory,
             baseFeed, // TODO: deploy the new proxy contract to wrap the base feed
@@ -229,7 +233,8 @@ contract CreateMorphoMarket is Script, Test {
         CreateMorphoMarket.OracleConfig memory ocfg
     ) internal returns (AggregatorV3Interface) {
         if (addresses.isAddressSet(ocfg.addressName)) {
-            return AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
+            return
+                AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
         }
 
         ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
@@ -313,9 +318,10 @@ contract ConfigureMorphoMarketCaps is Script, Test {
         });
 
         bytes32 marketId = _computeMarketId(market);
-        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(cfg.vaultAddressName));
+        IMetaMorpho vault = IMetaMorpho(
+            addresses.getAddress(cfg.vaultAddressName)
+        );
 
-        vm.startBroadcast();
         vault.submitCap(market, cfg.supplyCap);
         vault.acceptCap(market);
         if (cfg.setSupplyQueue) {
@@ -323,20 +329,23 @@ contract ConfigureMorphoMarketCaps is Script, Test {
             queue[0] = marketId;
             vault.setSupplyQueue(queue);
         }
-        vm.stopBroadcast();
-
-        (uint184 cap, bool accepted, uint64 removableAt) = IMetaMorphoStaticTyping(address(vault)).config(marketId);
+        vm.stopPrank();
+        (
+            uint184 cap,
+            bool accepted,
+            uint64 removableAt
+        ) = IMetaMorphoStaticTyping(address(vault)).config(marketId);
         assertEq(cap, cfg.supplyCap, "cap mismatch");
         assertEq(accepted, true, "cap not accepted");
         assertEq(removableAt, 0, "cap should not be removable");
-
-        vm.stopPrank();
 
         console.log("Configured cap/queue for market:");
         console.logBytes32(marketId);
     }
 
-    function _parse(string memory json) internal pure returns (CapsConfig memory cfg) {
+    function _parse(
+        string memory json
+    ) internal pure returns (CapsConfig memory cfg) {
         cfg.vaultAddressName = json.readString(".vaultAddressName");
         cfg.loanTokenName = json.readString(".loanTokenName");
         cfg.collateralTokenName = json.readString(".collateralTokenName");
@@ -350,7 +359,9 @@ contract ConfigureMorphoMarketCaps is Script, Test {
         cfg.oracle.addressName = json.readString(".oracle.addressName");
     }
 
-    function _computeMarketId(MarketParams memory params) internal pure returns (bytes32 marketParamsId) {
+    function _computeMarketId(
+        MarketParams memory params
+    ) internal pure returns (bytes32 marketParamsId) {
         assembly ("memory-safe") {
             marketParamsId := keccak256(params, MARKET_PARAMS_BYTES_LENGTH)
         }
@@ -385,9 +396,21 @@ contract MorphoSupplyBorrow is Script, Test {
         Addresses addresses = new Addresses();
 
         // Enforcing an immediate borrow and deposit: https://docs.morpho.org/curate/tutorials-market-v1/creating-market/#fill-all-attributes
-        assertGt(cfg.vaultDepositAssets, 0, "config.vaultDepositAssets must be greater than 0");
-        assertGt(cfg.collateralAmount, 0, "config.collateralAmount must be greater than 0");
-        assertGt(cfg.borrowAssets, 0, "config.borrowAssets must be greater than 0");
+        assertGt(
+            cfg.vaultDepositAssets,
+            0,
+            "config.vaultDepositAssets must be greater than 0"
+        );
+        assertGt(
+            cfg.collateralAmount,
+            0,
+            "config.collateralAmount must be greater than 0"
+        );
+        assertGt(
+            cfg.borrowAssets,
+            0,
+            "config.borrowAssets must be greater than 0"
+        );
 
         MarketParams memory market = MarketParams({
             loanToken: addresses.getAddress(cfg.loanTokenName),
@@ -398,12 +421,23 @@ contract MorphoSupplyBorrow is Script, Test {
         });
 
         address morphoBlue = addresses.getAddress("MORPHO_BLUE");
-        IMetaMorpho vault = IMetaMorpho(addresses.getAddress(cfg.vaultAddressName));
+        IMetaMorpho vault = IMetaMorpho(
+            addresses.getAddress(cfg.vaultAddressName)
+        );
 
         // Scale human-readable amounts by oracle decimals
-        uint256 depositAmount = _scaleByDecimals(cfg.vaultDepositAssets, cfg.oracle.quoteFeedDecimals);
-        uint256 supplyAmount = _scaleByDecimals(cfg.collateralAmount, cfg.oracle.baseFeedDecimals);
-        uint256 borrowAmount = _scaleByDecimals(cfg.borrowAssets, cfg.oracle.quoteFeedDecimals);
+        uint256 depositAmount = _scaleByDecimals(
+            cfg.vaultDepositAssets,
+            cfg.oracle.quoteFeedDecimals
+        );
+        uint256 supplyAmount = _scaleByDecimals(
+            cfg.collateralAmount,
+            cfg.oracle.baseFeedDecimals
+        );
+        uint256 borrowAmount = _scaleByDecimals(
+            cfg.borrowAssets,
+            cfg.oracle.quoteFeedDecimals
+        );
 
         vm.startBroadcast();
 
@@ -413,25 +447,34 @@ contract MorphoSupplyBorrow is Script, Test {
         console.log("Shares minted:", sharesMinted);
 
         IERC20(market.collateralToken).approve(morphoBlue, supplyAmount);
-        IMorphoBlue(morphoBlue).supplyCollateral(market, supplyAmount, msg.sender, "");
+        IMorphoBlue(morphoBlue).supplyCollateral(
+            market,
+            supplyAmount,
+            msg.sender,
+            ""
+        );
         console.log("Supplied collateral:", supplyAmount);
 
-        (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(morphoBlue).borrow(
-            market,
-            borrowAmount,
-            0,
-            msg.sender,
-            msg.sender
-        );
+        (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(
+            morphoBlue
+        ).borrow(market, borrowAmount, 0, msg.sender, msg.sender);
         vm.stopBroadcast();
 
         console.log("Borrowed:", assetsBorrowed);
         console.log("Borrow shares:", sharesBorrowed);
-        console.log("Loan token balance:", IERC20(market.loanToken).balanceOf(msg.sender));
-        console.log("Collateral token balance:", IERC20(market.collateralToken).balanceOf(msg.sender));
+        console.log(
+            "Loan token balance:",
+            IERC20(market.loanToken).balanceOf(msg.sender)
+        );
+        console.log(
+            "Collateral token balance:",
+            IERC20(market.collateralToken).balanceOf(msg.sender)
+        );
     }
 
-    function _parse(string memory json) internal pure returns (SBConfig memory cfg) {
+    function _parse(
+        string memory json
+    ) internal pure returns (SBConfig memory cfg) {
         cfg.vaultAddressName = json.readString(".vaultAddressName");
         cfg.loanTokenName = json.readString(".loanTokenName");
         cfg.collateralTokenName = json.readString(".collateralTokenName");
@@ -442,11 +485,18 @@ contract MorphoSupplyBorrow is Script, Test {
         cfg.borrowAssets = json.readUint(".borrowAssets");
         // oracle nested
         cfg.oracle.addressName = json.readString(".oracle.addressName");
-        cfg.oracle.baseFeedDecimals = uint8(json.readUint(".oracle.baseFeedDecimals"));
-        cfg.oracle.quoteFeedDecimals = uint8(json.readUint(".oracle.quoteFeedDecimals"));
+        cfg.oracle.baseFeedDecimals = uint8(
+            json.readUint(".oracle.baseFeedDecimals")
+        );
+        cfg.oracle.quoteFeedDecimals = uint8(
+            json.readUint(".oracle.quoteFeedDecimals")
+        );
     }
 
-    function _scaleByDecimals(uint256 amount, uint8 decimals) internal pure returns (uint256) {
+    function _scaleByDecimals(
+        uint256 amount,
+        uint8 decimals
+    ) internal pure returns (uint256) {
         return amount * (10 ** uint256(decimals));
     }
 }

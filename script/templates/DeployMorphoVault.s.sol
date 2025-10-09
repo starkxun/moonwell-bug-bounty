@@ -35,7 +35,10 @@ contract DeployMorphoVault is Script, Test {
 
         Addresses addresses = new Addresses();
 
-        require(!addresses.isAddressSet(cfg.addressName), "Vault already exists");
+        require(
+            !addresses.isAddressSet(cfg.addressName),
+            "Vault already exists"
+        );
 
         address asset = addresses.getAddress(cfg.assetName);
 
@@ -46,13 +49,13 @@ contract DeployMorphoVault is Script, Test {
         address vaultAddress = IMetaMorphoFactory(
             addresses.getAddress("MORPHO_FACTORY_V1_1")
         ).createMetaMorpho(
-            initialOwner,
-            cfg.initialTimelock,
-            asset,
-            cfg.vaultName,
-            cfg.vaultSymbol,
-            salt
-        );
+                initialOwner,
+                cfg.initialTimelock,
+                asset,
+                cfg.vaultName,
+                cfg.vaultSymbol,
+                salt
+            );
 
         addresses.addAddress(cfg.addressName, vaultAddress);
 
@@ -133,7 +136,10 @@ contract SetFinalCurator is Script, Test {
 
         Addresses addresses = new Addresses();
 
-        assertTrue(addresses.isAddressSet(cfg.addressName), "Vault is not deployed");
+        assertTrue(
+            addresses.isAddressSet(cfg.addressName),
+            "Vault is not deployed"
+        );
         assertTrue(bytes(cfg.curatorName).length != 0, "curatorName required");
 
         address vault = addresses.getAddress(cfg.addressName);

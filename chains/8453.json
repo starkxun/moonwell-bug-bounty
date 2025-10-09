@@ -1157,6 +1157,6 @@
     {
         "addr": "0x800e0d168a44D864204dE811945065fc59935ab3",
         "isContract": true,
-        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE_PROXY"
+        "name": "MORPHO_CHAINLINK_MAMO_USD_ORACLE_PROXY"
     }
 ]

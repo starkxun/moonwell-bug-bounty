@@ -423,14 +423,8 @@ contract MorphoSupplyBorrow is Script, Test {
         );
 
         // Scale human-readable amounts by oracle decimals
-        uint256 depositAmount = _scaleByDecimals(
-            cfg.vaultDepositAssets,
-            cfg.oracle.quoteFeedDecimals
-        );
-        uint256 supplyAmount = _scaleByDecimals(
-            cfg.collateralAmount,
-            cfg.oracle.baseFeedDecimals
-        );
+        uint256 depositAmount = cfg.vaultDepositAssets;
+        uint256 supplyAmount = cfg.collateralAmount;
         uint256 borrowAmount = cfg.borrowAssets;
         vm.startBroadcast();
 
@@ -484,12 +478,5 @@ contract MorphoSupplyBorrow is Script, Test {
         cfg.oracle.quoteFeedDecimals = uint8(
             json.readUint(".oracle.quoteFeedDecimals")
         );
-    }
-
-    function _scaleByDecimals(
-        uint256 amount,
-        uint8 decimals
-    ) internal pure returns (uint256) {
-        return amount * (10 ** uint256(decimals));
     }
 }

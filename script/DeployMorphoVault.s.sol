@@ -17,7 +17,7 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 import {IERC4626} from "@forge-std/interfaces/IERC4626.sol";
 
 /// @notice Script to create a new MetaMorpho vault using the Morpho factory
-contract CreateMetaMorphoVault is Script, Test {
+contract DeployMorphoVault is Script, Test {
     using ChainIds for uint256;
 
     /// @notice The created MetaMorpho vault address
@@ -81,8 +81,11 @@ contract CreateMetaMorphoVault is Script, Test {
         address vaultAddress = createVault(
             addresses,
             initialOwner,
+            asset,
             initialTimelock,
-            asset
+            VAULT_NAME,
+            VAULT_SYMBOL,
+            SALT
         );
 
         usdcVault = IMetaMorpho(vaultAddress);
@@ -368,13 +371,16 @@ contract CreateMetaMorphoVault is Script, Test {
     function createVault(
         Addresses addresses,
         address initialOwner,
+        address asset,
         uint256 initialTimelock,
-        address assetToken
-    ) internal returns (address) {
-        vm.startBroadcast();
-
-        // First create the USDC/WELL market on Morpho Blue
-        //        createMarket(addresses);
+        string memory vaultName,
+        string memory vaultSymbol,
+        bytes32 salt
+    ) public returns (address) {
+        string memory vaultAddressName = string.concat(
+            vaultSymbol,
+            "_METAMORPHO_VAULT"
+        );
 
         // Then create the MetaMorpho vault
         address vaultAddress = IMetaMorphoFactory(
@@ -382,13 +388,13 @@ contract CreateMetaMorphoVault is Script, Test {
         ).createMetaMorpho(
                 initialOwner,
                 initialTimelock,
-                assetToken,
-                VAULT_NAME,
-                VAULT_SYMBOL,
-                SALT
+                asset,
+                vaultName,
+                vaultSymbol,
+                salt
             );
 
-        vm.stopBroadcast();
+        addresses.addAddress(vaultAddressName, vaultAddress);
 
         return vaultAddress;
     }

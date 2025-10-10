@@ -1138,5 +1138,10 @@
         "addr": "0xF4d4fCDdE388408C7A295E1C34C7B204bC0b4BAC",
         "isContract": true,
         "name": "llUSDC_METAMORPHO_VAULT"
+    },
+    {
+        "addr": "0xE1bA476304255353aEF290e6474A417D06e7b773",
+        "isContract": true,
+        "name": "meUSDC_METAMORPHO_VAULT"
     }
 ]

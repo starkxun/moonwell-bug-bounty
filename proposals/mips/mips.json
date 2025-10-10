@@ -28,13 +28,6 @@
         "proposalType": "HybridProposal"
     },
     {
-        "envpath": "proposals/mips/mip-x30/x30.sh",
-        "governor": "MultichainGovernor",
-        "id": 115,
-        "path": "RewardsDistribution.sol/RewardsDistributionTemplate.json",
-        "proposalType": "HybridProposal"
-    },
-    {
         "envpath": "proposals/mips/mip-x29/x29.sh",
         "governor": "MultichainGovernor",
         "id": 112,

@@ -1,19 +1,19 @@
 # MIP-B49: Moonwell Ecosystem USDC Vault Addition
 
-**Author(s):** Anthias Labs **Submission Date:** September 25th, 2025
+**Author(s):** Anthias Labs **Submission Date:** October 10th, 2025
 
 ## Proposal Summary
 
 This proposal creates a new Moonwell Ecosystem USDC Vault (meUSDC), accepts
 ownership on behalf of the temporal governor and sets Anthias Labs as the
-curator. This proposal establishes a new Morpho vault for USDC as part of the
+allocator. This proposal establishes a new Morpho vault for USDC as part of the
 Moonwell ecosystem expansion. The vault will be managed by Anthias Labs as
-curator, providing professional vault management and risk oversight.
+allocator, providing professional vault management and risk oversight.
 
 This MIP proposes:
 
 1. Accept the Moonwell Ecosystem USDC Vault ownership
-2. Set the curator as Anthias Labs
+2. Set the allocator as Anthias Labs
 
 ## Background and Rationale
 
@@ -41,10 +41,10 @@ USDC Vault. This proposal will have no liquidity incentives as well.
 
 ## Implementation
 
-If this proposal passes, the following onchain actions will be executed:
+fcur If this proposal passes, the following onchain actions will be executed:
 
 1. Moonwell DAO will accept the Moonwell Ecosystem USDC Vault ownership
-2. Set the curator as Anthias Labs
+2. Set the allocator as Anthias Labs
 
 ## Voting Options
 

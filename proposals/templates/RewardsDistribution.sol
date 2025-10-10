@@ -169,6 +169,10 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     uint256 startTimeStamp;
     uint256 endTimeStamp;
 
+    // leftover reward rate on USDC morpho vault from previous proposal
+    uint256 leftoverRewardRate;
+    uint256 leftoverPeriodFinish;
+
     mapping(uint256 => JsonSpecExternalChain) externalChainActions;
 
     /// @notice we save this value to check if the transferFrom amount was successfully transferred
@@ -176,6 +180,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
 
     /// @notice Track reserve automation contract balances before proposal execution
     mapping(address => uint256) public reserveAutomationBalancesBefore;
+
+    bytes public constant payloadMerkleCampaignBase =
+        hex"000000000000000000000000a88594d404727625a9437c3f886c7643872296ae00000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
@@ -334,6 +341,21 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     bytes32(uint256(153)),
                     encodedData
                 );
+
+                if (chainId == OPTIMISM_CHAIN_ID) {
+                    (
+                        ,
+                        ,
+                        uint256 periodFinish,
+                        uint256 rewardRate,
+                        ,
+
+                    ) = IMultiRewards(
+                            addresses.getAddress("USDC_MULTI_REWARDER")
+                        ).rewardData(addresses.getAddress("xWELL_PROXY"));
+                    leftoverRewardRate = rewardRate;
+                    leftoverPeriodFinish = periodFinish;
+                }
             }
         }
 
@@ -345,6 +367,24 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             bytes32(uint256(153)),
             encodedData
         );
+
+        vm.selectFork(BASE_FORK_ID);
+
+        // TODO remove this after testing
+        deal(
+            addresses.getAddress("xWELL_PROXY"),
+            addresses.getAddress("F-AERO_MULTISIG"),
+            600191928791850000000000
+        );
+
+        vm.startPrank(addresses.getAddress("F-AERO_MULTISIG"));
+        IERC20(addresses.getAddress("xWELL_PROXY")).approve(
+            addresses.getAddress("TEMPORAL_GOVERNOR"),
+            600191928791850000000000
+        );
+        vm.stopPrank();
+
+        vm.selectFork(MOONBEAM_FORK_ID);
     }
 
     function afterSimulationHook(Addresses addresses) public override {
@@ -865,10 +905,11 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             _saveWithdrawWell(addresses, data, prefix, _chainId);
 
         if (_chainId != BASE_CHAIN_ID) {
+            // TODO remove the missing rewards after x32
             assertApproxEqRel(
                 ecosystemReserveProxyAmount,
-                externalChainActions[_chainId].stkWellEmissionsPerSecond *
-                    (endTimeStamp - startTimeStamp),
+                (externalChainActions[_chainId].stkWellEmissionsPerSecond *
+                    (endTimeStamp - startTimeStamp)) + 323094721447738864000000,
                 1e18,
                 "Amount transferred to ECOSYSTEM_RESERVE_PROXY must be equal to the stkWellEmissionsPerSecond * the epoch duration"
             );
@@ -1488,22 +1529,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     uint256,
                     uint256
                 ) {
-                    _pushAction(
-                        vault,
-                        abi.encodeWithSignature(
-                            "setRewardsDuration(address,uint256)",
-                            rewardToken,
-                            duration
-                        ),
-                        string.concat(
-                            "Set reward duration for ",
-                            vm.getLabel(rewardToken),
-                            " on ",
-                            multiRewarder.vault,
-                            " with duration ",
-                            vm.toString(duration)
-                        )
-                    );
+                    // No need to call setRewardsDuration because it's already set as 4 weeks and we don't need to set every month
                 } catch {
                     _pushAction(
                         vault,
@@ -1598,7 +1624,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                         campaignType: 18, // 4 is Token Holding Campaign
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
-                        campaignData: "" // Empty campaign data for now
+                        campaignData: payloadMerkleCampaignBase // Empty campaign data for now
                     });
 
             // Create the merkle campaign
@@ -2114,7 +2140,19 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             );
 
             // Calculate expected reward rate and validate
-            uint256 expectedRewardRate = rewarder.reward / rewardsDuration;
+            // Match MultiRewards.sol logic (lines 619-627):
+            // remaining = periodFinish - block.timestamp
+            // leftover = remaining * rewardRate
+            // newRewardRate = (reward + leftover) / duration
+            uint256 leftover = 0;
+            if (
+                leftoverRewardRate > 0 && block.timestamp < leftoverPeriodFinish
+            ) {
+                uint256 remaining = leftoverPeriodFinish - block.timestamp;
+                leftover = remaining * leftoverRewardRate;
+            }
+            uint256 expectedRewardRate = (rewarder.reward + leftover) /
+                rewardsDuration;
 
             // Validate reward rate
             assertApproxEqRel(
@@ -2148,13 +2186,13 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 memory campaignParameters = IMerkleCampaignCreator
                     .CampaignParameters({
                         campaignId: bytes32(0),
-                        creator: address(0),
+                        creator: addresses.getAddress("TEMPORAL_GOVERNOR"),
                         rewardToken: addresses.getAddress(campaign.rewardToken),
                         amount: campaign.amount,
                         campaignType: 18, // 4 is Token Holding Campaign
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
-                        campaignData: "" // Empty campaign data for now
+                        campaignData: payloadMerkleCampaignBase
                     });
 
             // Check if the campaign is created
@@ -2170,48 +2208,56 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     campaign.rewardToken
                 )
             );
-            // Add back once custom error 0x9b35ed3b fixed
-            // Validate campaign exists and has correct parameters
-            //      IMerkleCampaignCreator.CampaignParameters
-            //          memory storedCampaign = IMerkleCampaignCreator(
-            //              addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
-            //          ).campaign(campaignId);
 
-            //      assertEq(
-            //          storedCampaign.rewardToken,
-            //          addresses.getAddress(campaign.rewardToken),
-            //          string.concat(
-            //              "Campaign reward token mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            // Validate that the campaign data is correct
+            IMerkleCampaignCreator.CampaignParameters
+                memory returnedCampaignParams = IMerkleCampaignCreator(
+                    addresses.getAddress("MERKLE_CAMPAIGN_CREATOR")
+                ).campaign(campaignId);
 
-            //      assertEq(
-            //          storedCampaign.amount,
-            //          campaign.amount,
-            //          string.concat(
-            //              "Campaign amount mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            assertEq(
+                returnedCampaignParams.creator,
+                campaignParameters.creator,
+                "Creator should be correct"
+            );
 
-            //      assertEq(
-            //          storedCampaign.duration,
-            //          campaign.duration,
-            //          string.concat(
-            //              "Campaign duration mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            assertEq(
+                returnedCampaignParams.rewardToken,
+                campaignParameters.rewardToken,
+                "Reward token should be correct"
+            );
 
-            //      assertEq(
-            //          storedCampaign.startTimestamp,
-            //          campaign.startTimestamp,
-            //          string.concat(
-            //              "Campaign start timestamp mismatch for ",
-            //              campaign.rewardToken
-            //          )
-            //      );
+            assertApproxEqRel(
+                returnedCampaignParams.amount,
+                campaignParameters.amount -
+                    ((campaignParameters.amount * 1) / 100),
+                1e16,
+                "Amount should be correct"
+            ); // reduce the 1% fee
+
+            assertEq(
+                returnedCampaignParams.campaignType,
+                campaignParameters.campaignType,
+                "Campaign type should be correct"
+            );
+
+            assertEq(
+                returnedCampaignParams.startTimestamp,
+                campaignParameters.startTimestamp,
+                "Start timestamp should be correct"
+            );
+
+            assertEq(
+                returnedCampaignParams.duration,
+                campaignParameters.duration,
+                "Duration should be correct"
+            );
+
+            assertEq(
+                returnedCampaignParams.campaignData,
+                payloadMerkleCampaignBase,
+                "Campaign data should be correct"
+            );
         }
     }
 

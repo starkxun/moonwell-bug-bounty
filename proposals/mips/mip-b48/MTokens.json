@@ -4,7 +4,7 @@
             "addressesString": "MOONWELL_MAMO",
             "borrowCap": 12000000e18,
             "collateralFactor": 0.5e18,
-            "initialMintAmount": 1e5,
+            "initialMintAmount": 1e18,
             "jrm": {
                 "baseRatePerYear": 0,
                 "jumpMultiplierPerYear": 5e18,

@@ -1,0 +1,23 @@
+{
+    "8453": [
+        {
+            "addressesString": "MOONWELL_MAMO",
+            "borrowCap": 12000000e18,
+            "collateralFactor": 0.5e18,
+            "initialMintAmount": 1e18,
+            "jrm": {
+                "baseRatePerYear": 0,
+                "jumpMultiplierPerYear": 5e18,
+                "kink": 0.6e18,
+                "multiplierPerYear": 0.45e18
+            },
+            "name": "Moonwell MAMO",
+            "priceFeedName": "CHAINLINK_MAMO_USD",
+            "reserveFactor": 0.3e18,
+            "seizeShare": 0.03e18,
+            "supplyCap": 20000000e18,
+            "symbol": "mMAMO",
+            "tokenAddressName": "MAMO"
+        }
+    ]
+}

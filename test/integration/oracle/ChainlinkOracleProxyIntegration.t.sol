@@ -1,6 +1,7 @@
 pragma solidity 0.8.19;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {console} from "@forge-std/console.sol";
 
 import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
@@ -22,6 +23,9 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
 
         super.setUp();
         vm.selectFork(primaryForkId);
+
+        // revertt timestamp back
+        vm.warp(proposalStartTime);
 
         deployer = new DeployChainlinkOracleProxy();
 

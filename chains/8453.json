@@ -1148,5 +1148,15 @@
         "addr": "0xeF7541b388a77C1709a3d44BfBfC5c1ED3F0Ac94",
         "isContract": true,
         "name": "CHAINLINK_MAMO_USD"
+    },
+    {
+        "addr": "0x6D8CB0C4C5caA9876939cB6e5EED8ca84d474c0c",
+        "isContract": true,
+        "name": "JUMP_RATE_IRM_MOONWELL_MAMO"
+    },
+    {
+        "addr": "0x2F90Bb22eB3979f5FfAd31EA6C3F0792ca66dA32",
+        "isContract": true,
+        "name": "MOONWELL_MAMO"
     }
 ]

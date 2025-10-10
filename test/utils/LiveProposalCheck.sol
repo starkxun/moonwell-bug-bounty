@@ -237,8 +237,14 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             (, , , , crossChainVoteCollectionEndTimestamp, , , , ) = governor
                 .proposalInformation(proposalId);
 
-            governor.castVote(proposalId, 0);
-            console.log("casting vote on block.timestamp: ", block.timestamp);
+            // Only vote if not in cross-chain voting period
+            if (block.timestamp < crossChainVoteCollectionEndTimestamp) {
+                governor.castVote(proposalId, 0);
+                console.log(
+                    "casting vote on block.timestamp: ",
+                    block.timestamp
+                );
+            }
 
             vm.warp(crossChainVoteCollectionEndTimestamp + 1);
         }

@@ -3,16 +3,15 @@ pragma solidity 0.8.19;
 
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 
-contract MockChainlinkOracle is AggregatorV3Interface {
-    // fixed value
+/// @notice Mock oracle that doesn't support latestRound() - reverts when called
+/// @dev Used for testing the fallback mechanism in ChainlinkOracleProxy
+contract MockChainlinkOracleWithoutLatestRound is AggregatorV3Interface {
     int256 public _value;
     uint8 public _decimals;
-
-    // mocked data
-    uint80 _roundId;
-    uint256 _startedAt;
-    uint256 _updatedAt;
-    uint80 _answeredInRound;
+    uint80 public _roundId;
+    uint256 public _startedAt;
+    uint256 public _updatedAt;
+    uint80 public _answeredInRound;
 
     constructor(int256 value, uint8 oracleDecimals) {
         _value = value;
@@ -28,7 +27,7 @@ contract MockChainlinkOracle is AggregatorV3Interface {
     }
 
     function description() external pure override returns (string memory) {
-        return "Mock Oracle";
+        return "Mock Oracle Without LatestRound";
     }
 
     function getRoundData(
@@ -63,6 +62,15 @@ contract MockChainlinkOracle is AggregatorV3Interface {
         return (_roundId, _value, _startedAt, _updatedAt, _answeredInRound);
     }
 
+    function version() external pure override returns (uint256) {
+        return 1;
+    }
+
+    function latestRound() external pure override returns (uint256) {
+        // Revert to simulate an oracle that doesn't support this method
+        revert("latestRound not supported");
+    }
+
     function set(
         uint80 roundId,
         int256 answer,
@@ -75,13 +83,5 @@ contract MockChainlinkOracle is AggregatorV3Interface {
         _startedAt = startedAt;
         _updatedAt = updatedAt;
         _answeredInRound = answeredInRound;
-    }
-
-    function version() external pure override returns (uint256) {
-        return 1;
-    }
-
-    function latestRound() external view override returns (uint256) {
-        return _roundId;
     }
 }

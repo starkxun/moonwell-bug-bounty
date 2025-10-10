@@ -36,32 +36,7 @@ contract mipb49 is HybridProposal, Configs, ParameterValidation {
         return BASE_FORK_ID;
     }
 
-    function deploy(Addresses addresses, address) public override {
-        // Deploy the new MetaMorpho vault with msg.sender as initial owner
-        address vaultAddress = createVault(
-            addresses,
-            msg.sender,
-            addresses.getAddress("USDC"),
-            0,
-            VAULT_NAME,
-            VAULT_SYMBOL,
-            SALT
-        );
-
-        // Transfer ownership to temporal governor
-        IMetaMorpho(vaultAddress).transferOwnership(
-            addresses.getAddress("TEMPORAL_GOVERNOR")
-        );
-    }
-
     function build(Addresses addresses) public override {
-        // Accept ownership of the Moonwell Ecosystem USDC Vault
-        _pushAction(
-            addresses.getAddress(VAULT_ADDRESS_NAME),
-            abi.encodeWithSignature("acceptOwnership()"),
-            "Accept ownership of the Moonwell Ecosystem USDC Vault"
-        );
-
         // Set allocator as Anthias Labs (EOA)
         _pushAction(
             addresses.getAddress(VAULT_ADDRESS_NAME),
@@ -73,8 +48,6 @@ contract mipb49 is HybridProposal, Configs, ParameterValidation {
             "Set allocator as Anthias Labs (EOA)"
         );
     }
-
-    function teardown(Addresses addresses, address) public pure override {}
 
     function validate(Addresses addresses, address) public view override {
         // Validate that vault was created and added to addresses
@@ -116,39 +89,5 @@ contract mipb49 is HybridProposal, Configs, ParameterValidation {
             ),
             "USDC Ecosystem Vault allocator incorrect"
         );
-    }
-
-    function createVault(
-        Addresses addresses,
-        address initialOwner,
-        address asset,
-        uint256 initialTimelock,
-        string memory vaultName,
-        string memory vaultSymbol,
-        bytes32 salt
-    ) public returns (address) {
-        string memory vaultAddressName = string.concat(
-            vaultSymbol,
-            "_METAMORPHO_VAULT"
-        );
-
-        // Then create the MetaMorpho vault
-        address vaultAddress = IMetaMorphoFactory(
-            addresses.getAddress("MORPHO_FACTORY_V1_1")
-        ).createMetaMorpho(
-                initialOwner,
-                initialTimelock,
-                asset,
-                vaultName,
-                vaultSymbol,
-                salt
-            );
-        if (addresses.isAddressSet(vaultAddressName)) {
-            addresses.changeAddress(vaultAddressName, vaultAddress, true);
-        } else {
-            addresses.addAddress(vaultAddressName, vaultAddress);
-        }
-
-        return vaultAddress;
     }
 }

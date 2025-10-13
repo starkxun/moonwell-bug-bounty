@@ -22,7 +22,19 @@ runs:
       with:
         version: nightly-e52076714ace23c7a68e14f0048a40be3c6c8f0b
 
+    - name: Cache Foundry build outputs
+      id: cache-foundry-build
+      uses: actions/cache@v3
+      with:
+        path: |
+          artifacts/forge-cache
+          artifacts/foundry
+        key: ${{ runner.os }}-foundry-build-${{ hashFiles('foundry.toml', 'remappings.txt', 'lib/**', 'proposals/**', 'crv-rewards/**') }}
+        restore-keys: |
+          ${{ runner.os }}-foundry-build-
+
     - name: Clean Contracts
+      if: steps.cache-foundry-build.outputs.cache-hit != 'true'
       run: forge clean
       shell: bash
 

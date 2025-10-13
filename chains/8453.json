@@ -1100,6 +1100,11 @@
         "name": "ANTHIAS_MULTISIG"
     },
     {
+        "addr": "0x09f96462CA418aCf8f4570149d1533Ab5030EAdC",
+        "isContract": false,
+        "name": "ANTHIAS_EOA"
+    },
+    {
         "addr": "0x8BB4C975Ff3c250e0ceEA271728547f3802B36Fd",
         "isContract": true,
         "name": "MERKLE_CAMPAIGN_CREATOR"
@@ -1141,8 +1146,8 @@
     },
     {
         "addr": "0x7300B37DfdfAb110d83290A29DfB31B1740219fE",
-        "name": "MAMO",
-        "isContract": true
+        "isContract": true,
+        "name": "MAMO"
     },
     {
         "addr": "0xeF7541b388a77C1709a3d44BfBfC5c1ED3F0Ac94",
@@ -1150,13 +1155,13 @@
         "name": "CHAINLINK_MAMO_USD"
     },
     {
-        "addr": "0x4a761563cE4a0212AD79A931b82fB294f4e9a623",
+        "addr": "0x6D8CB0C4C5caA9876939cB6e5EED8ca84d474c0c",
         "isContract": true,
-        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE_PROXY"
+        "name": "JUMP_RATE_IRM_MOONWELL_MAMO"
     },
     {
-        "addr": "0x800e0d168a44D864204dE811945065fc59935ab3",
+        "addr": "0x2F90Bb22eB3979f5FfAd31EA6C3F0792ca66dA32",
         "isContract": true,
-        "name": "MORPHO_CHAINLINK_MAMO_USD_ORACLE_PROXY"
+        "name": "MOONWELL_MAMO"
     }
 ]

@@ -231,22 +231,31 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
 
         checkMoonbeamActions(targets);
 
+        uint256 endTimestamp;
         uint256 crossChainVoteCollectionEndTimestamp;
         {
             // Simulate proposals execution
-            (, , , , crossChainVoteCollectionEndTimestamp, , , , ) = governor
-                .proposalInformation(proposalId);
+            (
+                ,
+                ,
+                ,
+                endTimestamp,
+                crossChainVoteCollectionEndTimestamp,
+                ,
+                ,
+                ,
 
-            // Only vote if not in cross-chain voting period
-            if (block.timestamp < crossChainVoteCollectionEndTimestamp) {
+            ) = governor.proposalInformation(proposalId);
+
+            // Only vote if not in voting period
+            if (block.timestamp < endTimestamp) {
                 governor.castVote(proposalId, 0);
                 console.log(
                     "casting vote on block.timestamp: ",
                     block.timestamp
                 );
+                vm.warp(crossChainVoteCollectionEndTimestamp + 1);
             }
-
-            vm.warp(crossChainVoteCollectionEndTimestamp + 1);
         }
 
         _executeProposalActions(

@@ -219,7 +219,7 @@ contract CreateMorphoMarket is Script, Test {
         AggregatorV3Interface baseFeed = _getOrDeployBaseFeed(addresses, ocfg);
         IMorphoChainlinkOracleV2 oracle = _createOracle(
             oracleFactory,
-            baseFeed, // TODO: deploy the new proxy contract to wrap the base feed
+            baseFeed,
             AggregatorV3Interface(addresses.getAddress(ocfg.quoteFeedName)), // assuming we don't deploy quote feeds (ie USDC)
             ocfg.baseFeedDecimals,
             ocfg.quoteFeedDecimals
@@ -304,6 +304,8 @@ contract ConfigureMorphoMarketCaps is Script, Test {
 
         Addresses addresses = new Addresses();
 
+        // only needed for existing vaults
+        // vm.startBroadcast(addresses.getAddress("ANTHIAS_MULTISIG"));
         vm.startBroadcast();
 
         MarketParams memory market = MarketParams({
@@ -429,9 +431,7 @@ contract MorphoSupplyBorrow is Script, Test {
         vm.startBroadcast();
 
         IERC20(market.loanToken).approve(address(vault), depositAmount);
-        uint256 sharesMinted = vault.deposit(depositAmount, msg.sender);
-        console.log("Deposited loan asset into vault:", depositAmount);
-        console.log("Shares minted:", sharesMinted);
+        vault.deposit(depositAmount, msg.sender);
 
         IERC20(market.collateralToken).approve(morphoBlue, supplyAmount);
         IMorphoBlue(morphoBlue).supplyCollateral(
@@ -440,7 +440,6 @@ contract MorphoSupplyBorrow is Script, Test {
             msg.sender,
             ""
         );
-        console.log("Supplied collateral:", supplyAmount);
 
         (uint256 assetsBorrowed, uint256 sharesBorrowed) = IMorphoBlue(
             morphoBlue

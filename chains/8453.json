@@ -1100,6 +1100,11 @@
         "name": "ANTHIAS_MULTISIG"
     },
     {
+        "addr": "0x09f96462CA418aCf8f4570149d1533Ab5030EAdC",
+        "isContract": false,
+        "name": "ANTHIAS_EOA"
+    },
+    {
         "addr": "0x8BB4C975Ff3c250e0ceEA271728547f3802B36Fd",
         "isContract": true,
         "name": "MERKLE_CAMPAIGN_CREATOR"

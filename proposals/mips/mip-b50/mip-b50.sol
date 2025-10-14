@@ -5,7 +5,6 @@ import "@forge-std/Test.sol";
 
 import {Configs} from "@proposals/Configs.sol";
 import "@protocol/utils/ChainIds.sol";
-import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {HybridProposal, ActionType} from "@proposals/proposalTypes/HybridProposal.sol";

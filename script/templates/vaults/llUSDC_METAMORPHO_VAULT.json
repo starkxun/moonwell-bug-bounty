@@ -1,0 +1,10 @@
+{
+    "addressName": "llUSDC_METAMORPHO_VAULT",
+    "vaultName": "Lunar Labs Treasury USDC Vault",
+    "vaultSymbol": "llUSDC",
+    "assetName": "USDC",
+    "factoryName": "MORPHO_FACTORY_V1_1",
+    "curatorName": "LUKE_EOA",
+    "saltString": "llUSDC",
+    "initialTimelock": 0
+}

@@ -150,6 +150,13 @@ contract mipb50 is HybridProposal, Configs {
             bytes32(uint256(153)),
             encodedData
         );
+
+        // Deal xWELL tokens to Temporal Governor for stkWELL campaign (funds not bridged yet)
+        deal(
+            addresses.getAddress("xWELL_PROXY"),
+            addresses.getAddress("TEMPORAL_GOVERNOR"),
+            STKWELL_AMOUNT
+        );
     }
 
     function build(Addresses addresses) public override {

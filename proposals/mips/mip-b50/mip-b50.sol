@@ -67,9 +67,6 @@ contract mipb50 is HybridProposal, Configs {
     uint256 public constant meUSDC_AMOUNT = 923076920000000000000000; // 923,076.92 WELL
     uint256 public constant STKWELL_AMOUNT = 7135075310220094109600000; // 7,135,075.310220094109600000 WELL
 
-    // Hardcoded bridge cost from onchain transaction
-    uint256 public constant BRIDGE_COST = 14059583765471401896;
-
     // Campaign type for MORPHOVAULT
     uint32 public constant MORPHOVAULT_CAMPAIGN_TYPE = 56;
     // Campaign type for Token Holding (stkWELL)
@@ -202,8 +199,7 @@ contract mipb50 is HybridProposal, Configs {
         uint16 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
 
         // find bridge cost from xWELLRouter
-        //uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
-        uint256 bridgeCost = BRIDGE_COST;
+        uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
 
         _pushAction(
             router,

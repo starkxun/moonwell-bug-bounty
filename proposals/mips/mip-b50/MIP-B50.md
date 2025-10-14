@@ -21,7 +21,7 @@ rewards and points for campaigns, allowing for flexibility.
 
 ## Campaign Distribution
 
-The proposal distributes a total of 11,181,679.98 WELL tokens across multiple
+The proposal distributes a total of 11,108,152.23 WELL tokens across multiple
 campaigns over the next 28 days:
 
 - **USDC MetaMorpho Vault Campaign**: 1,500,000 WELL
@@ -29,7 +29,7 @@ campaigns over the next 28 days:
 - **EURC MetaMorpho Vault Campaign**: 400,000 WELL
 - **cbBTC MetaMorpho Vault Campaign**: 400,000 WELL
 - **meUSDC MetaMorpho Vault Campaign**: 923,076.92 WELL
-- **stkWELL Safety Module Campaign**: 7,208,603.06 WELL
+- **stkWELL Safety Module Campaign**: 7,135,075.31 WELL
 
 ## Implementation
 

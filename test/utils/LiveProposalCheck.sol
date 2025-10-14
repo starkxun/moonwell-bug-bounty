@@ -254,8 +254,9 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                     "casting vote on block.timestamp: ",
                     block.timestamp
                 );
-                vm.warp(crossChainVoteCollectionEndTimestamp + 1);
             }
+
+            vm.warp(crossChainVoteCollectionEndTimestamp + 1);
         }
 
         _executeProposalActions(

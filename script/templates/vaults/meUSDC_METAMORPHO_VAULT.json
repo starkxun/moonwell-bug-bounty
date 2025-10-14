@@ -1,0 +1,10 @@
+{
+    "addressName": "meUSDC_METAMORPHO_VAULT",
+    "vaultName": "USDC Vault",
+    "vaultSymbol": "meUSDC",
+    "assetName": "USDC",
+    "factoryName": "MORPHO_FACTORY_V1_1",
+    "curatorName": "ANTHIAS_MULTISIG",
+    "saltString": "meUSDC",
+    "initialTimelock": 0
+}

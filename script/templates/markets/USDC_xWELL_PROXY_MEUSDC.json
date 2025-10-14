@@ -1,0 +1,21 @@
+{
+    "vaultAddressName": "",
+    "loanTokenName": "USDC",
+    "collateralTokenName": "xWELL_PROXY",
+    "irmName": "MORPHO_ADAPTIVE_CURVE_IRM",
+    "lltv": 625000000000000000,
+    "supplyCap": 0,
+    "morphoBlueName": "MORPHO_BLUE",
+    "oracle": {
+        "addressName": "MORPHO_CHAINLINK_WELL_USD_ORACLE_MEUSDC",
+        "baseFeedName": "CHAINLINK_WELL_USD",
+        "baseFeedDecimals": 18,
+        "quoteFeedName": "CHAINLINK_USDC_USD",
+        "quoteFeedDecimals": 6,
+        "oracleSalt": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "autoDeposit": false,
+    "vaultDepositAssets": 0,
+    "collateralAmount": 0,
+    "borrowAssets": 0
+}

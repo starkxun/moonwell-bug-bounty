@@ -215,7 +215,7 @@ contract mipb50 is HybridProposal, Configs {
 
         vm.selectFork(BASE_FORK_ID);
 
-        // Approve merkle campaign creator to spend all campaign tokens (only MetaMorpho vaults, stkWELL already on Base)
+        // Approve merkle campaign creator to spend all campaign tokens
         _pushAction(
             addresses.getAddress("xWELL_PROXY"),
             abi.encodeWithSignature(

@@ -54,7 +54,8 @@ contract mipb50 is HybridProposal, Configs {
     /// @notice the name of the proposal
     string public constant override name = "MIP-B50";
 
-    uint256 public constant totalCampaignAmount = 11181679981446852000000000; // 11,181,679.981446852 WELL tokens
+    uint256 public constant totalCampaignAmount = 11181679981446852000000000; // 11,181,679.981446852 WELL tokens (total for all campaigns)
+    uint256 public constant bridgeAmount = 3973076920000000000000000; // 3,973,076.92 WELL tokens (amount to bridge, excluding stkWELL)
     uint32 public constant campaignDuration = 2419200; // 28 days
     uint32 public constant campaignStartTimestamp = 1760103018;
 
@@ -134,11 +135,11 @@ contract mipb50 is HybridProposal, Configs {
             encodedData
         );
 
-        // approve governor to spend well
+        // approve governor to spend well (only amount to bridge, stkWELL already on Base)
         vm.startPrank(addresses.getAddress("F-GLMR-DEVGRANT"));
         IERC20(addresses.getAddress("GOVTOKEN")).approve(
             addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
-            totalCampaignAmount
+            bridgeAmount
         );
         vm.stopPrank();
         vm.selectFork(primaryForkId());
@@ -163,7 +164,7 @@ contract mipb50 is HybridProposal, Configs {
                 "transferFrom(address,address,uint256)",
                 addresses.getAddress("F-GLMR-DEVGRANT"),
                 addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
-                totalCampaignAmount
+                bridgeAmount
             ),
             string(
                 abi.encodePacked(
@@ -178,12 +179,12 @@ contract mipb50 is HybridProposal, Configs {
             abi.encodeWithSignature(
                 "approve(address,uint256)",
                 router,
-                totalCampaignAmount
+                bridgeAmount
             ),
             string(
                 abi.encodePacked(
                     "Approve xWELL Router to spend ",
-                    vm.toString(totalCampaignAmount / 1e18),
+                    vm.toString(bridgeAmount / 1e18),
                     " ",
                     vm.getLabel(well)
                 )
@@ -203,7 +204,7 @@ contract mipb50 is HybridProposal, Configs {
             abi.encodeWithSignature(
                 "bridgeToRecipient(address,uint256,uint16)",
                 addresses.getAddress("TEMPORAL_GOVERNOR", BASE_CHAIN_ID),
-                totalCampaignAmount,
+                bridgeAmount,
                 wormholeChainId
             ),
             "Bridge xWELL to TEMPORAL_GOVERNOR",
@@ -212,7 +213,7 @@ contract mipb50 is HybridProposal, Configs {
 
         vm.selectFork(BASE_FORK_ID);
 
-        // Approve merkle campaign creator to spend all campaign tokens
+        // Approve merkle campaign creator to spend all campaign tokens (only MetaMorpho vaults, stkWELL already on Base)
         _pushAction(
             addresses.getAddress("xWELL_PROXY"),
             abi.encodeWithSignature(

@@ -3,8 +3,11 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {MErc20Interface} from "../MTokenInterfaces.sol";
 import "./AggregatorV3Interface.sol";
-
+import {MErc20Storage} from "../MTokenInterfaces.sol";
+import {EIP20Interface} from "../EIP20Interface.sol";
+import {MTokenInterface} from "../MTokenInterfaces.sol";
 /**
  * @title ChainlinkOracleProxy
  * @notice A TransparentUpgradeableProxy compliant contract that implements AggregatorV3Interface
@@ -15,8 +18,45 @@ contract ChainlinkOracleProxy is
     OwnableUpgradeable,
     AggregatorV3Interface
 {
+    /// @notice The maximum basis points for the fee multiplier
+    uint16 public constant MAX_BPS = 10000;
+
     /// @notice The Chainlink price feed this proxy forwards to
     AggregatorV3Interface public priceFeed;
+
+    /// @notice The address that will receive the OEV fees
+    address public feeRecipient;
+
+    /// @notice The fee multiplier for the OEV fees
+    /// @dev Represented as a percentage
+    uint16 public feeMultiplier;
+
+    /// @notice The last cached round id
+    uint256 public cachedRoundId;
+
+    /// @notice The max round delay
+    uint256 public maxRoundDelay;
+
+    /// @notice The max decrements
+    uint256 public maxDecrements;
+
+    /// @notice Emitted when the fee recipient is changed
+    event FeeRecipientChanged(address oldFeeRecipient, address newFeeRecipient);
+
+    /// @notice Emitted when the fee multiplier is changed
+    event FeeMultiplierChanged(
+        uint16 oldFeeMultiplier,
+        uint16 newFeeMultiplier
+    );
+
+    /// @notice Emitted when the price is updated early and liquidated
+    event PriceUpdatedEarlyAndLiquidated(
+        address indexed sender,
+        address indexed borrower,
+        uint256 repayAmount,
+        address indexed mToken,
+        uint256 fee
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -27,8 +67,19 @@ contract ChainlinkOracleProxy is
      * @notice Initialize the proxy with a price feed address
      * @param _priceFeed Address of the Chainlink price feed to forward calls to
      * @param _owner Address that will own this contract
+     * @param _feeRecipient Address that will receive the OEV fees
+     * @param _feeMultiplier The fee multiplier for the OEV fees
+     * @param _maxRoundDelay The max round delay
+     * @param _maxDecrements The max decrements
      */
-    function initialize(address _priceFeed, address _owner) public initializer {
+    function initialize(
+        address _priceFeed,
+        address _owner,
+        address _feeRecipient,
+        uint16 _feeMultiplier,
+        uint256 _maxRoundDelay,
+        uint256 _maxDecrements
+    ) public initializer {
         require(
             _priceFeed != address(0),
             "ChainlinkOracleProxy: price feed cannot be zero address"
@@ -37,14 +88,31 @@ contract ChainlinkOracleProxy is
             _owner != address(0),
             "ChainlinkOracleProxy: owner cannot be zero address"
         );
-
+        require(
+            _feeRecipient != address(0),
+            "ChainlinkOracleProxy: fee recipient cannot be zero address"
+        );
+        require(
+            _feeMultiplier <= MAX_BPS,
+            "ChainlinkOracleProxy: fee multiplier cannot be greater than MAX_BPS"
+        );
+        require(
+            _maxRoundDelay > 0,
+            "ChainlinkOracleProxy: max round delay cannot be zero"
+        );
+        require(
+            _maxDecrements > 0,
+            "ChainlinkOracleProxy: max decrements cannot be zero"
+        );
         __Ownable_init();
 
         priceFeed = AggregatorV3Interface(_priceFeed);
         _transferOwnership(_owner);
-    }
 
-    // AggregatorV3Interface implementation - forwards all calls to the configured price feed
+        cachedRoundId = priceFeed.latestRound();
+        maxRoundDelay = _maxRoundDelay;
+        maxDecrements = _maxDecrements;
+    }
 
     function decimals() external view override returns (uint8) {
         return priceFeed.decimals();
@@ -91,6 +159,37 @@ contract ChainlinkOracleProxy is
     {
         (roundId, answer, startedAt, updatedAt, answeredInRound) = priceFeed
             .latestRoundData();
+
+        // Return the current round data if either:
+        // 1. This round has already been cached (meaning someone paid for it)
+        // 2. The round is too old
+
+        if (
+            roundId != cachedRoundId &&
+            block.timestamp < updatedAt + maxRoundDelay
+        ) {
+            // If the current round is not too old and hasn't been paid for,
+            // attempt to find the most recent valid round by checking previous rounds
+            uint256 startRoundId = roundId;
+
+            for (uint256 i = 0; i < maxDecrements && --startRoundId > 0; i++) {
+                try priceFeed.getRoundData(uint80(startRoundId)) returns (
+                    uint80 r,
+                    int256 a,
+                    uint256 s,
+                    uint256 u,
+                    uint80 ar
+                ) {
+                    roundId = r;
+                    answer = a;
+                    startedAt = s;
+                    updatedAt = u;
+                    answeredInRound = ar;
+                    break;
+                } catch {}
+            }
+        }
+
         _validateRoundData(roundId, answer, updatedAt, answeredInRound);
     }
 
@@ -102,6 +201,28 @@ contract ChainlinkOracleProxy is
             (uint80 roundId, , , , ) = priceFeed.latestRoundData();
             return uint256(roundId);
         }
+    }
+
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        require(
+            _feeRecipient != address(0),
+            "ChainlinkOracleProxy: fee recipient cannot be zero address"
+        );
+
+        address oldFeeRecipient = feeRecipient;
+        feeRecipient = _feeRecipient;
+
+        emit FeeRecipientChanged(oldFeeRecipient, _feeRecipient);
+    }
+
+    function setFeeMultiplier(uint16 _feeMultiplier) external onlyOwner {
+        require(
+            _feeMultiplier <= MAX_BPS,
+            "ChainlinkOracleProxy: fee multiplier cannot be greater than MAX_BPS"
+        );
+        uint16 oldFeeMultiplier = feeMultiplier;
+        feeMultiplier = _feeMultiplier;
+        emit FeeMultiplierChanged(oldFeeMultiplier, _feeMultiplier);
     }
 
     /// @notice Validate the round data from Chainlink
@@ -118,5 +239,51 @@ contract ChainlinkOracleProxy is
         require(answer > 0, "Chainlink price cannot be lower or equal to 0");
         require(updatedAt != 0, "Round is in incompleted state");
         require(answeredInRound >= roundId, "Stale price");
+    }
+
+    function updatePriceEarlyAndLiquidate(
+        address borrower,
+        uint256 repayAmount,
+        address mToken
+    ) external {
+        uint256 fee = (repayAmount * uint256(feeMultiplier)) / MAX_BPS;
+        require(fee > 0, "ChainlinkOracleProxy: fee cannot be zero");
+
+        EIP20Interface underlying = EIP20Interface(
+            MErc20Storage(mToken).underlying()
+        );
+
+        address recipient = feeRecipient == address(0) ? owner() : feeRecipient;
+        underlying.transferFrom(msg.sender, recipient, fee);
+
+        _updatePriceEarly();
+
+        MErc20Interface(mToken).liquidateBorrow(
+            borrower,
+            repayAmount,
+            MTokenInterface(mToken)
+        );
+
+        emit PriceUpdatedEarlyAndLiquidated(
+            msg.sender,
+            borrower,
+            repayAmount,
+            mToken,
+            fee
+        );
+    }
+
+    function _updatePriceEarly() internal returns (uint80) {
+        (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+        _validateRoundData(roundId, answer, updatedAt, answeredInRound);
+
+        cachedRoundId = roundId;
+        return roundId;
     }
 }

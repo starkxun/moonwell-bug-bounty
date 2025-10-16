@@ -3,20 +3,20 @@ pragma solidity 0.8.19;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {console} from "@forge-std/console.sol";
 
-import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
+import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {MockChainlinkOracle} from "@test/mock/MockChainlinkOracle.sol";
 import {MockChainlinkOracleWithoutLatestRound} from "@test/mock/MockChainlinkOracleWithoutLatestRound.sol";
-import {DeployChainlinkOracleProxy} from "@script/DeployChainlinkOracleProxy.s.sol";
+import {DeployChainlinkOEVWrapper} from "@script/DeployChainlinkOEVWrapper.s.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {ChainIds, BASE_FORK_ID} from "@utils/ChainIds.sol";
 
-contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
+contract ChainlinkOEVWrapperIntegrationTest is PostProposalCheck {
     using ChainIds for uint256;
 
-    ChainlinkOracleProxy public proxy;
+    ChainlinkOEVWrapper public proxy;
     AggregatorV3Interface public originalFeed;
-    DeployChainlinkOracleProxy public deployer;
+    DeployChainlinkOEVWrapper public deployer;
 
     function setUp() public override {
         uint256 primaryForkId = vm.envUint("PRIMARY_FORK_ID");
@@ -27,7 +27,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
         // revertt timestamp back
         vm.warp(proposalStartTime);
 
-        deployer = new DeployChainlinkOracleProxy();
+        deployer = new DeployChainlinkOEVWrapper();
 
         originalFeed = AggregatorV3Interface(
             addresses.getAddress("CHAINLINK_WELL_USD")
@@ -35,9 +35,9 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
 
         (
             TransparentUpgradeableProxy proxyContract,
-            ChainlinkOracleProxy implementation
+            ChainlinkOEVWrapper implementation
         ) = deployer.deploy(addresses);
-        proxy = ChainlinkOracleProxy(address(proxyContract));
+        proxy = ChainlinkOEVWrapper(address(proxyContract));
 
         // Validate deployment
         deployer.validate(addresses, proxyContract, implementation);
@@ -219,7 +219,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
     function testLatestRoundDataRevertsOnZeroPrice() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(0, 8);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -229,7 +229,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -240,7 +240,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
     function testLatestRoundDataRevertsOnNegativePrice() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(-1, 8);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -250,7 +250,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -262,7 +262,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         mockFeed.set(1, 100e8, 1, 0, 1);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -272,7 +272,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -284,7 +284,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         mockFeed.set(5, 100e8, 1, 1, 4);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -294,7 +294,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -305,7 +305,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
     function testGetRoundDataRevertsOnZeroPrice() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -315,7 +315,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -328,7 +328,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
     function testGetRoundDataRevertsOnZeroUpdatedAt() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -338,7 +338,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -351,7 +351,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
     function testGetRoundDataRevertsOnStalePrice() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -361,7 +361,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -379,7 +379,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
             );
         mockFeed.set(12345, 100e8, 1, 1, 12345);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -389,7 +389,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 
@@ -405,7 +405,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         mockFeed.set(99999, 100e8, 1, 1, 99999);
 
-        ChainlinkOracleProxy newProxy = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper newProxy = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(newProxy),
                 addresses.getAddress("MRD_PROXY_ADMIN"),
@@ -415,7 +415,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
                     addresses.getAddress("MRD_PROXY_ADMIN")
                 )
             );
-        ChainlinkOracleProxy testProxy = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper testProxy = ChainlinkOEVWrapper(
             address(proxyContract)
         );
 

@@ -6,24 +6,25 @@ import {Script} from "@forge-std/Script.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
+import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
-contract DeployChainlinkOracleProxy is Script {
+// TODO: update for new ChainlinkOEVWrapper
+contract DeployChainlinkOEVWrapper is Script {
     function deploy(
         Addresses addresses
-    ) public returns (TransparentUpgradeableProxy, ChainlinkOracleProxy) {
+    ) public returns (TransparentUpgradeableProxy, ChainlinkOEVWrapper) {
         vm.startBroadcast();
 
         // Deploy the implementation contract
-        ChainlinkOracleProxy implementation = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper implementation = new ChainlinkOEVWrapper();
 
         // Get the ProxyAdmin address
         address proxyAdmin = addresses.getAddress("MRD_PROXY_ADMIN");
 
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
-            ChainlinkOracleProxy.initialize.selector,
+            ChainlinkOEVWrapper.initialize.selector,
             addresses.getAddress("CHAINLINK_WELL_USD"), // Price feed address
             addresses.getAddress("MRD_PROXY_ADMIN") // Owner address
         );
@@ -50,7 +51,7 @@ contract DeployChainlinkOracleProxy is Script {
     function validate(
         Addresses addresses,
         TransparentUpgradeableProxy proxy,
-        ChainlinkOracleProxy implementation
+        ChainlinkOEVWrapper implementation
     ) public view {
         // Get proxy admin contract
         ProxyAdmin proxyAdmin = ProxyAdmin(
@@ -67,39 +68,39 @@ contract DeployChainlinkOracleProxy is Script {
 
         require(
             actualImplementation == address(implementation),
-            "DeployChainlinkOracleProxy: proxy implementation mismatch"
+            "DeployChainlinkOEVWrapper: proxy implementation mismatch"
         );
 
         require(
             actualProxyAdmin == address(proxyAdmin),
-            "DeployChainlinkOracleProxy: proxy admin mismatch"
+            "DeployChainlinkOEVWrapper: proxy admin mismatch"
         );
 
         // Validate implementation configuration
-        ChainlinkOracleProxy proxyInstance = ChainlinkOracleProxy(
+        ChainlinkOEVWrapper proxyInstance = ChainlinkOEVWrapper(
             address(proxy)
         );
 
         require(
             proxyInstance.owner() == addresses.getAddress("MRD_PROXY_ADMIN"),
-            "DeployChainlinkOracleProxy: implementation owner mismatch"
+            "DeployChainlinkOEVWrapper: implementation owner mismatch"
         );
 
         require(
             address(proxyInstance.priceFeed()) ==
                 addresses.getAddress("CHAINLINK_WELL_USD"),
-            "DeployChainlinkOracleProxy: price feed address mismatch"
+            "DeployChainlinkOEVWrapper: price feed address mismatch"
         );
     }
 
     function run()
         public
-        returns (TransparentUpgradeableProxy, ChainlinkOracleProxy)
+        returns (TransparentUpgradeableProxy, ChainlinkOEVWrapper)
     {
         Addresses addresses = new Addresses();
         (
             TransparentUpgradeableProxy proxy,
-            ChainlinkOracleProxy implementation
+            ChainlinkOEVWrapper implementation
         ) = deploy(addresses);
         validate(addresses, proxy, implementation);
         return (proxy, implementation);

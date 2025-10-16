@@ -3,11 +3,11 @@ pragma solidity 0.8.19;
 
 import {Test} from "@forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
+import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {MockChainlinkOracle} from "@test/mock/MockChainlinkOracle.sol";
 import {MockChainlinkOracleWithoutLatestRound} from "@test/mock/MockChainlinkOracleWithoutLatestRound.sol";
 
-contract ChainlinkOracleProxyUnitTest is Test {
+contract ChainlinkOEVWrapperUnitTest is Test {
     address public owner = address(0x1);
     address public proxyAdmin = address(0x2);
 
@@ -19,7 +19,7 @@ contract ChainlinkOracleProxyUnitTest is Test {
             );
         mockFeed.set(12345, 100e8, 1, 1, 12345);
 
-        ChainlinkOracleProxy implementation = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper implementation = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(implementation),
                 proxyAdmin,
@@ -29,9 +29,7 @@ contract ChainlinkOracleProxyUnitTest is Test {
                     owner
                 )
             );
-        ChainlinkOracleProxy proxy = ChainlinkOracleProxy(
-            address(proxyContract)
-        );
+        ChainlinkOEVWrapper proxy = ChainlinkOEVWrapper(address(proxyContract));
 
         // Call latestRound() - should fall back to getting roundId from latestRoundData()
         uint256 round = proxy.latestRound();
@@ -45,7 +43,7 @@ contract ChainlinkOracleProxyUnitTest is Test {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         mockFeed.set(99999, 100e8, 1, 1, 99999);
 
-        ChainlinkOracleProxy implementation = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper implementation = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(implementation),
                 proxyAdmin,
@@ -55,9 +53,7 @@ contract ChainlinkOracleProxyUnitTest is Test {
                     owner
                 )
             );
-        ChainlinkOracleProxy proxy = ChainlinkOracleProxy(
-            address(proxyContract)
-        );
+        ChainlinkOEVWrapper proxy = ChainlinkOEVWrapper(address(proxyContract));
 
         // Call latestRound() - should use the direct call
         uint256 round = proxy.latestRound();
@@ -74,7 +70,7 @@ contract ChainlinkOracleProxyUnitTest is Test {
             );
         mockFeed.set(54321, 150e8, 100, 200, 54321);
 
-        ChainlinkOracleProxy implementation = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper implementation = new ChainlinkOEVWrapper();
         TransparentUpgradeableProxy proxyContract = new TransparentUpgradeableProxy(
                 address(implementation),
                 proxyAdmin,
@@ -84,9 +80,7 @@ contract ChainlinkOracleProxyUnitTest is Test {
                     owner
                 )
             );
-        ChainlinkOracleProxy proxy = ChainlinkOracleProxy(
-            address(proxyContract)
-        );
+        ChainlinkOEVWrapper proxy = ChainlinkOEVWrapper(address(proxyContract));
 
         // Get roundId from latestRoundData
         (uint80 roundId, , , , ) = proxy.latestRoundData();

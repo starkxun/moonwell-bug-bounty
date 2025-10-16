@@ -12,7 +12,7 @@ import {IMorphoBlue} from "@protocol/morpho/IMorphoBlue.sol";
 import {IMorphoChainlinkOracleV2Factory} from "@protocol/morpho/IMorphoChainlinkOracleFactory.sol";
 import {IMorphoChainlinkOracleV2} from "@protocol/morpho/IMorphoChainlinkOracleV2.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
-import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
+import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -240,7 +240,7 @@ contract CreateMorphoMarket is Script, Test {
                 AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
         }
 
-        ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
+        ChainlinkOEVWrapper logic = new ChainlinkOEVWrapper();
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
@@ -249,9 +249,9 @@ contract CreateMorphoMarket is Script, Test {
             ""
         );
 
-        ChainlinkOracleProxy(address(proxy)).initialize(
+        ChainlinkOEVWrapper(address(proxy)).initialize(
             addresses.getAddress(ocfg.baseFeedName),
-            msg.sender, // TODO: should be the Temporal Governor?
+            addresses.getAddress("TEMPORAL_GOVERNOR"),
             addresses.getAddress("OEV_FEE_RECIPIENT"),
             FEE_MULTIPLIER,
             MAX_ROUND_DELAY,

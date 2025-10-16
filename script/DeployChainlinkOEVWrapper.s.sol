@@ -77,9 +77,7 @@ contract DeployChainlinkOEVWrapper is Script {
         );
 
         // Validate implementation configuration
-        ChainlinkOEVWrapper proxyInstance = ChainlinkOEVWrapper(
-            address(proxy)
-        );
+        ChainlinkOEVWrapper proxyInstance = ChainlinkOEVWrapper(address(proxy));
 
         require(
             proxyInstance.owner() == addresses.getAddress("MRD_PROXY_ADMIN"),

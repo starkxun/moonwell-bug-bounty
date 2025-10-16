@@ -45,6 +45,10 @@ contract CreateMorphoMarket is Script, Test {
 
     uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
 
+    uint16 internal constant FEE_MULTIPLIER = 9000; // 90%
+    uint8 internal constant MAX_ROUND_DELAY = 10;
+    uint8 internal constant MAX_DECREMENTS = 10;
+
     function run() external {
         // Setup fork for Base chain
         BASE_FORK_ID.createForksAndSelect();
@@ -247,7 +251,11 @@ contract CreateMorphoMarket is Script, Test {
 
         ChainlinkOracleProxy(address(proxy)).initialize(
             addresses.getAddress(ocfg.baseFeedName),
-            msg.sender
+            msg.sender, // TODO: should be the Temporal Governor?
+            addresses.getAddress("OEV_FEE_RECIPIENT"),
+            FEE_MULTIPLIER,
+            MAX_ROUND_DELAY,
+            MAX_DECREMENTS
         );
 
         return AggregatorV3Interface(address(proxy));

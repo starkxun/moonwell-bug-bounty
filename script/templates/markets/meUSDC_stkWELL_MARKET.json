@@ -8,7 +8,8 @@
     "setSupplyQueue": true,
     "morphoBlueName": "MORPHO_BLUE",
     "oracle": {
-        "addressName": "MORPHO_CHAINLINK_WELL_USD_ORACLE_PROXY",
+        "addressName": "MORPHO_CHAINLINK_WELL_USD_ORACLE",
+        "proxyAddressName": "CHAINLINK_WELL_USD_ORACLE_PROXY",
         "baseFeedName": "CHAINLINK_WELL_USD",
         "baseFeedDecimals": 18,
         "quoteFeedName": "CHAINLINK_USDC_USD",

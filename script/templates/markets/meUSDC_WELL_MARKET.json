@@ -8,13 +8,14 @@
     "setSupplyQueue": true,
     "morphoBlueName": "MORPHO_BLUE",
     "oracle": {
-        "addressName": "MORPHO_CHAINLINK_WELL_USD_ORACLE_PROXY",
+        "addressName": "MORPHO_CHAINLINK_WELL_USD_ORACLE",
+        "proxyAddressName": "CHAINLINK_WELL_USD_ORACLE",
         "baseFeedName": "CHAINLINK_WELL_USD",
         "baseFeedDecimals": 18,
         "quoteFeedName": "CHAINLINK_USDC_USD",
         "quoteFeedDecimals": 6
     },
-    "vaultDepositAssets": 1000000000000,
-    "collateralAmount": 100000000000000000000,
-    "borrowAssets": 1000000000000
+    "vaultDepositAssets": 1e6,
+    "collateralAmount": 110e18,
+    "borrowAssets": 9e5
 }

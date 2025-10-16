@@ -239,12 +239,21 @@ contract CreateMorphoMarket is Script, Test {
             return
                 AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
         }
-
-        ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
         string memory logicAddressName = string(
             abi.encodePacked(ocfg.proxyAddressName, "_IMPL")
         );
-        addresses.addAddress(logicAddressName, address(logic));
+
+        ChainlinkOracleProxy logic;
+
+        if (!addresses.isAddressSet(logicAddressName)) {
+            logic = new ChainlinkOracleProxy();
+
+            addresses.addAddress(logicAddressName, address(logic));
+        } else {
+            logic = ChainlinkOracleProxy(
+                addresses.getAddress(logicAddressName)
+            );
+        }
 
         ProxyAdmin proxyAdmin;
         if (!addresses.isAddressSet("CHAINLINK_ORACLE_PROXY_ADMIN")) {
@@ -259,20 +268,24 @@ contract CreateMorphoMarket is Script, Test {
             );
         }
 
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(logic),
-            address(proxyAdmin),
-            ""
-        );
         string memory proxyAddressName = string(
             abi.encodePacked(ocfg.proxyAddressName, "_PROXY")
         );
-        addresses.addAddress(proxyAddressName, address(proxy));
 
-        ChainlinkOracleProxy(address(proxy)).initialize(
-            addresses.getAddress(ocfg.baseFeedName),
-            addresses.getAddress("TEMPORAL_GOVERNOR")
-        );
+        TransparentUpgradeableProxy proxy;
+        if (!addresses.isAddressSet(proxyAddressName)) {
+            proxy = new TransparentUpgradeableProxy(
+                address(logic),
+                address(proxyAdmin),
+                ""
+            );
+
+            ChainlinkOracleProxy(logic).initialize(
+                addresses.getAddress(ocfg.baseFeedName),
+                addresses.getAddress("TEMPORAL_GOVERNOR")
+            );
+            addresses.addAddress(proxyAddressName, address(proxy));
+        }
 
         return AggregatorV3Interface(address(proxy));
     }

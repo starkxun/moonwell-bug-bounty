@@ -9,13 +9,13 @@
     "morphoBlueName": "MORPHO_BLUE",
     "oracle": {
         "addressName": "MORPHO_CHAINLINK_MAMO_USD_ORACLE",
-        "proxyAddressName": "CHAINLINK_MAMO_USD_ORACLE_PROXY",
+        "proxyAddressName": "CHAINLINK_MAMO_USD_ORACLE",
         "baseFeedName": "CHAINLINK_MAMO_USD",
         "baseFeedDecimals": 18,
         "quoteFeedName": "CHAINLINK_USDC_USD",
         "quoteFeedDecimals": 6
     },
-    "vaultDepositAssets": 1000000000000,
-    "collateralAmount": 40000000000000000000,
-    "borrowAssets": 900000
+    "vaultDepositAssets": 1e6,
+    "collateralAmount": 40e18,
+    "borrowAssets": 9e5
 }

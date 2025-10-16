@@ -242,7 +242,7 @@ contract CreateMorphoMarket is Script, Test {
 
         ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
         string memory logicAddressName = string(
-            abi.encodePacked(ocfg.baseFeedName, "_IMPL")
+            abi.encodePacked(ocfg.proxyAddressName, "_IMPL")
         );
         addresses.addAddress(logicAddressName, address(logic));
 
@@ -265,7 +265,7 @@ contract CreateMorphoMarket is Script, Test {
             ""
         );
         string memory proxyAddressName = string(
-            abi.encodePacked(ocfg.baseFeedName, "_PROXY")
+            abi.encodePacked(ocfg.proxyAddressName, "_PROXY")
         );
         addresses.addAddress(proxyAddressName, address(proxy));
 

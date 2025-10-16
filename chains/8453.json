@@ -1163,5 +1163,25 @@
         "addr": "0x2F90Bb22eB3979f5FfAd31EA6C3F0792ca66dA32",
         "isContract": true,
         "name": "MOONWELL_MAMO"
+    },
+    {
+        "addr": "0xb62f6CcE22d414483c3BC4Dea6f4Fe6B6dF50239",
+        "isContract": true,
+        "name": "CHAINLINK_WELL_USD_ORACLE_IMPL"
+    },
+    {
+        "addr": "0x3fCA08493283E79cbD1E733Ca3Cb8eC8C6074deC",
+        "isContract": true,
+        "name": "CHAINLINK_ORACLE_PROXY_ADMIN"
+    },
+    {
+        "addr": "0xAEeE6335f50e1f8aF924DF0742b1879C9761F5f5",
+        "isContract": true,
+        "name": "CHAINLINK_WELL_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0x71FBaD6c2200C8A5B89380f9B6bb8a35d411c852",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE"
     }
 ]

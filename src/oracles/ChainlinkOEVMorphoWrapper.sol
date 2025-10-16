@@ -298,23 +298,18 @@ contract ChainlinkOEVMorphoWrapper is
     /**
      * @notice Updates the cached round ID to allow early access to the latest price and executes a liquidation
      * @dev This function collects a fee from the caller, updates the cached price, and performs the liquidation on Morpho Blue
+     * @dev The actual repayment amount is calculated by Morpho based on seizedAssets, oracle price, and liquidation incentive
      * @param marketParams The Morpho market parameters identifying the market
      * @param borrower The address of the borrower to liquidate
-     * @param repayAmount The amount of loan tokens to repay on behalf of the borrower
      * @param seizedAssets The amount of collateral assets to seize from the borrower
+     * @param maxRepayAmount The maximum amount of loan tokens the liquidator is willing to repay (slippage protection)
      */
     function updatePriceEarlyAndLiquidate(
         MarketParams memory marketParams,
         address borrower,
-        uint256 repayAmount,
-        uint256 seizedAssets
+        uint256 seizedAssets,
+        uint256 maxRepayAmount
     ) external {
-        // ensure the repay amount is greater than zero
-        require(
-            repayAmount > 0,
-            "ChainlinkOEVMorphoWrapper: repay amount cannot be zero"
-        );
-
         // ensure the borrower is not the zero address
         require(
             borrower != address(0),
@@ -327,6 +322,12 @@ contract ChainlinkOEVMorphoWrapper is
             "ChainlinkOEVMorphoWrapper: seized assets cannot be zero"
         );
 
+        // ensure max repay amount is greater than zero
+        require(
+            maxRepayAmount > 0,
+            "ChainlinkOEVMorphoWrapper: max repay amount cannot be zero"
+        );
+
         // get the loan token from market params
         EIP20Interface loanToken = EIP20Interface(marketParams.loanToken);
 
@@ -334,9 +335,6 @@ contract ChainlinkOEVMorphoWrapper is
         EIP20Interface collateralToken = EIP20Interface(
             marketParams.collateralToken
         );
-
-        // transfer the repay amount (loan tokens) from caller to this contract
-        loanToken.transferFrom(msg.sender, address(this), repayAmount);
 
         // get the latest round data
         (
@@ -353,14 +351,31 @@ contract ChainlinkOEVMorphoWrapper is
         // update the cached round id
         cachedRoundId = roundId;
 
-        // approve Morpho Blue to spend the loan tokens for liquidation
-        loanToken.approve(address(morphoBlue), repayAmount);
+        // transfer max repay amount from liquidator to this contract
+        // Morpho will pull the actual amount needed, and we'll return any excess
+        loanToken.transferFrom(msg.sender, address(this), maxRepayAmount);
+
+        // approve Morpho Blue to spend the loan tokens
+        loanToken.approve(address(morphoBlue), maxRepayAmount);
 
         // liquidate the borrower on Morpho Blue
+        // Morpho will: 1) Transfer seized collateral to this contract, 2) Pull loan tokens from this contract
         // seizedAssets: amount of collateral to seize
-        // repaidShares: 0 (means we use seizedAssets to determine liquidation amount)
+        // repaidShares: 0 (means we specify collateral amount, Morpho calculates debt repayment)
         (uint256 actualSeizedAssets, uint256 actualRepaidAssets) = morphoBlue
             .liquidate(marketParams, borrower, seizedAssets, 0, "");
+
+        // ensure actual repaid amount doesn't exceed liquidator's maximum
+        require(
+            actualRepaidAssets <= maxRepayAmount,
+            "ChainlinkOEVMorphoWrapper: repaid amount exceeds maximum"
+        );
+
+        // return any excess loan tokens to the liquidator
+        uint256 excessLoanTokens = maxRepayAmount - actualRepaidAssets;
+        if (excessLoanTokens > 0) {
+            loanToken.transfer(msg.sender, excessLoanTokens);
+        }
 
         // calculate the protocol fee based on the seized collateral
         uint256 fee = (actualSeizedAssets * uint256(feeMultiplier)) / MAX_BPS;

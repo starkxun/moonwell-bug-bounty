@@ -82,27 +82,27 @@ contract ChainlinkOEVWrapper is
     ) public initializer {
         require(
             _priceFeed != address(0),
-            "ChainlinkOracleProxy: price feed cannot be zero address"
+            "ChainlinkOEVWrapper: price feed cannot be zero address"
         );
         require(
             _owner != address(0),
-            "ChainlinkOracleProxy: owner cannot be zero address"
+            "ChainlinkOEVWrapper: owner cannot be zero address"
         );
         require(
             _feeRecipient != address(0),
-            "ChainlinkOracleProxy: fee recipient cannot be zero address"
+            "ChainlinkOEVWrapper: fee recipient cannot be zero address"
         );
         require(
             _feeMultiplier <= MAX_BPS,
-            "ChainlinkOracleProxy: fee multiplier cannot be greater than MAX_BPS"
+            "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
         );
         require(
             _maxRoundDelay > 0,
-            "ChainlinkOracleProxy: max round delay cannot be zero"
+            "ChainlinkOEVWrapper: max round delay cannot be zero"
         );
         require(
             _maxDecrements > 0,
-            "ChainlinkOracleProxy: max decrements cannot be zero"
+            "ChainlinkOEVWrapper: max decrements cannot be zero"
         );
         __Ownable_init();
 
@@ -194,13 +194,14 @@ contract ChainlinkOEVWrapper is
         // The default behavior is to delay the price update unless someone has paid for the current round.
         // If the current round is not too old (maxRoundDelay seconds) and hasn't been paid for,
         // attempt to find the most recent valid round by checking previous rounds
-        if (roundId != cachedRoundId && block.timestamp < updatedAt + maxRoundDelay) {
+        if (
+            roundId != cachedRoundId &&
+            block.timestamp < updatedAt + maxRoundDelay
+        ) {
+            // start from the previous round
+            uint256 currentRoundId = roundId - 1;
 
-    
-        // start from the previous round
-        uint256 currentRoundId = roundId - 1;
-
-        for (uint256 i = 0; i < maxDecrements && currentRoundId > 0; i++) {
+            for (uint256 i = 0; i < maxDecrements && currentRoundId > 0; i++) {
                 try priceFeed.getRoundData(uint80(currentRoundId)) returns (
                     uint80 r,
                     int256 a,
@@ -208,7 +209,7 @@ contract ChainlinkOEVWrapper is
                     uint256 u,
                     uint80 ar
                 ) {
-                    // previous round data found, update the round data 
+                    // previous round data found, update the round data
                     roundId = r;
                     answer = a;
                     startedAt = s;
@@ -246,7 +247,7 @@ contract ChainlinkOEVWrapper is
     function setFeeRecipient(address _feeRecipient) external onlyOwner {
         require(
             _feeRecipient != address(0),
-            "ChainlinkOracleProxy: fee recipient cannot be zero address"
+            "ChainlinkOEVWrapper: fee recipient cannot be zero address"
         );
 
         address oldFeeRecipient = feeRecipient;
@@ -262,7 +263,7 @@ contract ChainlinkOEVWrapper is
     function setFeeMultiplier(uint16 _feeMultiplier) external onlyOwner {
         require(
             _feeMultiplier <= MAX_BPS,
-            "ChainlinkOracleProxy: fee multiplier cannot be greater than MAX_BPS"
+            "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
         );
         uint16 oldFeeMultiplier = feeMultiplier;
         feeMultiplier = _feeMultiplier;
@@ -298,19 +299,28 @@ contract ChainlinkOEVWrapper is
         address mToken
     ) external {
         // ensure the repay amount is greater than zero
-        require(repayAmount > 0, "ChainlinkOracleProxy: repay amount cannot be zero");
+        require(
+            repayAmount > 0,
+            "ChainlinkOEVWrapper: repay amount cannot be zero"
+        );
 
         // ensure the borrower is not the zero address
-        require(borrower != address(0), "ChainlinkOracleProxy: borrower cannot be zero address");
+        require(
+            borrower != address(0),
+            "ChainlinkOEVWrapper: borrower cannot be zero address"
+        );
 
         // ensure the mToken is not the zero address
-        require(mToken != address(0), "ChainlinkOracleProxy: mToken cannot be zero address");
+        require(
+            mToken != address(0),
+            "ChainlinkOEVWrapper: mToken cannot be zero address"
+        );
 
         // calculate the protocol fee based on the fee multiplier
         uint256 fee = (repayAmount * uint256(feeMultiplier)) / MAX_BPS;
 
         // ensure the fee is greater than zero
-        require(fee > 0, "ChainlinkOracleProxy: fee cannot be zero");
+        require(fee > 0, "ChainlinkOEVWrapper: fee cannot be zero");
 
         // get the collateral underlying token
         EIP20Interface underlying = EIP20Interface(
@@ -326,8 +336,8 @@ contract ChainlinkOEVWrapper is
         // get the latest round data
         (
             uint80 roundId,
-            int256 answer,
-            , // startedAt
+            int256 answer, // startedAt
+            ,
             uint256 updatedAt,
             uint80 answeredInRound
         ) = priceFeed.latestRoundData();
@@ -342,19 +352,25 @@ contract ChainlinkOEVWrapper is
         underlying.approve(mToken, repayAmount);
 
         // liquidate the borrower's collateral
-        require(MErc20Interface(mToken).liquidateBorrow(
-            borrower,
-            repayAmount,
-            MTokenInterface(mToken)
-        ) == 0, "ChainlinkOracleProxy: liquidation failed");
+        require(
+            MErc20Interface(mToken).liquidateBorrow(
+                borrower,
+                repayAmount,
+                MTokenInterface(mToken)
+            ) == 0,
+            "ChainlinkOEVWrapper: liquidation failed"
+        );
 
         // redeem mToken and withdraw the underlying tokens to the contract
-        require(MErc20Interface(mToken).redeem(repayAmount) == 0, "ChainlinkOracleProxy: redemption failed");
+        require(
+            MErc20Interface(mToken).redeem(repayAmount) == 0,
+            "ChainlinkOEVWrapper: redemption failed"
+        );
 
         // transfer the protocol fee to the recipient
         underlying.transferFrom(address(this), recipient, fee);
 
-        // transfer the remaining underlying tokens to the caller 
+        // transfer the remaining underlying tokens to the caller
         underlying.transferFrom(address(this), msg.sender, repayAmount - fee);
 
         emit PriceUpdatedEarlyAndLiquidated(
@@ -365,6 +381,4 @@ contract ChainlinkOEVWrapper is
             fee
         );
     }
-
- 
 }

@@ -309,6 +309,10 @@ contract ChainlinkOracleProxy is
 
         _updatePriceEarly();
 
+        // first approve the mToken to spent the tokens
+        underlying.approve(mToken, repayAmount);
+
+        // then liquidate the borrow
         MErc20Interface(mToken).liquidateBorrow(
             borrower,
             repayAmount,

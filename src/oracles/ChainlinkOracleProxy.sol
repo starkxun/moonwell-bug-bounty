@@ -114,18 +114,39 @@ contract ChainlinkOracleProxy is
         maxDecrements = _maxDecrements;
     }
 
+    /**
+     * @notice Returns the number of decimals in the price feed
+     * @return The number of decimals
+     */
     function decimals() external view override returns (uint8) {
         return priceFeed.decimals();
     }
 
+    /**
+     * @notice Returns a description of the price feed
+     * @return The description string
+     */
     function description() external view override returns (string memory) {
         return priceFeed.description();
     }
 
+    /**
+     * @notice Returns the version number of the price feed
+     * @return The version number
+     */
     function version() external view override returns (uint256) {
         return priceFeed.version();
     }
 
+    /**
+     * @notice Returns data for a specific round
+     * @param _roundId The round ID to retrieve data for
+     * @return roundId The round ID
+     * @return answer The price reported in this round
+     * @return startedAt The timestamp when the round started
+     * @return updatedAt The timestamp when the round was updated
+     * @return answeredInRound The round ID in which the answer was computed
+     */
     function getRoundData(
         uint80 _roundId
     )
@@ -145,6 +166,16 @@ contract ChainlinkOracleProxy is
         _validateRoundData(roundId, answer, updatedAt, answeredInRound);
     }
 
+    /**
+     * @notice Returns data from the latest round, with OEV protection mechanism
+     * @dev If the latest round hasn't been paid for (via updatePriceEarlyAndLiquidate) and is recent,
+     *      this function will return data from a previous round instead
+     * @return roundId The round ID
+     * @return answer The latest price
+     * @return startedAt The timestamp when the round started
+     * @return updatedAt The timestamp when the round was updated
+     * @return answeredInRound The round ID in which the answer was computed
+     */
     function latestRoundData()
         external
         view
@@ -193,6 +224,11 @@ contract ChainlinkOracleProxy is
         _validateRoundData(roundId, answer, updatedAt, answeredInRound);
     }
 
+    /**
+     * @notice Returns the latest round ID
+     * @dev Falls back to extracting round ID from latestRoundData if latestRound() is not supported
+     * @return The latest round ID
+     */
     function latestRound() external view override returns (uint256) {
         try priceFeed.latestRound() returns (uint256 round) {
             return round;
@@ -203,6 +239,10 @@ contract ChainlinkOracleProxy is
         }
     }
 
+    /**
+     * @notice Sets the fee recipient address
+     * @param _feeRecipient The new fee recipient address
+     */
     function setFeeRecipient(address _feeRecipient) external onlyOwner {
         require(
             _feeRecipient != address(0),
@@ -215,6 +255,10 @@ contract ChainlinkOracleProxy is
         emit FeeRecipientChanged(oldFeeRecipient, _feeRecipient);
     }
 
+    /**
+     * @notice Sets the fee multiplier for OEV fees
+     * @param _feeMultiplier The new fee multiplier in basis points (must be <= MAX_BPS)
+     */
     function setFeeMultiplier(uint16 _feeMultiplier) external onlyOwner {
         require(
             _feeMultiplier <= MAX_BPS,
@@ -241,6 +285,13 @@ contract ChainlinkOracleProxy is
         require(answeredInRound >= roundId, "Stale price");
     }
 
+    /**
+     * @notice Updates the cached round ID to allow early access to the latest price and executes a liquidation
+     * @dev This function collects a fee from the caller, updates the cached price, and performs the liquidation
+     * @param borrower The address of the borrower to liquidate
+     * @param repayAmount The amount to repay on behalf of the borrower
+     * @param mToken The mToken market in which to perform the liquidation
+     */
     function updatePriceEarlyAndLiquidate(
         address borrower,
         uint256 repayAmount,
@@ -273,6 +324,11 @@ contract ChainlinkOracleProxy is
         );
     }
 
+    /**
+     * @notice Internal function to update the cached round ID to the latest round
+     * @dev This allows callers to bypass the OEV protection and access the latest price
+     * @return The updated round ID
+     */
     function _updatePriceEarly() internal returns (uint80) {
         (
             uint80 roundId,

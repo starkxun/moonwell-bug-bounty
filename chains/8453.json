@@ -1127,7 +1127,7 @@
     {
         "addr": "0x245951c8a17Dd700a35a3CB6E2007C3E8D133F0b",
         "isContract": true,
-        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE"
+        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE_DEPRECATED"
     },
     {
         "addr": "0xd4669fCee3BE73b51438ad1f1debEB3505Eab308",
@@ -1163,5 +1163,55 @@
         "addr": "0x2F90Bb22eB3979f5FfAd31EA6C3F0792ca66dA32",
         "isContract": true,
         "name": "MOONWELL_MAMO"
+    },
+    {
+        "addr": "0xb62f6CcE22d414483c3BC4Dea6f4Fe6B6dF50239",
+        "isContract": true,
+        "name": "CHAINLINK_WELL_USD_ORACLE_IMPL"
+    },
+    {
+        "addr": "0x3fCA08493283E79cbD1E733Ca3Cb8eC8C6074deC",
+        "isContract": true,
+        "name": "CHAINLINK_ORACLE_PROXY_ADMIN"
+    },
+    {
+        "addr": "0xAEeE6335f50e1f8aF924DF0742b1879C9761F5f5",
+        "isContract": true,
+        "name": "CHAINLINK_WELL_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0x71FBaD6c2200C8A5B89380f9B6bb8a35d411c852",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE"
+    },
+    {
+        "addr": "0x4073bA1AF0bD159BF5c6F85D2FC9f43EEf43b02A",
+        "isContract": true,
+        "name": "CHAINLINK_MAMO_USD_ORACLE_IMPL"
+    },
+    {
+        "addr": "0xF4DCcaE864EDF2b218B40A950c4407C3383Dadb9",
+        "isContract": true,
+        "name": "CHAINLINK_MAMO_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0x18d1325e8528E3ceafBf9a77F3bE3f76Fec42D5C",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_MAMO_USD_ORACLE"
+    },
+    {
+        "addr": "0xFf37a7467a80EF462Ad5d73f67F619Ca2dbb2D4B",
+        "isContract": true,
+        "name": "CHAINLINK_stkWELL_USD_ORACLE_IMPL"
+    },
+    {
+        "addr": "0x593355Faef3075AF1b20Ca22FeDAbF6F3D2FD66C",
+        "isContract": true,
+        "name": "CHAINLINK_stkWELL_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0xc842d95b9C35bf97842110408A8C501645Fb1722",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_stkWELL_USD_ORACLE"
     }
 ]

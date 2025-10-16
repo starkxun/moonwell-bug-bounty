@@ -37,6 +37,7 @@ contract CreateMorphoMarket is Script, Test {
 
     struct OracleConfig {
         string addressName; // name key for oracle (Addresses)
+        string proxyAddressName; // name key for oracle proxy wrapper (Addresses)
         string baseFeedName; // e.g. CHAINLINK_WELL_USD
         uint8 baseFeedDecimals; // e.g. 18
         string quoteFeedName; // e.g. CHAINLINK_USDC_USD
@@ -68,6 +69,8 @@ contract CreateMorphoMarket is Script, Test {
         _validate(addresses, market, cfg, marketId);
 
         vm.stopBroadcast();
+
+        addresses.printAddresses();
     }
 
     function _parseConfig(
@@ -108,6 +111,7 @@ contract CreateMorphoMarket is Script, Test {
             json.readUint(".oracle.quoteFeedDecimals")
         );
         ocfg.addressName = json.readString(".oracle.addressName");
+        ocfg.proxyAddressName = json.readString(".oracle.proxyAddressName");
     }
 
     function _computeMarketId(
@@ -235,20 +239,53 @@ contract CreateMorphoMarket is Script, Test {
             return
                 AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
         }
-
-        ChainlinkOracleProxy logic = new ChainlinkOracleProxy();
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(logic),
-            address(proxyAdmin),
-            ""
+        string memory logicAddressName = string(
+            abi.encodePacked(ocfg.proxyAddressName, "_IMPL")
         );
 
-        ChainlinkOracleProxy(address(proxy)).initialize(
-            addresses.getAddress(ocfg.baseFeedName),
-            msg.sender
+        ChainlinkOracleProxy logic;
+
+        if (!addresses.isAddressSet(logicAddressName)) {
+            logic = new ChainlinkOracleProxy();
+
+            addresses.addAddress(logicAddressName, address(logic));
+        } else {
+            logic = ChainlinkOracleProxy(
+                addresses.getAddress(logicAddressName)
+            );
+        }
+
+        ProxyAdmin proxyAdmin;
+        if (!addresses.isAddressSet("CHAINLINK_ORACLE_PROXY_ADMIN")) {
+            proxyAdmin = new ProxyAdmin();
+            addresses.addAddress(
+                "CHAINLINK_ORACLE_PROXY_ADMIN",
+                address(proxyAdmin)
+            );
+        } else {
+            proxyAdmin = ProxyAdmin(
+                addresses.getAddress("CHAINLINK_ORACLE_PROXY_ADMIN")
+            );
+        }
+
+        string memory proxyAddressName = string(
+            abi.encodePacked(ocfg.proxyAddressName, "_PROXY")
         );
+
+        TransparentUpgradeableProxy proxy;
+        if (!addresses.isAddressSet(proxyAddressName)) {
+            proxy = new TransparentUpgradeableProxy(
+                address(logic),
+                address(proxyAdmin),
+                ""
+            );
+
+            ChainlinkOracleProxy(address(proxy)).initialize(
+                addresses.getAddress(ocfg.baseFeedName),
+                addresses.getAddress("TEMPORAL_GOVERNOR")
+            );
+            addresses.addAddress(proxyAddressName, address(proxy));
+        }
 
         return AggregatorV3Interface(address(proxy));
     }

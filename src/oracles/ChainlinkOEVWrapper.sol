@@ -9,11 +9,11 @@ import {MErc20Storage} from "../MTokenInterfaces.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {MTokenInterface} from "../MTokenInterfaces.sol";
 /**
- * @title ChainlinkOracleProxy
- * @notice A TransparentUpgradeableProxy compliant contract that implements AggregatorV3Interface
- * and forwards calls to a configurable Chainlink price feed
+ * @title ChainlinkOEVWrapper
+ * @notice A wrapper for Chainlink price feeds that allows early updates for liquidation
+ * @dev This contract implements the AggregatorV3Interface and adds OEV (Oracle Extractable Value) functionality
  */
-contract ChainlinkOracleProxy is
+contract ChainlinkOEVWrapper is
     Initializable,
     OwnableUpgradeable,
     AggregatorV3Interface
@@ -107,11 +107,11 @@ contract ChainlinkOracleProxy is
         __Ownable_init();
 
         priceFeed = AggregatorV3Interface(_priceFeed);
-        _transferOwnership(_owner);
-
         cachedRoundId = priceFeed.latestRound();
         maxRoundDelay = _maxRoundDelay;
         maxDecrements = _maxDecrements;
+
+        _transferOwnership(_owner);
     }
 
     /**
@@ -191,36 +191,36 @@ contract ChainlinkOracleProxy is
         (roundId, answer, startedAt, updatedAt, answeredInRound) = priceFeed
             .latestRoundData();
 
-        // Return the current round data if either:
-        // 1. This round has already been cached (meaning someone paid for it)
-        // 2. The round is too old
+        // The default behavior is to delay the price update unless someone has paid for the current round.
+        // If the current round is not too old (maxRoundDelay seconds) and hasn't been paid for,
+        // attempt to find the most recent valid round by checking previous rounds
+        if (roundId != cachedRoundId && block.timestamp < updatedAt + maxRoundDelay) {
 
-        if (
-            roundId != cachedRoundId &&
-            block.timestamp < updatedAt + maxRoundDelay
-        ) {
-            // If the current round is not too old and hasn't been paid for,
-            // attempt to find the most recent valid round by checking previous rounds
-            uint256 startRoundId = roundId;
+    
+        // start from the previous round
+        uint256 currentRoundId = roundId - 1;
 
-            for (uint256 i = 0; i < maxDecrements && --startRoundId > 0; i++) {
-                try priceFeed.getRoundData(uint80(startRoundId)) returns (
+        for (uint256 i = 0; i < maxDecrements && currentRoundId > 0; i++) {
+                try priceFeed.getRoundData(uint80(currentRoundId)) returns (
                     uint80 r,
                     int256 a,
                     uint256 s,
                     uint256 u,
                     uint80 ar
                 ) {
+                    // previous round data found, update the round data 
                     roundId = r;
                     answer = a;
                     startedAt = s;
                     updatedAt = u;
                     answeredInRound = ar;
                     break;
-                } catch {}
+                } catch {
+                    // previous round data not found, continue to the next decrement
+                    currentRoundId--;
+                }
             }
         }
-
         _validateRoundData(roundId, answer, updatedAt, answeredInRound);
     }
 
@@ -297,29 +297,65 @@ contract ChainlinkOracleProxy is
         uint256 repayAmount,
         address mToken
     ) external {
+        // ensure the repay amount is greater than zero
+        require(repayAmount > 0, "ChainlinkOracleProxy: repay amount cannot be zero");
+
+        // ensure the borrower is not the zero address
+        require(borrower != address(0), "ChainlinkOracleProxy: borrower cannot be zero address");
+
+        // ensure the mToken is not the zero address
+        require(mToken != address(0), "ChainlinkOracleProxy: mToken cannot be zero address");
+
+        // calculate the protocol fee based on the fee multiplier
         uint256 fee = (repayAmount * uint256(feeMultiplier)) / MAX_BPS;
+
+        // ensure the fee is greater than zero
         require(fee > 0, "ChainlinkOracleProxy: fee cannot be zero");
 
+        // get the collateral underlying token
         EIP20Interface underlying = EIP20Interface(
             MErc20Storage(mToken).underlying()
         );
 
+        // if the fee recipient is not set, use the owner as the recipient
         address recipient = feeRecipient == address(0) ? owner() : feeRecipient;
-        underlying.transferFrom(msg.sender, recipient, fee);
 
-        _updatePriceEarly();
+        // transfer all the repay amount to the contract to cover the liquidation
+        underlying.transferFrom(msg.sender, address(this), repayAmount);
 
-        // first approve the mToken to spent the tokens
+        // get the latest round data
+        (
+            uint80 roundId,
+            int256 answer,
+            , // startedAt
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = priceFeed.latestRoundData();
+
+        // validate the round data
+        _validateRoundData(roundId, answer, updatedAt, answeredInRound);
+
+        // update the cached round id
+        cachedRoundId = roundId;
+
+        // approve the mToken to spent the tokens
         underlying.approve(mToken, repayAmount);
 
-        // then liquidate the borrow
-        MErc20Interface(mToken).liquidateBorrow(
+        // liquidate the borrower's collateral
+        require(MErc20Interface(mToken).liquidateBorrow(
             borrower,
             repayAmount,
             MTokenInterface(mToken)
-        );
+        ) == 0, "ChainlinkOracleProxy: liquidation failed");
 
-        // TODO redeem mToken and withdraw the underlying tokens to the recipient
+        // redeem mToken and withdraw the underlying tokens to the contract
+        require(MErc20Interface(mToken).redeem(repayAmount) == 0, "ChainlinkOracleProxy: redemption failed");
+
+        // transfer the protocol fee to the recipient
+        underlying.transferFrom(address(this), recipient, fee);
+
+        // transfer the remaining underlying tokens to the caller 
+        underlying.transferFrom(address(this), msg.sender, repayAmount - fee);
 
         emit PriceUpdatedEarlyAndLiquidated(
             msg.sender,
@@ -330,22 +366,5 @@ contract ChainlinkOracleProxy is
         );
     }
 
-    /**
-     * @notice Internal function to update the cached round ID to the latest round
-     * @dev This allows callers to bypass the OEV protection and access the latest price
-     * @return The updated round ID
-     */
-    function _updatePriceEarly() internal returns (uint80) {
-        (
-            uint80 roundId,
-            int256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        ) = priceFeed.latestRoundData();
-        _validateRoundData(roundId, answer, updatedAt, answeredInRound);
-
-        cachedRoundId = roundId;
-        return roundId;
-    }
+ 
 }

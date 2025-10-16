@@ -280,7 +280,7 @@ contract CreateMorphoMarket is Script, Test {
                 ""
             );
 
-            ChainlinkOracleProxy(logic).initialize(
+            ChainlinkOracleProxy(address(proxy)).initialize(
                 addresses.getAddress(ocfg.baseFeedName),
                 addresses.getAddress("TEMPORAL_GOVERNOR")
             );

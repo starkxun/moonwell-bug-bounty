@@ -15,7 +15,7 @@
         "quoteFeedName": "CHAINLINK_USDC_USD",
         "quoteFeedDecimals": 6
     },
-    "vaultDepositAssets": 1e6,
-    "collateralAmount": 110e18,
-    "borrowAssets": 9e5
+    "vaultDepositAssets": 1000000,
+    "collateralAmount": 110000000000000000000,
+    "borrowAssets": 900000
 }

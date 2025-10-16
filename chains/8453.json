@@ -1183,5 +1183,35 @@
         "addr": "0x71FBaD6c2200C8A5B89380f9B6bb8a35d411c852",
         "isContract": true,
         "name": "MORPHO_CHAINLINK_WELL_USD_ORACLE"
+    },
+    {
+        "addr": "0x4073bA1AF0bD159BF5c6F85D2FC9f43EEf43b02A",
+        "isContract": true,
+        "name": "CHAINLINK_MAMO_USD_ORACLE_IMPL"
+    },
+    {
+        "addr": "0xF4DCcaE864EDF2b218B40A950c4407C3383Dadb9",
+        "isContract": true,
+        "name": "CHAINLINK_MAMO_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0x18d1325e8528E3ceafBf9a77F3bE3f76Fec42D5C",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_MAMO_USD_ORACLE"
+    },
+    {
+        "addr": "0xFf37a7467a80EF462Ad5d73f67F619Ca2dbb2D4B",
+        "isContract": true,
+        "name": "CHAINLINK_stkWELL_USD_ORACLE_IMPL"
+    },
+    {
+        "addr": "0x593355Faef3075AF1b20Ca22FeDAbF6F3D2FD66C",
+        "isContract": true,
+        "name": "CHAINLINK_stkWELL_USD_ORACLE_PROXY"
+    },
+    {
+        "addr": "0xc842d95b9C35bf97842110408A8C501645Fb1722",
+        "isContract": true,
+        "name": "MORPHO_CHAINLINK_stkWELL_USD_ORACLE"
     }
 ]

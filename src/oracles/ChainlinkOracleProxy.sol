@@ -319,6 +319,8 @@ contract ChainlinkOracleProxy is
             MTokenInterface(mToken)
         );
 
+        // TODO redeem mToken and withdraw the underlying tokens to the recipient
+
         emit PriceUpdatedEarlyAndLiquidated(
             msg.sender,
             borrower,

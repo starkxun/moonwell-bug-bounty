@@ -9,11 +9,10 @@ import {ERC20} from "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 import {OPTIMISM_FORK_ID} from "@utils/ChainIds.sol";
 import {ChainlinkFeedOEVWrapper} from "@protocol/oracles/ChainlinkFeedOEVWrapper.sol";
-import {DeployChainlinkOEVWrapper} from "@script/DeployChainlinkOEVWrapper.sol";
 import {HybridProposal, ActionType} from "@proposals/proposalTypes/HybridProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
-contract mipo12 is HybridProposal, DeployChainlinkOEVWrapper {
+contract mipo12 is HybridProposal {
     using ProposalActions for *;
 
     string public constant override name = "MIP-O12";
@@ -31,7 +30,8 @@ contract mipo12 is HybridProposal, DeployChainlinkOEVWrapper {
 
     function deploy(Addresses addresses, address) public override {
         if (!addresses.isAddressSet("CHAINLINK_ETH_USD_OEV_WRAPPER")) {
-            deployChainlinkOEVWrapper(addresses, "CHAINLINK_ETH_USD");
+            // new version of deploy script not compatiblw with old wrapper
+            //deployChainlinkOEVWrapper(addresses, "CHAINLINK_ETH_USD");
         }
     }
 

@@ -31,7 +31,9 @@ contract MarketCreationHook {
     /// @notice comptroller address as specified by an mToken being created
     address private comptroller;
 
-    function _verifyActionsPreRun(ProposalAction[] memory proposal) internal {
+    function _verifyActionsPreRun(
+        ProposalAction[] memory proposal
+    ) internal virtual {
         address[] memory targets = new address[](proposal.length);
         uint256[] memory values = new uint256[](proposal.length);
         bytes[] memory datas = new bytes[](proposal.length);
@@ -200,7 +202,7 @@ contract MarketCreationHook {
     /// @notice function to grab the first 4 bytes of calldata payload
     function bytesToBytes4(
         bytes memory toSlice
-    ) public pure returns (bytes4 functionSignature) {
+    ) public pure virtual returns (bytes4 functionSignature) {
         if (toSlice.length < 4) {
             return bytes4(0);
         }

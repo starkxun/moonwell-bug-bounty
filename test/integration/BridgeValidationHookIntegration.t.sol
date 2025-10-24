@@ -365,6 +365,38 @@ contract BridgeValidationHookIntegrationTest is Test {
 
         proposal.testVerifyBridgeActions(actions);
     }
+
+    /// ============ VALIDATION TESTS ============
+
+    function testInvalidRouterNotContract() public {
+        InvalidRouterNotContractProposal proposal = new InvalidRouterNotContractProposal(
+                actualBridgeCost
+            );
+
+        proposal.build(addresses);
+
+        (
+            address[] memory targets,
+            uint256[] memory values,
+            bytes[] memory calldatas,
+            ,
+
+        ) = proposal.getProposalActionSteps();
+
+        ProposalAction[] memory actions = new ProposalAction[](1);
+        actions[0] = ProposalAction({
+            target: targets[0],
+            value: values[0],
+            data: calldatas[0],
+            description: "",
+            actionType: ActionType.Moonbeam
+        });
+
+        // Should fail validation - router is not a contract
+        vm.expectRevert("BridgeValidationHook: router must be a contract");
+
+        proposal.testVerifyBridgeActions(actions);
+    }
 }
 
 /// ============ TEST PROPOSAL CONTRACTS ============
@@ -538,6 +570,31 @@ contract BoundaryAboveMaximumProposal is BaseTestProposal {
             addresses,
             (bridgeCost * 1001) / 100, // 10.01x bridge cost
             TEST_BRIDGE_AMOUNT
+        );
+    }
+}
+
+/// @notice Invalid proposal - router is not a contract (EOA address)
+contract InvalidRouterNotContractProposal is BaseTestProposal {
+    constructor(uint256 _bridgeCost) BaseTestProposal(_bridgeCost) {}
+
+    string public constant override name = "INVALID_ROUTER_NOT_CONTRACT";
+
+    function build(Addresses addresses) public override {
+        // Use an EOA address instead of a contract
+        address eoaRouter = address(0x1234567890123456789012345678901234567890);
+
+        _pushAction(
+            eoaRouter, // EOA instead of contract
+            bridgeCost * 7,
+            abi.encodeWithSignature(
+                "bridgeToRecipient(address,uint256,uint16)",
+                TEST_RECIPIENT,
+                TEST_BRIDGE_AMOUNT,
+                BASE_WORMHOLE_CHAIN_ID
+            ),
+            "Bridge WELL to Base via invalid router",
+            ActionType.Moonbeam
         );
     }
 }

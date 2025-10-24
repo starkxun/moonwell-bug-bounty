@@ -24,37 +24,18 @@ contract BridgeValidationHook {
     function _verifyBridgeActions(
         ProposalAction[] memory proposal
     ) internal view {
-        address[] memory targets = new address[](proposal.length);
-        uint256[] memory values = new uint256[](proposal.length);
-        bytes[] memory datas = new bytes[](proposal.length);
-
-        for (uint256 i = 0; i < proposal.length; i++) {
-            targets[i] = proposal[i].target;
-            values[i] = proposal[i].value;
-            datas[i] = proposal[i].data;
-        }
-
-        _verifyBridgeCalls(targets, values, datas);
-    }
-
-    /// @notice Internal function to verify bridge calls
-    /// @param targets Array of target addresses for each action
-    /// @param values Array of native token values for each action
-    /// @param datas Array of calldata for each action
-    function _verifyBridgeCalls(
-        address[] memory targets,
-        uint256[] memory values,
-        bytes[] memory datas
-    ) internal view {
-        uint256 proposalLength = targets.length;
+        uint256 proposalLength = proposal.length;
 
         for (uint256 i = 0; i < proposalLength; i++) {
-            bytes4 selector = bytesToBytes4(datas[i]);
+            bytes4 selector = bytesToBytes4(proposal[i].data);
 
             // Check if this action is a bridgeToRecipient call
             if (selector == BRIDGE_TO_RECIPIENT_SELECTOR) {
-                address router = targets[i];
-                uint256 actionValue = values[i];
+                address router = proposal[i].target;
+                uint256 actionValue = proposal[i].value;
+
+                // Validate router is a contract
+                _validateRouterIsContract(router);
 
                 // Extract wormholeChainId from calldata
                 // Calldata structure:
@@ -62,12 +43,12 @@ contract BridgeValidationHook {
                 // 4-35: address to (32 bytes)
                 // 36-67: uint256 amount (32 bytes)
                 // 68-99: uint16 wormholeChainId (32 bytes, right-padded)
-                uint16 wormholeChainId = extractUint16FromCalldata(datas[i]);
-
-                // Get the actual bridge cost from the router
-                uint256 bridgeCost = xWELLRouter(router).bridgeCost(
-                    wormholeChainId
+                uint16 wormholeChainId = extractUint16FromCalldata(
+                    proposal[i].data
                 );
+
+                // Get the actual bridge cost from the router with validation
+                uint256 bridgeCost = _getBridgeCost(router, wormholeChainId);
 
                 // Validate that action value is between 5x and 10x the bridge cost
                 uint256 minValue = bridgeCost * MIN_BRIDGE_COST_MULTIPLIER;
@@ -94,6 +75,31 @@ contract BridgeValidationHook {
                 );
             }
         }
+    }
+
+    /// @notice Validates that the router address is a contract
+    /// @param router The router address to validate
+    function _validateRouterIsContract(address router) private view {
+        require(
+            router.code.length > 0,
+            "BridgeValidationHook: router must be a contract"
+        );
+    }
+
+    /// @notice Gets bridge cost from router and validates it's non-zero
+    /// @param router The router contract address
+    /// @param wormholeChainId The destination chain ID
+    /// @return bridgeCost The validated bridge cost
+    function _getBridgeCost(
+        address router,
+        uint16 wormholeChainId
+    ) private view returns (uint256 bridgeCost) {
+        bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
+
+        require(
+            bridgeCost > 0,
+            "BridgeValidationHook: bridge cost must be greater than zero"
+        );
     }
 
     /// @notice Extract uint16 value from calldata at the third parameter position

@@ -1,4 +1,4 @@
-//SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
@@ -12,8 +12,8 @@ import {ProposalAction} from "@proposals/proposalTypes/IProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {ChainIds, MOONBEAM_FORK_ID, BASE_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
 
-/// @notice Integration test for BridgeValidationHook using real forked contracts
-contract BridgeValidationHookIntegrationTest is Test {
+/// @notice Integration test for BridgeValidationHook using real forked contracts on Moonbeam
+contract BridgeValidationHookMoonbeamTest is Test {
     using ChainIds for uint256;
 
     Addresses public addresses;
@@ -580,7 +580,7 @@ contract InvalidRouterNotContractProposal is BaseTestProposal {
 
     string public constant override name = "INVALID_ROUTER_NOT_CONTRACT";
 
-    function build(Addresses addresses) public override {
+    function build(Addresses) public override {
         // Use an EOA address instead of a contract
         address eoaRouter = address(0x1234567890123456789012345678901234567890);
 

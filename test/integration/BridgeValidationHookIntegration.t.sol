@@ -12,8 +12,8 @@ import {ProposalAction} from "@proposals/proposalTypes/IProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {ChainIds, MOONBEAM_FORK_ID, BASE_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
 
-/// @notice Integration test for BridgeValidationHook using real forked contracts on Moonbeam
-contract BridgeValidationHookMoonbeamTest is Test {
+/// @notice Integration test for BridgeValidationHook using real forked contracts
+contract BridgeValidationHookIntegrationTest is Test {
     using ChainIds for uint256;
 
     Addresses public addresses;

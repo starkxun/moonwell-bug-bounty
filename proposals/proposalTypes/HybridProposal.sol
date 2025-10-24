@@ -46,15 +46,14 @@ abstract contract HybridProposal is
     /// @notice instant finality on moonbeam https://book.wormhole.com/wormhole/3_coreLayerContracts.html?highlight=consiste#consistency-levels
     uint8 public constant consistencyLevel = 200;
 
-    /// @notice Override to call both MarketCreationHook and BridgeValidationHook validations
+    /// @notice Verify all proposal actions before execution
+    /// @dev Calls both market creation and bridge validation hooks
     /// @param proposal Array of proposal actions to validate
-    function _verifyActionsPreRun(
-        ProposalAction[] memory proposal
-    ) internal override(MarketCreationHook) {
-        // Call MarketCreationHook validation
-        MarketCreationHook._verifyActionsPreRun(proposal);
+    function _verifyActionsPreRun(ProposalAction[] memory proposal) internal {
+        // Validate market creation actions
+        _verifyMarketCreationActions(proposal);
 
-        // Call BridgeValidationHook validation
+        // Validate bridge actions
         _verifyBridgeActions(proposal);
     }
 

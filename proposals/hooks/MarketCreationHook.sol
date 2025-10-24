@@ -31,9 +31,12 @@ abstract contract MarketCreationHook {
     /// @notice comptroller address as specified by an mToken being created
     address private comptroller;
 
-    function _verifyActionsPreRun(
+    /// @notice Verify market creation actions in proposals
+    /// @dev Called by inheriting contracts to validate market listing pattern
+    /// @param proposal Array of proposal actions to validate
+    function _verifyMarketCreationActions(
         ProposalAction[] memory proposal
-    ) internal virtual {
+    ) internal {
         address[] memory targets = new address[](proposal.length);
         uint256[] memory values = new uint256[](proposal.length);
         bytes[] memory datas = new bytes[](proposal.length);

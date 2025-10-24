@@ -19,7 +19,7 @@ abstract contract BridgeValidationHook {
     uint256 private constant MAX_BRIDGE_COST_MULTIPLIER = 10;
 
     /// @notice Verify bridge-related proposal actions before execution
-    /// @dev This function should be called from _verifyActionsPreRun in derived contracts
+    /// @dev Called by inheriting contracts to validate bridge cost parameters
     /// @param proposal Array of proposal actions to validate
     function _verifyBridgeActions(
         ProposalAction[] memory proposal

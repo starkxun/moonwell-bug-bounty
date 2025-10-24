@@ -7,7 +7,7 @@ import {ProposalAction} from "@proposals/proposalTypes/IProposal.sol";
 /// @notice Hook to validate bridgeToRecipient calls in proposals
 /// @dev Ensures that the native value sent with bridge calls is between 5x and 10x
 ///      the actual bridge cost returned by router.bridgeCost(destinationChain)
-contract BridgeValidationHook {
+abstract contract BridgeValidationHook {
     /// @notice Function selector for bridgeToRecipient(address,uint256,uint16)
     bytes4 private constant BRIDGE_TO_RECIPIENT_SELECTOR =
         xWELLRouter.bridgeToRecipient.selector;
@@ -128,20 +128,12 @@ contract BridgeValidationHook {
     }
 
     /// @notice Extract the first 4 bytes (function selector) from calldata
-    /// @dev This function is declared as virtual to allow inheritance from MarketCreationHook
+    /// @dev This function must be implemented by inheriting contracts
     /// @param toSlice The bytes to extract from
     /// @return functionSignature The extracted function selector
     function bytesToBytes4(
         bytes memory toSlice
-    ) public pure virtual returns (bytes4 functionSignature) {
-        if (toSlice.length < 4) {
-            return bytes4(0);
-        }
-
-        assembly {
-            functionSignature := mload(add(toSlice, 0x20))
-        }
-    }
+    ) public pure virtual returns (bytes4 functionSignature);
 
     /// @notice Convert uint256 to string
     /// @param value The uint256 value to convert

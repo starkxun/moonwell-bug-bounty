@@ -7,7 +7,7 @@ import {MToken} from "@protocol/MToken.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {ProposalAction} from "@proposals/proposalTypes/IProposal.sol";
 
-contract MarketCreationHook {
+abstract contract MarketCreationHook {
     /// private so that contracts that inherit cannot write to functionDetectors
     bytes4 private constant detector = Comptroller._supportMarket.selector;
 
@@ -199,18 +199,13 @@ contract MarketCreationHook {
         result = address(uint160(uint256(rawBytes)));
     }
 
-    /// @notice function to grab the first 4 bytes of calldata payload
+    /// @notice Extract the first 4 bytes (function selector) from calldata
+    /// @dev This function must be implemented by inheriting contracts
+    /// @param toSlice The bytes to extract from
+    /// @return functionSignature The extracted function selector
     function bytesToBytes4(
         bytes memory toSlice
-    ) public pure virtual returns (bytes4 functionSignature) {
-        if (toSlice.length < 4) {
-            return bytes4(0);
-        }
-
-        assembly {
-            functionSignature := mload(add(toSlice, 0x20))
-        }
-    }
+    ) public pure virtual returns (bytes4 functionSignature);
 
     /// Credit ethereum stackexchange https://ethereum.stackexchange.com/a/58341
     function toString(bytes memory data) public pure returns (string memory) {

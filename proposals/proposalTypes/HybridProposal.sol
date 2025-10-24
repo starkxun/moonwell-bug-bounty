@@ -58,7 +58,8 @@ abstract contract HybridProposal is
         _verifyBridgeActions(proposal);
     }
 
-    /// @notice Override bytesToBytes4 to resolve diamond inheritance
+    /// @notice Extract the first 4 bytes (function selector) from calldata
+    /// @dev Provides single implementation for both hooks to avoid duplication
     /// @param toSlice The bytes to extract from
     /// @return functionSignature The extracted function selector
     function bytesToBytes4(
@@ -69,7 +70,13 @@ abstract contract HybridProposal is
         override(MarketCreationHook, BridgeValidationHook)
         returns (bytes4 functionSignature)
     {
-        return MarketCreationHook.bytesToBytes4(toSlice);
+        if (toSlice.length < 4) {
+            return bytes4(0);
+        }
+
+        assembly {
+            functionSignature := mload(add(toSlice, 0x20))
+        }
     }
 
     /// @notice actions to run against contracts

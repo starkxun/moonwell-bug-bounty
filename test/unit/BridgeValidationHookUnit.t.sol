@@ -258,6 +258,19 @@ contract TestHook is BridgeValidationHook {
     ) external view {
         _verifyBridgeActions(proposal);
     }
+
+    // Implement bytesToBytes4 required by abstract parent
+    function bytesToBytes4(
+        bytes memory toSlice
+    ) public pure override returns (bytes4 functionSignature) {
+        if (toSlice.length < 4) {
+            return bytes4(0);
+        }
+
+        assembly {
+            functionSignature := mload(add(toSlice, 0x20))
+        }
+    }
 }
 
 /// @notice Mock router that returns zero bridge cost

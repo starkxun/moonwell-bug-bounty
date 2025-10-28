@@ -126,7 +126,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                     }
 
                     proposalMap.setEnv(envPath);
-                    console.log("executeTemporalGovernorQueuedProposals");
                     HybridProposal proposal = HybridProposal(
                         deployCode(proposalPath)
                     );
@@ -248,10 +247,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                 ,
 
             ) = governor.proposalInformation(proposalId);
-            console.log("votingStartTime: ", votingStartTime);
-            console.log("endTimestamp: ", endTimestamp);
-            console.log("block.timestamp: ", block.timestamp);
-
             // Only vote if not in voting period
             if (
                 block.timestamp > votingStartTime &&
@@ -309,7 +304,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
         }
 
         proposalMap.setEnv(envPath);
-        console.log("__executeProposalActions");
 
         Proposal proposal = Proposal(deployCode(proposalPath));
         vm.label(address(proposal), proposalPath);
@@ -474,7 +468,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
 
         temporalGovernor.queueProposal(vaa);
 
-        console.log("block timestamp after queueing: ", block.timestamp);
         vm.warp(block.timestamp + temporalGovernor.proposalDelay());
 
         try temporalGovernor.executeProposal(vaa) {} catch (bytes memory e) {
@@ -498,7 +491,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             }
 
             proposalMap.setEnv(envPath);
-            console.log("_execExtChain");
             Proposal proposal = Proposal(deployCode(proposalPath));
             vm.makePersistent(address(proposal));
             vm.selectFork(proposal.primaryForkId());
@@ -507,9 +499,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             proposal.beforeSimulationHook(addresses);
 
             vm.selectFork(activeFork);
-
-            console.log("temporalGovernor");
-            console.log(address(temporalGovernor));
 
             temporalGovernor.executeProposal(vaa);
 

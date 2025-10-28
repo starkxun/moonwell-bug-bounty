@@ -126,6 +126,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                     }
 
                     proposalMap.setEnv(envPath);
+                    console.log("executeTemporalGovernorQueuedProposals");
                     HybridProposal proposal = HybridProposal(
                         deployCode(proposalPath)
                     );
@@ -247,6 +248,9 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                 ,
 
             ) = governor.proposalInformation(proposalId);
+            console.log("votingStartTime: ", votingStartTime);
+            console.log("endTimestamp: ", endTimestamp);
+            console.log("block.timestamp: ", block.timestamp);
 
             // Only vote if not in voting period
             if (
@@ -305,6 +309,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
         }
 
         proposalMap.setEnv(envPath);
+        console.log("__executeProposalActions");
 
         Proposal proposal = Proposal(deployCode(proposalPath));
         vm.label(address(proposal), proposalPath);
@@ -493,6 +498,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             }
 
             proposalMap.setEnv(envPath);
+            console.log("_execExtChain");
             Proposal proposal = Proposal(deployCode(proposalPath));
             vm.makePersistent(address(proposal));
             vm.selectFork(proposal.primaryForkId());

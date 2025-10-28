@@ -231,6 +231,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
 
         checkMoonbeamActions(targets);
 
+        uint256 votingStartTime;
         uint256 endTimestamp;
         uint256 crossChainVoteCollectionEndTimestamp;
         {
@@ -238,7 +239,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             (
                 ,
                 ,
-                ,
+                votingStartTime,
                 endTimestamp,
                 crossChainVoteCollectionEndTimestamp,
                 ,
@@ -248,7 +249,10 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             ) = governor.proposalInformation(proposalId);
 
             // Only vote if not in voting period
-            if (block.timestamp < endTimestamp) {
+            if (
+                block.timestamp > votingStartTime &&
+                block.timestamp < endTimestamp
+            ) {
                 governor.castVote(proposalId, 0);
                 console.log(
                     "casting vote on block.timestamp: ",

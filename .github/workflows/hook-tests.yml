@@ -1,15 +1,19 @@
-name: Moonbeam 
+name: Hook Tests
 
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 env:
   MOONBEAM_RPC_URL: ${{secrets.MOONBEAM_RPC_URL}}
-  BASE_RPC_URL: ${{secrets.BASE_RPC_URL}}
   FOUNDRY_PROFILE: ci
 
 jobs:
-  run-moonbeam-tests:
-    name: Moonbeam Integration Test
+  hook-tests:
+    name: Hook Tests (Unit + Integration)
     runs-on: ubuntu-latest
 
     steps:
@@ -21,11 +25,11 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions
 
-      - name: Run Integration Test
+      - name: Run Hook Tests
         uses: nick-fields/retry@v3
         with:
            polling_interval_seconds: 30
            retry_wait_seconds: 60
            timeout_minutes: 20
            max_attempts: 3
-           command: time forge test --match-contract MoonbeamTest --fork-url moonbeam -vvv
+           command: time forge test --match-contract Hook --fork-url moonbeam -vvv

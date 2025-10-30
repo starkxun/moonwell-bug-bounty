@@ -139,6 +139,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
 
     struct MekleCampaign {
         uint256 amount;
+        string campaignData;
+        uint32 campaignType;
         uint32 duration;
         string rewardToken;
         uint32 startTimestamp;
@@ -307,8 +309,50 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         );
         vm.stopPrank();
 
-        // mock relayer so we can simulate bridging well
-        WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
+        // Get the real on-chain Wormhole relayer to query actual bridge costs
+        WormholeBridgeAdapter wormholeBridgeAdapter = WormholeBridgeAdapter(
+            addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY")
+        );
+
+        uint256 gasLimit = wormholeBridgeAdapter.gasLimit();
+
+        IWormholeRelayer realRelayer = IWormholeRelayer(
+            addresses.getAddress("WORMHOLE_BRIDGE_RELAYER_PROXY")
+        );
+
+        // Query real on-chain bridge costs for all target chains
+        uint16[] memory chainIds = new uint16[](3);
+        uint256[] memory bridgeCosts = new uint256[](3);
+
+        // Base - Wormhole Chain ID: 30
+        chainIds[0] = 30;
+        (bridgeCosts[0], ) = realRelayer.quoteEVMDeliveryPrice(
+            chainIds[0],
+            0,
+            gasLimit
+        );
+
+        // Optimism - Wormhole Chain ID: 24
+        chainIds[1] = 24;
+        (bridgeCosts[1], ) = realRelayer.quoteEVMDeliveryPrice(
+            chainIds[1],
+            0,
+            gasLimit
+        );
+
+        // Moonbeam - Wormhole Chain ID: 16
+        chainIds[2] = 16;
+        (bridgeCosts[2], ) = realRelayer.quoteEVMDeliveryPrice(
+            chainIds[2],
+            0,
+            gasLimit
+        );
+
+        // mock relayer so we can simulate bridging well, initialized with real on-chain costs for all chains
+        WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter(
+            chainIds,
+            bridgeCosts
+        );
         vm.makePersistent(address(wormholeRelayer));
         vm.label(address(wormholeRelayer), "MockWormholeRelayer");
 
@@ -316,13 +360,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
         // call it must switch forks
         wormholeRelayer.setIsMultichainTest(true);
         wormholeRelayer.setSenderChainId(MOONBEAM_WORMHOLE_CHAIN_ID);
-
-        // set mock as the wormholeRelayer address on bridge adapter
-        WormholeBridgeAdapter wormholeBridgeAdapter = WormholeBridgeAdapter(
-            addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY")
-        );
-
-        uint256 gasLimit = wormholeBridgeAdapter.gasLimit();
 
         // encode gasLimit and relayer address since is stored in a single slot
         // relayer is first due to how evm pack values into a single storage
@@ -753,6 +790,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 addresses.getAddress(transferFroms[i].token) ==
                 addresses.getAddress("xWELL_PROXY")
             ) {
+                console.log("totalWellEpochRewards", totalWellEpochRewards);
+                console.log("transferFroms[i].amount", transferFroms[i].amount);
                 assertApproxEqRel(
                     transferFroms[i].amount,
                     totalWellEpochRewards,
@@ -774,6 +813,8 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 addresses.getAddress(transferFroms[i].token) ==
                 addresses.getAddress("OP", OPTIMISM_CHAIN_ID)
             ) {
+                console.log("totalOpEpochRewards", totalOpEpochRewards);
+                console.log("transferFroms[i].amount", transferFroms[i].amount);
                 assertApproxEqRel(
                     transferFroms[i].amount,
                     totalOpEpochRewards,
@@ -1621,10 +1662,10 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                         creator: address(0),
                         rewardToken: rewardTokenAddress,
                         amount: campaign.amount,
-                        campaignType: 18, // 4 is Token Holding Campaign
+                        campaignType: campaign.campaignType,
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
-                        campaignData: payloadMerkleCampaignBase // Empty campaign data for now
+                        campaignData: bytes(campaign.campaignData)
                     });
 
             // Create the merkle campaign
@@ -2189,10 +2230,10 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                         creator: addresses.getAddress("TEMPORAL_GOVERNOR"),
                         rewardToken: addresses.getAddress(campaign.rewardToken),
                         amount: campaign.amount,
-                        campaignType: 18, // 4 is Token Holding Campaign
+                        campaignType: campaign.campaignType,
                         startTimestamp: campaign.startTimestamp,
                         duration: campaign.duration,
-                        campaignData: payloadMerkleCampaignBase
+                        campaignData: bytes(campaign.campaignData)
                     });
 
             // Check if the campaign is created
@@ -2255,7 +2296,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
 
             assertEq(
                 returnedCampaignParams.campaignData,
-                payloadMerkleCampaignBase,
+                bytes(campaign.campaignData),
                 "Campaign data should be correct"
             );
         }

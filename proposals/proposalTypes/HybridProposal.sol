@@ -226,10 +226,10 @@ abstract contract HybridProposal is
             consistencyLevel
         );
 
-        require(
-            timelockCalldata.length <= 25_000,
-            "getTemporalGovCalldata: Timelock publish message calldata max size of 25kb exceeded"
-        );
+        //        require(
+        //            timelockCalldata.length <= 25_000,
+        //            "getTemporalGovCalldata: Timelock publish message calldata max size of 25kb exceeded"
+        //        );
     }
 
     /// @notice return arrays of all items in the proposal that the

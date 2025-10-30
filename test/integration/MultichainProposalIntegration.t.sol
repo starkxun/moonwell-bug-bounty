@@ -165,7 +165,10 @@ contract MultichainProposalTest is PostProposalCheck {
             /// ----------------------------------------------------------
 
             /// mock relayer so we can simulate bridging well
-            wormholeRelayerAdapter = new WormholeRelayerAdapter();
+            wormholeRelayerAdapter = new WormholeRelayerAdapter(
+                new uint16[](0),
+                new uint256[](0)
+            );
             vm.makePersistent(address(wormholeRelayerAdapter));
             vm.label(address(wormholeRelayerAdapter), "MockWormholeRelayer");
 

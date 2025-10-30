@@ -112,7 +112,9 @@ contract MultichainGovernorDeploy is Test {
             address gProxy,
             address gImplementation
         ) = deployMockMultichainGovernor(proxyAdmin);
-        address wormholeRelayerAdapter = address(new WormholeRelayerAdapter());
+        address wormholeRelayerAdapter = address(
+            new WormholeRelayerAdapter(new uint16[](0), new uint256[](0))
+        );
 
         // deploy vote collection
         (address vProxy, ) = deployVoteCollection(

@@ -183,6 +183,10 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
     /// @notice Track reserve automation contract balances before proposal execution
     mapping(address => uint256) public reserveAutomationBalancesBefore;
 
+    /// @notice Track leftover xWELL balance in Temporal Governor on Base before proposal execution
+    /// TODO: Remove this after x34 - this is a one-time cleanup for leftover funds
+    uint256 public temporalGovernorLeftoverBalance;
+
     bytes public constant payloadMerkleCampaignBase =
         hex"000000000000000000000000a88594d404727625a9437c3f886c7643872296ae00000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000001600000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
@@ -229,6 +233,17 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     "ECOSYSTEM_RESERVE_PROXY"
                 );
                 wellBalancesBefore[reserve] = xwell.balanceOf(reserve);
+
+                // On Base, check for leftover xWELL in Temporal Governor
+                // TODO: Remove this after x34 - this is a one-time cleanup for leftover funds
+                if (chainId == BASE_CHAIN_ID) {
+                    address temporalGovernor = addresses.getAddress(
+                        "TEMPORAL_GOVERNOR"
+                    );
+                    temporalGovernorLeftoverBalance = xwell.balanceOf(
+                        temporalGovernor
+                    );
+                }
 
                 // Save initial balances for reserve automation contracts
                 JsonSpecExternalChain memory spec = externalChainActions[
@@ -1313,6 +1328,27 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             }
         }
 
+        // On Base, return any leftover xWELL in Temporal Governor to F-GLMR-DEVGRANT
+        // TODO: Remove this after x34 - this is a one-time cleanup for leftover funds
+        if (_chainId == BASE_CHAIN_ID && temporalGovernorLeftoverBalance > 0) {
+            address xwell = addresses.getAddress("xWELL_PROXY");
+            address devGrant = addresses.getAddress("F-GLMR-DEVGRANT");
+
+            _pushAction(
+                xwell,
+                abi.encodeWithSignature(
+                    "transfer(address,uint256)",
+                    devGrant,
+                    temporalGovernorLeftoverBalance
+                ),
+                string.concat(
+                    "Return leftover ",
+                    vm.toString(temporalGovernorLeftoverBalance / 1e18),
+                    " xWELL from Temporal Governor to F-GLMR-DEVGRANT on Base"
+                )
+            );
+        }
+
         for (uint256 i = 0; i < spec.setRewardSpeed.length; i++) {
             SetMRDRewardSpeed memory setRewardSpeed = spec.setRewardSpeed[i];
 
@@ -1754,7 +1790,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                 (uint256 quoteEVMDeliveryPrice, ) = relayer
                     .quoteEVMDeliveryPrice(wormholeChainId, 0, gasLimit);
 
-                uint256 expectedValue = quoteEVMDeliveryPrice * 4;
+                uint256 expectedValue = quoteEVMDeliveryPrice * 5;
 
                 assertEq(
                     router.bridgeCost(wormholeChainId),
@@ -2054,6 +2090,37 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     );
                 }
             }
+        }
+
+        // Validate leftover xWELL transfer on Base
+        // TODO: Remove this after x34 - this is a one-time cleanup for leftover funds
+        if (_chainId == BASE_CHAIN_ID && temporalGovernorLeftoverBalance > 0) {
+            address temporalGovernor = addresses.getAddress(
+                "TEMPORAL_GOVERNOR"
+            );
+            address devGrant = addresses.getAddress("F-GLMR-DEVGRANT");
+            IERC20 xwell = IERC20(addresses.getAddress("xWELL_PROXY"));
+
+            // Verify F-GLMR-DEVGRANT received the leftover amount
+            uint256 expectedDevGrantBalance = wellBalancesBefore[devGrant] +
+                temporalGovernorLeftoverBalance;
+            assertEq(
+                xwell.balanceOf(devGrant),
+                expectedDevGrantBalance,
+                string.concat(
+                    "F-GLMR-DEVGRANT should have received leftover ",
+                    vm.toString(temporalGovernorLeftoverBalance / 1e18),
+                    " xWELL from Temporal Governor"
+                )
+            );
+
+            // Verify Temporal Governor balance is now zero or only has new transfers
+            uint256 currentTempGovBalance = xwell.balanceOf(temporalGovernor);
+            assertEq(
+                currentTempGovBalance,
+                0,
+                "Temporal Governor should have zero xWELL balance after returning leftovers"
+            );
         }
 
         {

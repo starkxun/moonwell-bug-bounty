@@ -52,6 +52,9 @@ contract PostProposalCheck is LiveProposalCheck {
         // execute proposals that are succeeded but not executed yet
         executeSucceededProposals(addresses, governor);
 
+        // reset the block timestamp in case executeSucceededProposals moved it forward
+        vm.warp(proposalStartTime);
+
         // execute proposals that are in the vote or vote collection period
         executeLiveProposals(addresses, governor);
 

@@ -231,6 +231,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
 
         checkMoonbeamActions(targets);
 
+        uint256 votingStartTime;
         uint256 endTimestamp;
         uint256 crossChainVoteCollectionEndTimestamp;
         {
@@ -238,7 +239,7 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             (
                 ,
                 ,
-                ,
+                votingStartTime,
                 endTimestamp,
                 crossChainVoteCollectionEndTimestamp,
                 ,
@@ -246,9 +247,11 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                 ,
 
             ) = governor.proposalInformation(proposalId);
-
             // Only vote if not in voting period
-            if (block.timestamp < endTimestamp) {
+            if (
+                block.timestamp > votingStartTime &&
+                block.timestamp < endTimestamp
+            ) {
                 governor.castVote(proposalId, 0);
                 console.log(
                     "casting vote on block.timestamp: ",
@@ -465,7 +468,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
 
         temporalGovernor.queueProposal(vaa);
 
-        console.log("block timestamp after queueing: ", block.timestamp);
         vm.warp(block.timestamp + temporalGovernor.proposalDelay());
 
         try temporalGovernor.executeProposal(vaa) {} catch (bytes memory e) {
@@ -497,9 +499,6 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
             proposal.beforeSimulationHook(addresses);
 
             vm.selectFork(activeFork);
-
-            console.log("temporalGovernor");
-            console.log(address(temporalGovernor));
 
             temporalGovernor.executeProposal(vaa);
 

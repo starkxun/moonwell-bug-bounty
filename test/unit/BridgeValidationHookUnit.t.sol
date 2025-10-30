@@ -221,7 +221,7 @@ contract BridgeValidationHookUnitTest is Test {
         vm.expectRevert(
             "BridgeValidationHook: bridge cost must be greater than zero"
         );
-        hook.testVerifyBridgeActions(actions);
+        hook.verifyBridgeActions(actions);
     }
 
     /// @notice Test router validation with EOA
@@ -246,14 +246,14 @@ contract BridgeValidationHookUnitTest is Test {
 
         // Should revert with router validation error
         vm.expectRevert("BridgeValidationHook: router must be a contract");
-        hook.testVerifyBridgeActions(actions);
+        hook.verifyBridgeActions(actions);
     }
 }
 
 /// @notice Test harness to expose internal functions
 contract TestHook is BridgeValidationHook {
     // Expose _verifyBridgeActions for testing
-    function testVerifyBridgeActions(
+    function verifyBridgeActions(
         ProposalAction[] memory proposal
     ) external view {
         _verifyBridgeActions(proposal);

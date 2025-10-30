@@ -280,7 +280,10 @@ contract RewardsDistributionDeprecated is HybridProposal, Networks {
 
     function beforeSimulationHook(Addresses addresses) public override {
         // mock relayer so we can simulate bridging well
-        WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
+        WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter(
+            new uint16[](0),
+            new uint256[](0)
+        );
         vm.makePersistent(address(wormholeRelayer));
         vm.label(address(wormholeRelayer), "MockWormholeRelayer");
 

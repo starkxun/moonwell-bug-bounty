@@ -17,6 +17,7 @@ import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 import {ProposalChecker} from "@proposals/utils/ProposalChecker.sol";
 import {ITemporalGovernor} from "@protocol/governance/TemporalGovernor.sol";
 import {MarketCreationHook} from "@proposals/hooks/MarketCreationHook.sol";
+import {BridgeValidationHook} from "@proposals/hooks/BridgeValidationHook.sol";
 import {ProposalAction, ActionType} from "@proposals/proposalTypes/IProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MultichainGovernor, IMultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
@@ -31,7 +32,8 @@ import {MultichainGovernor, IMultichainGovernor} from "@protocol/governance/mult
 abstract contract HybridProposal is
     Proposal,
     ProposalChecker,
-    MarketCreationHook
+    MarketCreationHook,
+    BridgeValidationHook
 {
     using Strings for string;
     using Address for address;
@@ -43,6 +45,38 @@ abstract contract HybridProposal is
 
     /// @notice instant finality on moonbeam https://book.wormhole.com/wormhole/3_coreLayerContracts.html?highlight=consiste#consistency-levels
     uint8 public constant consistencyLevel = 200;
+
+    /// @notice Verify all proposal actions before execution
+    /// @dev Calls both market creation and bridge validation hooks
+    /// @param proposal Array of proposal actions to validate
+    function _verifyActionsPreRun(ProposalAction[] memory proposal) internal {
+        // Validate market creation actions
+        _verifyMarketCreationActions(proposal);
+
+        // Validate bridge actions
+        _verifyBridgeActions(proposal);
+    }
+
+    /// @notice Extract the first 4 bytes (function selector) from calldata
+    /// @dev Provides single implementation for both hooks to avoid duplication
+    /// @param toSlice The bytes to extract from
+    /// @return functionSignature The extracted function selector
+    function bytesToBytes4(
+        bytes memory toSlice
+    )
+        public
+        pure
+        override(MarketCreationHook, BridgeValidationHook)
+        returns (bytes4 functionSignature)
+    {
+        if (toSlice.length < 4) {
+            return bytes4(0);
+        }
+
+        assembly {
+            functionSignature := mload(add(toSlice, 0x20))
+        }
+    }
 
     /// @notice actions to run against contracts
     ProposalAction[] public actions;

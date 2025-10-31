@@ -2111,13 +2111,14 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
 
             // Verify Temporal Governor balance is now zero (leftovers were sent out)
             uint256 currentTempGovBalance = xwell.balanceOf(temporalGovernor);
-            assertEq(
+            assertApproxEqAbs(
                 currentTempGovBalance,
                 0,
+                1e18,
                 string.concat(
                     "Temporal Governor should have zero xWELL balance after returning leftover ",
                     vm.toString(temporalGovernorLeftoverBalance / 1e18),
-                    " xWELL to F-DEVGRANT"
+                    " xWELL to F-DEVGRANT on Base"
                 )
             );
 

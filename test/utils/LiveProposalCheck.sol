@@ -163,6 +163,10 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                         (uint32, bytes, uint8)
                     );
 
+                    if (vm.activeFork() != MOONBEAM_FORK_ID) {
+                        vm.selectFork(MOONBEAM_FORK_ID);
+                    }
+
                     // Get crossChainVoteCollectionEndTimestamp for the proposal
                     (
                         ,

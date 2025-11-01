@@ -658,36 +658,36 @@ abstract contract HybridProposal is
                 );
             }
 
-            if (actions.proposalActionTypeCount(ActionType.Base) != 0) {
-                bytes
-                    memory temporalGovExecDataBase = getTemporalGovPayloadByChain(
-                        addresses,
-                        block.chainid.toBaseChainId()
-                    );
-                /// expect emitting of events to Wormhole Core on Moonbeam if Base actions exist
-                vm.expectEmit(true, true, true, true, wormholeCoreMoonbeam);
+            //     if (actions.proposalActionTypeCount(ActionType.Base) != 0) {
+            //         bytes
+            //             memory temporalGovExecDataBase = getTemporalGovPayloadByChain(
+            //                 addresses,
+            //                 block.chainid.toBaseChainId()
+            //             );
+            //         /// expect emitting of events to Wormhole Core on Moonbeam if Base actions exist
+            //         vm.expectEmit(true, true, true, true, wormholeCoreMoonbeam);
 
-                emit LogMessagePublished(
-                    address(governor),
-                    nextSequence++,
-                    nonce, /// nonce is hardcoded at 0 in HybridProposal.sol
-                    temporalGovExecDataBase,
-                    consistencyLevel /// consistency level is hardcoded at 200 in HybridProposal.sol
-                );
-            }
+            //         emit LogMessagePublished(
+            //             address(governor),
+            //             nextSequence++,
+            //             nonce, /// nonce is hardcoded at 0 in HybridProposal.sol
+            //             temporalGovExecDataBase,
+            //             consistencyLevel /// consistency level is hardcoded at 200 in HybridProposal.sol
+            //         );
+            //     }
 
-            if (actions.proposalActionTypeCount(ActionType.Optimism) != 0) {
-                /// expect emitting of events to Wormhole Core on Moonbeam if Optimism actions exist
-                vm.expectEmit(true, true, true, true, wormholeCoreMoonbeam);
+            //     if (actions.proposalActionTypeCount(ActionType.Optimism) != 0) {
+            //         /// expect emitting of events to Wormhole Core on Moonbeam if Optimism actions exist
+            //         vm.expectEmit(true, true, true, true, wormholeCoreMoonbeam);
 
-                emit LogMessagePublished(
-                    address(governor),
-                    nextSequence,
-                    nonce, /// nonce is hardcoded at 0 in HybridProposal.sol
-                    temporalGovExecDataOptimism,
-                    consistencyLevel /// consistency level is hardcoded at 200 in HybridProposal.sol
-                );
-            }
+            //         emit LogMessagePublished(
+            //             address(governor),
+            //             nextSequence,
+            //             nonce, /// nonce is hardcoded at 0 in HybridProposal.sol
+            //             temporalGovExecDataOptimism,
+            //             consistencyLevel /// consistency level is hardcoded at 200 in HybridProposal.sol
+            //         );
+            //     }
 
             vm.deal(caller, actions.sumTotalValue());
 

@@ -54,6 +54,22 @@ contract IRModelWethUpgradePostProposalTest is PostProposalCheck, Configs {
         testSupplyingWethAfterIRModelUpgradeSucceeds();
         uint256 borrowAmount = 74e18;
 
+        // Check current borrow cap and increase if needed
+        uint256 currentBorrowCap = comptroller.borrowCaps(address(mWeth));
+        uint256 totalBorrows = mWeth.totalBorrows();
+        uint256 nextTotalBorrows = totalBorrows + borrowAmount;
+
+        // If borrow would hit cap, increase it
+        if (currentBorrowCap != 0 && nextTotalBorrows >= currentBorrowCap) {
+            vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
+            MToken[] memory mTokens = new MToken[](1);
+            mTokens[0] = mWeth;
+            uint256[] memory newBorrowCaps = new uint256[](1);
+            newBorrowCaps[0] = currentBorrowCap + borrowAmount;
+            comptroller._setMarketBorrowCaps(mTokens, newBorrowCaps);
+            vm.stopPrank();
+        }
+
         address[] memory mToken = new address[](1);
         mToken[0] = address(mWeth);
 

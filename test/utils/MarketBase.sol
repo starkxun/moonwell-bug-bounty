@@ -1,11 +1,13 @@
 //SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
 
+import {Test} from "@forge-std/Test.sol";
 import {MToken} from "@protocol/MToken.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {ExponentialNoError} from "@protocol/ExponentialNoError.sol";
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
-contract MarketBase is ExponentialNoError {
+contract MarketBase is ExponentialNoError, Test {
     Comptroller comptroller;
 
     constructor(Comptroller _comptroller) {
@@ -105,5 +107,31 @@ contract MarketBase is ExponentialNoError {
                     ? maxUserBorrow
                     : borrowableAmount
             ) - 1;
+    }
+
+    /// @notice Ensures sufficient borrow cap for a given borrow amount
+    /// @dev If the current borrow cap would be exceeded, this function increases it
+    /// @param mToken The market token to check/increase borrow cap for
+    /// @param borrowAmount The amount to be borrowed
+    /// @param addresses The addresses contract to get TEMPORAL_GOVERNOR
+    function ensureSufficientBorrowCap(
+        MToken mToken,
+        uint256 borrowAmount,
+        Addresses addresses
+    ) public {
+        uint256 currentBorrowCap = comptroller.borrowCaps(address(mToken));
+        uint256 totalBorrows = mToken.totalBorrows();
+        uint256 nextTotalBorrows = totalBorrows + borrowAmount;
+
+        // If borrow would hit cap, increase it
+        if (currentBorrowCap != 0 && nextTotalBorrows >= currentBorrowCap) {
+            vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
+            MToken[] memory mTokens = new MToken[](1);
+            mTokens[0] = mToken;
+            uint256[] memory newBorrowCaps = new uint256[](1);
+            newBorrowCaps[0] = currentBorrowCap + borrowAmount;
+            comptroller._setMarketBorrowCaps(mTokens, newBorrowCaps);
+            vm.stopPrank();
+        }
     }
 }

@@ -141,7 +141,7 @@ contract mipx36 is HybridProposal {
                 baseMarkets,
                 baseSupplyCaps
             ),
-            "Set supply cap to 0 for wrsETH on Base",
+            "Set supply cap to 0.1e18 for wrsETH on Base",
             ActionType.Base
         );
 
@@ -153,7 +153,7 @@ contract mipx36 is HybridProposal {
                 baseMarkets,
                 baseBorrowCaps
             ),
-            "Set borrow cap to 0 for wrsETH on Base",
+            "Set borrow cap to 0.1e18 for wrsETH on Base",
             ActionType.Base
         );
 
@@ -193,7 +193,7 @@ contract mipx36 is HybridProposal {
                 optimismMarkets,
                 optimismSupplyCaps
             ),
-            "Set supply cap to 0 for wrsETH on Optimism",
+            "Set supply cap to 0.1e18 for wrsETH on Optimism",
             ActionType.Optimism
         );
 
@@ -205,7 +205,7 @@ contract mipx36 is HybridProposal {
                 optimismMarkets,
                 optimismBorrowCaps
             ),
-            "Set borrow cap to 0 for wrsETH on Optimism",
+            "Set borrow cap to 0.1e18 for wrsETH on Optimism",
             ActionType.Optimism
         );
 
@@ -237,7 +237,7 @@ contract mipx36 is HybridProposal {
         assertEq(
             baseSupplyCap,
             NEW_SUPPLY_CAP,
-            "Base wrsETH supply cap not set to 0"
+            "Base wrsETH supply cap not set to 0.1e18"
         );
 
         // Validate borrow cap is 0
@@ -245,7 +245,7 @@ contract mipx36 is HybridProposal {
         assertEq(
             baseBorrowCap,
             NEW_BORROW_CAP,
-            "Base wrsETH borrow cap not set to 0"
+            "Base wrsETH borrow cap not set to 0.1e18"
         );
 
         // Validate oracle is updated
@@ -274,7 +274,7 @@ contract mipx36 is HybridProposal {
         assertEq(
             optimismSupplyCap,
             NEW_SUPPLY_CAP,
-            "Optimism wrsETH supply cap not set to 0"
+            "Optimism wrsETH supply cap not set to 0.1e18"
         );
 
         // Validate borrow cap is 0
@@ -282,7 +282,7 @@ contract mipx36 is HybridProposal {
         assertEq(
             optimismBorrowCap,
             NEW_BORROW_CAP,
-            "Optimism wrsETH borrow cap not set to 0"
+            "Optimism wrsETH borrow cap not set to 0.1e18"
         );
 
         // Validate oracle is updated

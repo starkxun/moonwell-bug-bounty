@@ -1223,5 +1223,10 @@
         "addr": "0x74Cbb1E8B68dDD13B28684ECA202a351afD45EAa",
         "isContract": true,
         "name": "F-DEVGRANT"
+    },
+    {
+        "addr": "0xe8dD07CCf5BC4922424140E44Eb970F5950725ef",
+        "isContract": true,
+        "name": "CHAINLINK_wrsETH_ETH_EXCHANGE_RATE"
     }
 ]

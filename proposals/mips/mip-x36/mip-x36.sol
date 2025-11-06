@@ -111,10 +111,10 @@ contract mipx36 is HybridProposal {
 
     function afterDeploy(Addresses addresses, address) public override {
         vm.selectFork(BASE_FORK_ID);
-        addresses.changeAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(baseWrsethOracle), true);
+        addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(baseWrsethOracle), true);
 
         vm.selectFork(OPTIMISM_FORK_ID);
-        addresses.changeAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(optimismWrsethOracle), true);
+        addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(optimismWrsethOracle), true);
     }
 
     function build(Addresses addresses) public override {

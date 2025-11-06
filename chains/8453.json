@@ -771,7 +771,7 @@
     },
     {
         "addr": "0x79C613B4f07080963C3B0CA58Eb2745dD4C744A5",
-        "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE",
+        "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE_DEPRECATED",
         "isContract": true
     },
     {

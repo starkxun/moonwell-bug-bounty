@@ -6,6 +6,8 @@ import "@forge-std/Test.sol";
 import {MToken} from "@protocol/MToken.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {MErc20} from "@protocol/MErc20.sol";
+import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
+import {IERC20} from "@protocol/IERC20.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {ChainlinkCompositeOracle} from "@protocol/oracles/ChainlinkCompositeOracle.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
@@ -27,9 +29,6 @@ contract mipx36 is HybridProposal {
     using ChainIds for uint256;
 
     string public constant override name = "MIP-X36";
-
-    uint256 public constant NEW_SUPPLY_CAP = 0.1e18;
-    uint256 public constant NEW_BORROW_CAP = 0.1e18;
 
     // Storage for deployed oracles
     ChainlinkCompositeOracle public baseWrsethOracle;
@@ -124,36 +123,27 @@ contract mipx36 is HybridProposal {
         address baseComptroller = addresses.getAddress("UNITROLLER");
         address baseWrsethMToken = addresses.getAddress("MOONWELL_wrsETH");
 
-        address[] memory baseMarkets = new address[](1);
-        baseMarkets[0] = baseWrsethMToken;
-
-        uint256[] memory baseSupplyCaps = new uint256[](1);
-        baseSupplyCaps[0] = NEW_SUPPLY_CAP;
-
-        uint256[] memory baseBorrowCaps = new uint256[](1);
-        baseBorrowCaps[0] = NEW_BORROW_CAP;
-
-        // Set supply cap to 0 on Base
+        // Pause minting on Base
         _pushAction(
             baseComptroller,
             abi.encodeWithSignature(
-                "_setMarketSupplyCaps(address[],uint256[])",
-                baseMarkets,
-                baseSupplyCaps
+                "_setMintPaused(address,bool)",
+                baseWrsethMToken,
+                true
             ),
-            "Set supply cap to 0.1e18 for wrsETH on Base",
+            "Pause minting for wrsETH on Base",
             ActionType.Base
         );
 
-        // Set borrow cap to 0 on Base
+        // Pause borrowing on Base
         _pushAction(
             baseComptroller,
             abi.encodeWithSignature(
-                "_setMarketBorrowCaps(address[],uint256[])",
-                baseMarkets,
-                baseBorrowCaps
+                "_setBorrowPaused(address,bool)",
+                baseWrsethMToken,
+                true
             ),
-            "Set borrow cap to 0.1e18 for wrsETH on Base",
+            "Pause borrowing for wrsETH on Base",
             ActionType.Base
         );
 
@@ -176,36 +166,27 @@ contract mipx36 is HybridProposal {
         address optimismComptroller = addresses.getAddress("UNITROLLER");
         address optimismWrsethMToken = addresses.getAddress("MOONWELL_wrsETH");
 
-        address[] memory optimismMarkets = new address[](1);
-        optimismMarkets[0] = optimismWrsethMToken;
-
-        uint256[] memory optimismSupplyCaps = new uint256[](1);
-        optimismSupplyCaps[0] = NEW_SUPPLY_CAP;
-
-        uint256[] memory optimismBorrowCaps = new uint256[](1);
-        optimismBorrowCaps[0] = NEW_BORROW_CAP;
-
-        // Set supply cap to 0 on Optimism
+        // Pause minting on Optimism
         _pushAction(
             optimismComptroller,
             abi.encodeWithSignature(
-                "_setMarketSupplyCaps(address[],uint256[])",
-                optimismMarkets,
-                optimismSupplyCaps
+                "_setMintPaused(address,bool)",
+                optimismWrsethMToken,
+                true
             ),
-            "Set supply cap to 0.1e18 for wrsETH on Optimism",
+            "Pause minting for wrsETH on Optimism",
             ActionType.Optimism
         );
 
-        // Set borrow cap to 0 on Optimism
+        // Pause borrowing on Optimism
         _pushAction(
             optimismComptroller,
             abi.encodeWithSignature(
-                "_setMarketBorrowCaps(address[],uint256[])",
-                optimismMarkets,
-                optimismBorrowCaps
+                "_setBorrowPaused(address,bool)",
+                optimismWrsethMToken,
+                true
             ),
-            "Set borrow cap to 0.1e18 for wrsETH on Optimism",
+            "Pause borrowing for wrsETH on Optimism",
             ActionType.Optimism
         );
 
@@ -225,6 +206,22 @@ contract mipx36 is HybridProposal {
 
     function teardown(Addresses addresses, address) public pure override {}
 
+    function _testMintPaused(
+        address mToken,
+        address underlying
+    ) internal {
+        MErc20Delegator mTokenDelegator = MErc20Delegator(payable(mToken));
+
+        uint256 mintAmount = 1e18;
+
+        deal(underlying, address(this), mintAmount);
+
+        IERC20(underlying).approve(mToken, mintAmount);
+
+        vm.expectRevert("mint is paused");
+        mTokenDelegator.mint(mintAmount);
+    }
+
     function validate(Addresses addresses, address) public override {
         // ============ VALIDATE BASE CHAIN ============
         vm.selectFork(BASE_FORK_ID);
@@ -232,20 +229,16 @@ contract mipx36 is HybridProposal {
         Comptroller baseComptroller = Comptroller(addresses.getAddress("UNITROLLER"));
         address baseWrsethMToken = addresses.getAddress("MOONWELL_wrsETH");
 
-        // Validate supply cap is 0
-        uint256 baseSupplyCap = baseComptroller.supplyCaps(baseWrsethMToken);
-        assertEq(
-            baseSupplyCap,
-            NEW_SUPPLY_CAP,
-            "Base wrsETH supply cap not set to 0.1e18"
+        // Validate minting is paused
+        assertTrue(
+            baseComptroller.mintGuardianPaused(baseWrsethMToken),
+            "Base wrsETH minting not paused"
         );
 
-        // Validate borrow cap is 0
-        uint256 baseBorrowCap = baseComptroller.borrowCaps(baseWrsethMToken);
-        assertEq(
-            baseBorrowCap,
-            NEW_BORROW_CAP,
-            "Base wrsETH borrow cap not set to 0.1e18"
+        // Validate borrowing is paused
+        assertTrue(
+            baseComptroller.borrowGuardianPaused(baseWrsethMToken),
+            "Base wrsETH borrowing not paused"
         );
 
         // Validate oracle is updated
@@ -263,26 +256,29 @@ contract mipx36 is HybridProposal {
         (, int256 basePrice, , , ) = baseFeed.latestRoundData();
         assertGt(uint256(basePrice), 0, "Base wrsETH price check failed");
 
+        // Test that minting is actually paused
+        address baseWrsethUnderlying = MErc20(baseWrsethMToken).underlying();
+        _testMintPaused(
+            baseWrsethMToken,
+            baseWrsethUnderlying
+        );
+
         // ============ VALIDATE OPTIMISM CHAIN ============
         vm.selectFork(OPTIMISM_FORK_ID);
 
         Comptroller optimismComptroller = Comptroller(addresses.getAddress("UNITROLLER"));
         address optimismWrsethMToken = addresses.getAddress("MOONWELL_wrsETH");
 
-        // Validate supply cap is 0
-        uint256 optimismSupplyCap = optimismComptroller.supplyCaps(optimismWrsethMToken);
-        assertEq(
-            optimismSupplyCap,
-            NEW_SUPPLY_CAP,
-            "Optimism wrsETH supply cap not set to 0.1e18"
+        // Validate minting is paused
+        assertTrue(
+            optimismComptroller.mintGuardianPaused(optimismWrsethMToken),
+            "Optimism wrsETH minting not paused"
         );
 
-        // Validate borrow cap is 0
-        uint256 optimismBorrowCap = optimismComptroller.borrowCaps(optimismWrsethMToken);
-        assertEq(
-            optimismBorrowCap,
-            NEW_BORROW_CAP,
-            "Optimism wrsETH borrow cap not set to 0.1e18"
+        // Validate borrowing is paused
+        assertTrue(
+            optimismComptroller.borrowGuardianPaused(optimismWrsethMToken),
+            "Optimism wrsETH borrowing not paused"
         );
 
         // Validate oracle is updated
@@ -299,5 +295,12 @@ contract mipx36 is HybridProposal {
         // Validate price can be fetched
         (, int256 optimismPrice, , , ) = optimismFeed.latestRoundData();
         assertGt(uint256(optimismPrice), 0, "Optimism wrsETH price check failed");
+
+        // Test that minting is actually paused
+        address optimismWrsethUnderlying = MErc20(optimismWrsethMToken).underlying();
+        _testMintPaused(
+            optimismWrsethMToken,
+            optimismWrsethUnderlying
+        );
     }
 }

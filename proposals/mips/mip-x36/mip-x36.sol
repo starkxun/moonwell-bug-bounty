@@ -7,7 +7,7 @@ import {MToken} from "@protocol/MToken.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {MErc20} from "@protocol/MErc20.sol";
 import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
-import {IERC20} from "@protocol/IERC20.sol";
+import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {ChainlinkCompositeOracle} from "@protocol/oracles/ChainlinkCompositeOracle.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";

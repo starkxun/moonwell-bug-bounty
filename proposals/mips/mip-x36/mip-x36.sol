@@ -28,8 +28,8 @@ contract mipx36 is HybridProposal {
 
     string public constant override name = "MIP-X36";
 
-    uint256 public constant NEW_SUPPLY_CAP = 0;
-    uint256 public constant NEW_BORROW_CAP = 0;
+    uint256 public constant NEW_SUPPLY_CAP = 0.1;
+    uint256 public constant NEW_BORROW_CAP = 0.1;
 
     // Storage for deployed oracles
     ChainlinkCompositeOracle public baseWrsethOracle;

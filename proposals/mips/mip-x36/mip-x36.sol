@@ -18,12 +18,13 @@ import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID} from "@utils/ChainIds.
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 import {ChainIds} from "@utils/ChainIds.sol";
 
-/// @title MIP-X36: Deprecate wrsETH Markets with Exchange-Rate Oracle Transition
+/// @title MIP-X36: Disable Mint/Borrow in wrsETH Markets and Transition to Exchange-Rate Oracle
 /// @author Moonwell Contributors
-/// @notice Proposal to deprecate wrsETH markets on Base and Optimism by:
-///         1. Setting supply and borrow caps to 0
-///         2. Deploying new ChainlinkCompositeOracle contracts using exchange rate feeds
-///         3. Updating oracle addresses for wrsETH markets
+/// @notice Proposal to disable new positions in wrsETH markets on Base and Optimism by:
+///         1. Pausing minting operations for wrsETH markets
+///         2. Pausing borrowing operations for wrsETH markets
+///         3. Deploying new ChainlinkCompositeOracle contracts using exchange rate feeds
+///         4. Updating oracle addresses for wrsETH markets to use exchange rate feeds
 contract mipx36 is HybridProposal {
     using ProposalActions for *;
     using ChainIds for uint256;

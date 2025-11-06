@@ -48,8 +48,11 @@ contract TestProposalCalldataGeneration is ProposalMap, Test {
                 "HybridProposal"
             );
         for (uint256 i = multichainGovernorProposals.length; i > 0; i--) {
-            // exclude proposals that are not onchain yet
-            if (multichainGovernorProposals[i - 1].id == 0) {
+            // exclude proposals that are not onchain yet or proposal ID 127 (mip-x34)
+            if (
+                multichainGovernorProposals[i - 1].id == 0 ||
+                multichainGovernorProposals[i - 1].id == 127
+            ) {
                 continue;
             }
 
@@ -133,7 +136,11 @@ contract TestProposalCalldataGeneration is ProposalMap, Test {
                 "HybridProposal"
             );
         for (uint256 i = artemisGovernorProposals.length; i > 0; i--) {
-            if (artemisGovernorProposals[i - 1].id == 0) {
+            // exclude proposals that are not onchain yet or proposal ID 127 (mip-x34)
+            if (
+                artemisGovernorProposals[i - 1].id == 0 ||
+                artemisGovernorProposals[i - 1].id == 127
+            ) {
                 continue;
             }
 
@@ -200,8 +207,11 @@ contract TestProposalCalldataGeneration is ProposalMap, Test {
                 "GovernanceProposal"
             );
         for (uint256 i = artemisGovernorProposals.length; i > 0; i--) {
-            // exclude proposals that are not onchain yet
-            if (artemisGovernorProposals[i - 1].id == 0) {
+            // exclude proposals that are not onchain yet or proposal ID 127 (mip-x34)
+            if (
+                artemisGovernorProposals[i - 1].id == 0 ||
+                artemisGovernorProposals[i - 1].id == 127
+            ) {
                 continue;
             }
 

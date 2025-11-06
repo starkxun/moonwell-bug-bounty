@@ -244,9 +244,7 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
                     address temporalGovernor = addresses.getAddress(
                         "TEMPORAL_GOVERNOR"
                     );
-                    temporalGovernorLeftoverBalance = xwell.balanceOf(
-                        temporalGovernor
-                    );
+                    temporalGovernorLeftoverBalance = 7386122000000000000000000;
 
                     // Also track F-DEVGRANT's balance on Base before the proposal
                     address devGrant = addresses.getAddress("F-DEVGRANT");

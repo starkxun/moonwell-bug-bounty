@@ -111,6 +111,7 @@ contract MarketBase is ExponentialNoError, Test {
 
     /// @notice Ensures sufficient borrow cap for a given borrow amount
     /// @dev If the current borrow cap would be exceeded, this function increases it
+    /// @dev Adds a 10% buffer to account for interest accrual between check and borrow
     /// @param mToken The market token to check/increase borrow cap for
     /// @param borrowAmount The amount to be borrowed
     /// @param addresses The addresses contract to get TEMPORAL_GOVERNOR
@@ -123,13 +124,14 @@ contract MarketBase is ExponentialNoError, Test {
         uint256 totalBorrows = mToken.totalBorrows();
         uint256 nextTotalBorrows = totalBorrows + borrowAmount;
 
-        // If borrow would hit cap, increase it
+        // If borrow would hit cap, increase it with a buffer for interest accrual
         if (currentBorrowCap != 0 && nextTotalBorrows >= currentBorrowCap) {
             vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
             MToken[] memory mTokens = new MToken[](1);
             mTokens[0] = mToken;
             uint256[] memory newBorrowCaps = new uint256[](1);
-            newBorrowCaps[0] = currentBorrowCap + borrowAmount;
+            // Add 10% buffer to account for interest accrual and ensure borrow succeeds
+            newBorrowCaps[0] = nextTotalBorrows + (borrowAmount / 10);
             comptroller._setMarketBorrowCaps(mTokens, newBorrowCaps);
             vm.stopPrank();
         }

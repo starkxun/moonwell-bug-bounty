@@ -644,12 +644,15 @@ abstract contract HybridProposal is
                 block.chainid.toMoonbeamChainId()
             );
 
-            /// increments each time the Multichain Governor publishes a message
-            uint64 nextSequence = IWormhole(wormholeCoreMoonbeam).nextSequence(
-                address(governor)
-            );
-
+            bytes memory temporalGovExecDataBase;
             bytes memory temporalGovExecDataOptimism;
+
+            if (actions.proposalActionTypeCount(ActionType.Base) != 0) {
+                temporalGovExecDataBase = getTemporalGovPayloadByChain(
+                    addresses,
+                    block.chainid.toBaseChainId()
+                );
+            }
 
             if (actions.proposalActionTypeCount(ActionType.Optimism) != 0) {
                 temporalGovExecDataOptimism = getTemporalGovPayloadByChain(
@@ -658,38 +661,10 @@ abstract contract HybridProposal is
                 );
             }
 
-            //     if (actions.proposalActionTypeCount(ActionType.Base) != 0) {
-            //         bytes
-            //             memory temporalGovExecDataBase = getTemporalGovPayloadByChain(
-            //                 addresses,
-            //                 block.chainid.toBaseChainId()
-            //             );
-            //         /// expect emitting of events to Wormhole Core on Moonbeam if Base actions exist
-            //         vm.expectEmit(true, true, true, true, wormholeCoreMoonbeam);
-
-            //         emit LogMessagePublished(
-            //             address(governor),
-            //             nextSequence++,
-            //             nonce, /// nonce is hardcoded at 0 in HybridProposal.sol
-            //             temporalGovExecDataBase,
-            //             consistencyLevel /// consistency level is hardcoded at 200 in HybridProposal.sol
-            //         );
-            //     }
-
-            //     if (actions.proposalActionTypeCount(ActionType.Optimism) != 0) {
-            //         /// expect emitting of events to Wormhole Core on Moonbeam if Optimism actions exist
-            //         vm.expectEmit(true, true, true, true, wormholeCoreMoonbeam);
-
-            //         emit LogMessagePublished(
-            //             address(governor),
-            //             nextSequence,
-            //             nonce, /// nonce is hardcoded at 0 in HybridProposal.sol
-            //             temporalGovExecDataOptimism,
-            //             consistencyLevel /// consistency level is hardcoded at 200 in HybridProposal.sol
-            //         );
-            //     }
-
             vm.deal(caller, actions.sumTotalValue());
+
+            // Start recording logs to verify events after execution
+            vm.recordLogs();
 
             uint256 gasStart = gasleft();
 
@@ -703,6 +678,84 @@ abstract contract HybridProposal is
                 gasStart - gasleft() <= 60_000_000,
                 "Proposal propose gas limit exceeded"
             );
+
+            // Verify LogMessagePublished events were emitted with correct payloads
+            Vm.Log[] memory logs = vm.getRecordedLogs();
+            bytes32 sig = keccak256(
+                "LogMessagePublished(address,uint64,uint32,bytes,uint8)"
+            );
+
+            if (temporalGovExecDataBase.length != 0) {
+                bool seenBase = false;
+                for (uint256 k = 0; k < logs.length; k++) {
+                    if (
+                        logs[k].emitter == wormholeCoreMoonbeam &&
+                        logs[k].topics.length > 0 &&
+                        logs[k].topics[0] == sig
+                    ) {
+                        (
+                            uint64 sequence,
+                            uint32 nonce2,
+                            bytes memory payload,
+                            uint8 cl
+                        ) = abi.decode(
+                                logs[k].data,
+                                (uint64, uint32, bytes, uint8)
+                            );
+                        sequence;
+                        nonce2;
+                        cl;
+
+                        if (
+                            keccak256(payload) ==
+                            keccak256(temporalGovExecDataBase)
+                        ) {
+                            seenBase = true;
+                            break;
+                        }
+                    }
+                }
+                assertTrue(
+                    seenBase,
+                    "Missing LogMessagePublished event on Base"
+                );
+            }
+
+            if (temporalGovExecDataOptimism.length != 0) {
+                bool seenOptimism = false;
+                for (uint256 k = 0; k < logs.length; k++) {
+                    if (
+                        logs[k].emitter == wormholeCoreMoonbeam &&
+                        logs[k].topics.length > 0 &&
+                        logs[k].topics[0] == sig
+                    ) {
+                        (
+                            uint64 sequence,
+                            uint32 nonce2,
+                            bytes memory payload,
+                            uint8 cl
+                        ) = abi.decode(
+                                logs[k].data,
+                                (uint64, uint32, bytes, uint8)
+                            );
+                        sequence;
+                        nonce2;
+                        cl;
+
+                        if (
+                            keccak256(payload) ==
+                            keccak256(temporalGovExecDataOptimism)
+                        ) {
+                            seenOptimism = true;
+                            break;
+                        }
+                    }
+                }
+                assertTrue(
+                    seenOptimism,
+                    "Missing LogMessagePublished event on Optimism"
+                );
+            }
         }
 
         require(

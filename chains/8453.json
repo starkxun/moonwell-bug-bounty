@@ -1228,5 +1228,10 @@
         "addr": "0xe8dD07CCf5BC4922424140E44Eb970F5950725ef",
         "isContract": true,
         "name": "CHAINLINK_wrsETH_ETH_EXCHANGE_RATE"
+    },
+    {
+        "addr": "0xccC994a46c0d81c934fd6c82d89f626aee336ade",
+        "isContract": true,
+        "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE"
     }
 ]

@@ -80,6 +80,8 @@ contract mipx36 is HybridProposal {
     function deploy(Addresses addresses, address) public override {
         // Deploy new ChainlinkCompositeOracle for Base wrsETH
         vm.selectFork(BASE_FORK_ID);
+
+        if(!addresses.isAddressSet("CHAINLINK_wrsETH_COMPOSITE_ORACLE")) {
         vm.startBroadcast();
 
         address baseEthUsdFeed = addresses.getAddress("CHAINLINK_ETH_USD");
@@ -93,8 +95,15 @@ contract mipx36 is HybridProposal {
 
         vm.stopBroadcast();
 
+        addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(baseWrsethOracle));
+        } else {
+            baseWrsethOracle = ChainlinkCompositeOracle(addresses.getAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE"));
+        }
+
         // Deploy new ChainlinkCompositeOracle for Optimism wrsETH
         vm.selectFork(OPTIMISM_FORK_ID);
+
+        if(!addresses.isAddressSet("CHAINLINK_wrsETH_COMPOSITE_ORACLE")) {
         vm.startBroadcast();
 
         address optimismEthUsdFeed = addresses.getAddress("CHAINLINK_ETH_USD");
@@ -107,14 +116,11 @@ contract mipx36 is HybridProposal {
         );
 
         vm.stopBroadcast();
-    }
 
-    function afterDeploy(Addresses addresses, address) public override {
-        vm.selectFork(BASE_FORK_ID);
-        addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(baseWrsethOracle));
-
-        vm.selectFork(OPTIMISM_FORK_ID);
         addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(optimismWrsethOracle));
+        } else {
+            optimismWrsethOracle = ChainlinkCompositeOracle(addresses.getAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE"));
+        }
     }
 
     function build(Addresses addresses) public override {

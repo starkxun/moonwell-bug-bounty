@@ -1218,5 +1218,10 @@
         "addr": "0xc842d95b9C35bf97842110408A8C501645Fb1722",
         "isContract": true,
         "name": "MORPHO_CHAINLINK_stkWELL_USD_ORACLE"
+    },
+    {
+        "addr": "0x74Cbb1E8B68dDD13B28684ECA202a351afD45EAa",
+        "isContract": true,
+        "name": "F-DEVGRANT"
     }
 ]

@@ -11,10 +11,12 @@ import {Configs} from "@proposals/Configs.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
+import {MarketBase} from "@test/utils/MarketBase.sol";
 import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 
 contract IRModelWethUpgradePostProposalTest is PostProposalCheck, Configs {
     Comptroller comptroller;
+    MarketBase marketBase;
     MErc20 mUSDbC;
     MErc20 mWeth;
     MErc20 mcbEth;
@@ -25,6 +27,7 @@ contract IRModelWethUpgradePostProposalTest is PostProposalCheck, Configs {
         vm.selectFork(BASE_FORK_ID);
 
         comptroller = Comptroller(addresses.getAddress("UNITROLLER"));
+        marketBase = new MarketBase(comptroller);
         mUSDbC = MErc20(addresses.getAddress("MOONWELL_USDBC"));
         mWeth = MErc20(addresses.getAddress("MOONWELL_WETH"));
         mcbEth = MErc20(addresses.getAddress("MOONWELL_cbETH"));
@@ -53,6 +56,9 @@ contract IRModelWethUpgradePostProposalTest is PostProposalCheck, Configs {
     function testBorrowSucceeds() public {
         testSupplyingWethAfterIRModelUpgradeSucceeds();
         uint256 borrowAmount = 74e18;
+
+        // Ensure sufficient borrow cap using the utility function
+        marketBase.ensureSufficientBorrowCap(mWeth, borrowAmount, addresses);
 
         address[] memory mToken = new address[](1);
         mToken[0] = address(mWeth);

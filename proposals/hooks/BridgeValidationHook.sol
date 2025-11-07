@@ -6,15 +6,15 @@ import {ProposalAction} from "@proposals/proposalTypes/IProposal.sol";
 
 /// @title BridgeValidationHook
 /// @notice Hook to validate bridgeToRecipient calls in proposals
-/// @dev Ensures that the native value sent with bridge calls is between 5x and 10x
+/// @dev Ensures that the native value sent with bridge calls is between 4x and 10x
 ///      the actual bridge cost returned by router.bridgeCost(destinationChain)
 abstract contract BridgeValidationHook {
     /// @notice Function selector for bridgeToRecipient(address,uint256,uint16)
     bytes4 private constant BRIDGE_TO_RECIPIENT_SELECTOR =
         xWELLRouter.bridgeToRecipient.selector;
 
-    /// @notice Minimum multiplier for bridge cost (5x)
-    uint256 private constant MIN_BRIDGE_COST_MULTIPLIER = 5;
+    /// @notice Minimum multiplier for bridge cost (4x)
+    uint256 private constant MIN_BRIDGE_COST_MULTIPLIER = 4;
 
     /// @notice Maximum multiplier for bridge cost (10x)
     uint256 private constant MAX_BRIDGE_COST_MULTIPLIER = 10;
@@ -51,7 +51,7 @@ abstract contract BridgeValidationHook {
                 // Get the actual bridge cost from the router with validation
                 uint256 bridgeCost = _getBridgeCost(router, wormholeChainId);
 
-                // Validate that action value is between 5x and 10x the bridge cost
+                // Validate that action value is between 4x and 10x the bridge cost
                 uint256 minValue = bridgeCost * MIN_BRIDGE_COST_MULTIPLIER;
                 uint256 maxValue = bridgeCost * MAX_BRIDGE_COST_MULTIPLIER;
 

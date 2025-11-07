@@ -63,8 +63,8 @@ contract BridgeValidationHookIntegrationTest is Test {
         assertEq(targets.length, 1, "Should have 1 action");
         assertEq(
             values[0],
-            actualBridgeCost * 5,
-            "Value should be 5x bridge cost"
+            actualBridgeCost * 4,
+            "Value should be 4x bridge cost"
         );
     }
 
@@ -146,8 +146,8 @@ contract BridgeValidationHookIntegrationTest is Test {
         );
 
         // Calculate expected values for error message
-        uint256 minValue = actualBridgeCost * 5;
-        uint256 actualValue = actualBridgeCost * 4;
+        uint256 minValue = actualBridgeCost * 4;
+        uint256 actualValue = actualBridgeCost * 3;
 
         // Build expected error message
         string memory expectedError = string.concat(
@@ -192,8 +192,8 @@ contract BridgeValidationHookIntegrationTest is Test {
         }
 
         // Calculate expected values for error message
-        uint256 minValue = actualBridgeCost * 5;
-        uint256 actualValue = actualBridgeCost * 4;
+        uint256 minValue = actualBridgeCost * 4;
+        uint256 actualValue = actualBridgeCost * 3;
 
         // Build expected error message
         string memory expectedError = string.concat(
@@ -281,7 +281,7 @@ contract BridgeValidationHookIntegrationTest is Test {
     /// ============ EDGE CASE TESTS ============
 
     function testBoundaryConditionJustBelowMinimum() public {
-        // Test with 4.99x (just below minimum)
+        // Test with 3.99x (just below minimum)
         BoundaryBelowMinimumProposal proposal = new BoundaryBelowMinimumProposal(
                 actualBridgeCost
             );
@@ -306,8 +306,8 @@ contract BridgeValidationHookIntegrationTest is Test {
         });
 
         // Calculate expected values for error message
-        uint256 minValue = actualBridgeCost * 5;
-        uint256 actualValue = (actualBridgeCost * 499) / 100; // 4.99x
+        uint256 minValue = actualBridgeCost * 4;
+        uint256 actualValue = (actualBridgeCost * 399) / 100; // 3.99x
 
         // Build expected error message
         string memory expectedError = string.concat(
@@ -456,7 +456,7 @@ abstract contract BaseTestProposal is Configs, HybridProposal {
     function validate(Addresses, address) public pure override {}
 }
 
-/// @notice Valid proposal with bridge value at minimum (5x)
+/// @notice Valid proposal with bridge value at minimum (4x)
 contract ValidBridgeMinimumProposal is BaseTestProposal {
     constructor(uint256 _bridgeCost) BaseTestProposal(_bridgeCost) {}
 
@@ -465,7 +465,7 @@ contract ValidBridgeMinimumProposal is BaseTestProposal {
     function build(Addresses addresses) public override {
         createBridgeAction(
             addresses,
-            bridgeCost * 5, // 5x bridge cost (minimum)
+            bridgeCost * 4, // 4x bridge cost (minimum)
             TEST_BRIDGE_AMOUNT
         );
     }
@@ -514,7 +514,7 @@ contract MultipleBridgesProposal is BaseTestProposal {
     }
 }
 
-/// @notice Invalid proposal - bridge value too low (4x)
+/// @notice Invalid proposal - bridge value too low (3x)
 contract InvalidBridgeTooLowProposal is BaseTestProposal {
     constructor(uint256 _bridgeCost) BaseTestProposal(_bridgeCost) {}
 
@@ -523,7 +523,7 @@ contract InvalidBridgeTooLowProposal is BaseTestProposal {
     function build(Addresses addresses) public override {
         createBridgeAction(
             addresses,
-            bridgeCost * 4, // 4x bridge cost (below minimum of 5x)
+            bridgeCost * 3, // 3x bridge cost (below minimum of 4x)
             TEST_BRIDGE_AMOUNT
         );
     }
@@ -544,7 +544,7 @@ contract InvalidBridgeTooHighProposal is BaseTestProposal {
     }
 }
 
-/// @notice Boundary test - just below minimum (4.99x)
+/// @notice Boundary test - just below minimum (3.99x)
 contract BoundaryBelowMinimumProposal is BaseTestProposal {
     constructor(uint256 _bridgeCost) BaseTestProposal(_bridgeCost) {}
 
@@ -553,7 +553,7 @@ contract BoundaryBelowMinimumProposal is BaseTestProposal {
     function build(Addresses addresses) public override {
         createBridgeAction(
             addresses,
-            (bridgeCost * 499) / 100, // 4.99x bridge cost
+            (bridgeCost * 399) / 100, // 3.99x bridge cost
             TEST_BRIDGE_AMOUNT
         );
     }

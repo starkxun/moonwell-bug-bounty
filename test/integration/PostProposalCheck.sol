@@ -91,5 +91,8 @@ contract PostProposalCheck is LiveProposalCheck {
         addresses.removeAllRestrictions();
 
         vm.setEnv("PRIMARY_FORK_ID", vm.toString(primaryForkBefore));
+
+        // revert back to proposalStartTime
+        vm.warp(proposalStartTime);
     }
 }

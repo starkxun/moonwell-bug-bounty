@@ -9,7 +9,7 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 /// @custom:contact security@morpho.org
 /// @notice Interface of MorphoChainlinkOracleV2.
 interface IMorphoChainlinkOracleV2 {
-    /// @notice Returns the address of the base ERC4626 vault.
+    /// @notice Returns hte address of the base ERC4626 vault.
     function BASE_VAULT() external view returns (IERC4626);
 
     /// @notice Returns the base vault conversion sample.

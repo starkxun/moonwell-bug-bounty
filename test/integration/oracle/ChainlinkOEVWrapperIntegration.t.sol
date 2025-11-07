@@ -257,18 +257,12 @@ contract ChainlinkOEVWrapperIntegrationTest is PostProposalCheck {
             // so we need to convert borrow amount to 6 decimals
             borrowAmount = ((liquidity * 80) / 100) / 1e12; // Changed from full amount
 
-            // before borrowing, increase borrow cap to make sure we borrow a significant amount
-            vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
-            MToken[] memory mTokens = new MToken[](1);
-            mTokens[0] = mTokenBorrowed;
-            uint256[] memory newBorrowCaps = new uint256[](1);
-            uint256 currentBorrowCap = comptroller.borrowCaps(
-                address(mTokens[0])
+            // Ensure sufficient borrow cap using the utility function
+            marketBase.ensureSufficientBorrowCap(
+                mTokenBorrowed,
+                borrowAmount,
+                addresses
             );
-
-            newBorrowCaps[0] = currentBorrowCap + borrowAmount;
-            comptroller._setMarketBorrowCaps(mTokens, newBorrowCaps);
-            vm.stopPrank();
 
             // make sure the mToken has enough underlying to borrow
             deal(

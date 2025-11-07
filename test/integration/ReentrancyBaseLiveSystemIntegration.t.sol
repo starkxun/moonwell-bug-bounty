@@ -15,6 +15,7 @@ import {mipb02 as mip} from "@proposals/mips/mip-b02/mip-b02.sol";
 import {MErc20Delegator} from "@protocol/MErc20Delegator.sol";
 import {MaliciousBorrower} from "@test/mock/MaliciousBorrower.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
+import {MarketBase} from "@test/utils/MarketBase.sol";
 import {ComptrollerErrorReporter} from "@protocol/TokenErrorReporter.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
@@ -24,6 +25,7 @@ contract ReentrancyPostProposalTest is
     ComptrollerErrorReporter
 {
     Comptroller comptroller;
+    MarketBase marketBase;
     WETHRouter router;
 
     function setUp() public override {
@@ -32,6 +34,7 @@ contract ReentrancyPostProposalTest is
         vm.selectFork(BASE_FORK_ID);
 
         comptroller = Comptroller(addresses.getAddress("UNITROLLER"));
+        marketBase = new MarketBase(comptroller);
         router = WETHRouter(payable(addresses.getAddress("WETH_ROUTER")));
     }
 
@@ -95,6 +98,14 @@ contract ReentrancyPostProposalTest is
 
         deal(addresses.getAddress("WETH"), address(borrower), 100e18); /// fund attack contract with weth
 
+        // Ensure sufficient borrow cap for the attack (60 WETH = 100 * 0.6)
+        uint256 borrowAmount = 60e18;
+        marketBase.ensureSufficientBorrowCap(
+            MErc20(mToken),
+            borrowAmount,
+            addresses
+        );
+
         vm.expectRevert("re-entered"); /// cannot reenter and borrow
         borrower.exploit();
     }
@@ -107,6 +118,14 @@ contract ReentrancyPostProposalTest is
         MaliciousBorrower borrower = new MaliciousBorrower(mToken, true);
 
         deal(addresses.getAddress("WETH"), address(borrower), 100e18); /// fund attack contract with weth
+
+        // Ensure sufficient borrow cap for the attack (60 WETH = 100 * 0.6)
+        uint256 borrowAmount = 60e18;
+        marketBase.ensureSufficientBorrowCap(
+            MErc20(mToken),
+            borrowAmount,
+            addresses
+        );
 
         vm.expectEmit(true, true, true, true, address(comptroller));
         /// cannot reenter and borrow

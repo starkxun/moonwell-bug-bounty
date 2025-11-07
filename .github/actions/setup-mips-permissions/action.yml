@@ -1,0 +1,8 @@
+name: 'Setup MIPs Permissions'
+description: 'Grant execute permissions to the proposals/mips directory'
+runs:
+  using: 'composite'
+  steps:
+    - name: Give write permissions
+      shell: bash
+      run: chmod -R +x proposals/mips/

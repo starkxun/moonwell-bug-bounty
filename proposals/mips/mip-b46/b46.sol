@@ -93,7 +93,10 @@ contract mipb46 is HybridProposal, Configs {
     function beforeSimulationHook(Addresses addresses) public override {
         vm.selectFork(MOONBEAM_FORK_ID);
         // mock relayer so we can simulate bridging well
-        WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter();
+        WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter(
+            new uint16[](0),
+            new uint256[](0)
+        );
         vm.makePersistent(address(wormholeRelayer));
         vm.label(address(wormholeRelayer), "MockWormholeRelayer");
 

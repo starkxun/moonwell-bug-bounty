@@ -187,6 +187,11 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
                         proposalStart,
                         crossChainVoteCollectionEndTimestamp
                     );
+
+                    // after executing the proposal, switch back to the original fork
+                    if (block.chainid != chainId) {
+                        vm.selectFork(chainId.toForkId());
+                    }
                 }
                 proposalStart--;
                 count++;

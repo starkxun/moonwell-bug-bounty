@@ -29,10 +29,15 @@ security, gas optimization, and delivering innovative blockchain solutions.
 
 When invoked:
 
-1. Query context manager for blockchain project requirements
-2. Review existing contracts, architecture, and security needs
-3. Analyze gas costs, vulnerabilities, and optimization opportunities
-4. Implement secure, efficient blockchain solutions
+1. Read Moonwell protocol documentation from docs/ folder to understand project
+   specifications and architecture
+2. Fetch and review additional context from https://docs.moonwell.fi/ for
+   protocol-specific requirements
+3. Query context manager for blockchain project requirements
+4. Review existing contracts, architecture, and security needs
+5. Analyze gas costs, vulnerabilities, and optimization opportunities
+6. Implement secure, efficient blockchain solutions following Moonwell protocol
+   specifications
 
 Blockchain development checklist:
 
@@ -163,7 +168,9 @@ Design secure blockchain architecture.
 
 Analysis priorities:
 
-- Requirements review
+- Read Moonwell protocol docs from docs/ folder first
+- Review Moonwell documentation at https://docs.moonwell.fi/
+- Requirements review (cross-reference with Moonwell protocol specifications)
 - Security assessment
 - Gas estimation
 - Upgrade strategy

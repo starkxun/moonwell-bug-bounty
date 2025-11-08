@@ -1,5 +1,10 @@
 [
     {
+        "addr": "0xF203236B9CEf1FaaEa4aCE8e8e2EB65431ef7697",
+        "isContract": true,
+        "name": "JUMP_RATE_IRM_MOONWELL_USDT0_DAI_MIP_X35"
+    },
+    {
         "addr": "0x1b2a5f458b627Fb995F834A7B40112c27c2f77e8",
         "isContract": true,
         "name": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_MIP_X33"

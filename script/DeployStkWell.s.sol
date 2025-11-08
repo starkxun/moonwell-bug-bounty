@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {Script} from "@forge-std/Script.sol";
 import {console} from "@forge-std/console.sol";
 
-import {MultichainGovernorDeploy} from "@protocol/governance/multichain/MultichainGovernorDeploy.sol";
+import {MultichainGovernorDeploy} from "@script/DeployMultichainGovernor.s.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
 /// forge script script/DeployStkWell.sol --rpc-url moonbase -vvvv --broadcast -g 200 --slow
@@ -40,7 +40,7 @@ contract DeployStkWell is Script, MultichainGovernorDeploy {
         vm.stopBroadcast();
 
         addresses.addAddress("STK_GOVTOKEN_IMPL", address(implementation));
-        addresses.addAddress("STK_GOVTOKEN", address(proxy));
+        addresses.addAddress("STK_GOVTOKEN_PROXY", address(proxy));
         addresses.addAddress(
             "ECOSYSTEM_RESERVE_PROXY",
             address(ecosystemReserveProxy)

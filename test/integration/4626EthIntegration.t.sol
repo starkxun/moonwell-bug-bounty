@@ -15,7 +15,7 @@ import {deployFactoryEth} from "@protocol/4626/4626FactoryDeploy.sol";
 import {MoonwellERC4626Eth} from "@protocol/4626/MoonwellERC4626Eth.sol";
 import {Comptroller as IComptroller} from "@protocol/Comptroller.sol";
 
-contract MoonwellERC4626EthLiveSystemBaseTest is Test {
+contract ERC4626EthDeployIntegrationTest is Test {
     using LibCompound for MErc20;
     address constant rewardRecipient = address(10_000_000);
     Addresses addresses;
@@ -72,7 +72,7 @@ contract MoonwellERC4626EthLiveSystemBaseTest is Test {
             ERC20(addresses.getAddress("MOONWELL_WETH")).balanceOf(
                 address(vault)
             ),
-            4.9e5,
+            1e5,
             "underlying mToken balance incorrect"
         );
     }

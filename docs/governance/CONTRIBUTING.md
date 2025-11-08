@@ -6,7 +6,7 @@ is still operating normally.
 
 ## How to add a new proposal
 
-[IProposal.sol](../../src/proposals/proposalTypes/IProposal.sol) defines the
+[IProposal.sol](../../proposals/proposalTypes/IProposal.sol) defines the
 interface for a Moonwell Improvement Proposal.
 
 When creating new proposals, please follow the naming conventions and guidelines
@@ -14,25 +14,16 @@ outlined below
 
 ### Naming Convention
 
-1. **Base Proposals:**
-
-   - **Folder Name:** Use the format `mip-bXX`, where `XX` is the proposal
-     number, incremented by 1 from the last base proposal.
-   - **File Name:** Inside the folder, create a file named `mip-bXX.sol`.
-   - **Contract Name:** Inside the file, the proposal should be named
-     `contract mipbXX`
-
-2. **Moonbeam Proposals:**
-
-   - **Folder Name:** Use the format `mip-mXX`, where `XX` is the proposal
-     number, incremented by 1 from the last moonbeam proposal.
-   - **File Name:** Inside the folder, create a file named `mip-mXX.sol`.
-   - **Contract Name:** Inside the file, the proposal should be named
-     `contract mipmXX`
-
-3. **Case Sensitivity:**
-   - **Folders and Solidity Files:** Use lowercase letters.
-   - **Markdown Files:** Use uppercase letters, e.g., `MIP-BXX.md`.
+1.  **Folder Name:** Use the format `mip-yXX`, where `y` is the first letter of
+    the chain name and `XX` is the proposal number, incremented by 1 from the
+    last proposal. For proposals that touch multiple chains, use the letter `x`.
+    For example, if the last multichain proposal is `mip-x09`, the next should
+    be `mip-x10`.
+2.  **Markdown File Name:** Inside the folder, create a file named `MIP-YXX.md`.
+3.  **Contract Name:** If the proposal includes a smart contract, name it
+    `contract mipyxx` inside the corresponding Solidity file.
+4.  **Folders and Solidity Files:** Use lowercase letters.
+5.  **Markdown Files:** Use uppercase letters, e.g., `MIP-BXX.md`.
 
 ### Guidelines for Pull Requests and Branches
 
@@ -44,12 +35,23 @@ All pull requests must adhere to the style guidelines detailed in
 - Ensure that each step of the proposal is thoroughly documented within the
   Solidity file.
 - Inherit from
-  [HybridProposal](../../src/proposals/proposalTypes/HybridProposal.sol) and
-  include all necessary details.
+  [HybridProposal](../../proposals/proposalTypes/HybridProposal.sol) and include
+  all necessary details.
 
 ## How to test a proposal
 
-`forge test --match-contract LiveSystemBaseTest --fork-url base -vvv`
+### Set the `PRIMARY_FORK_ID` environment variable
+
+For example, to test a proposal on the base network, set the `PRIMARY_FORK_ID`
+to `1`. Find the corresponding fork ID in the `chains/mainnetchains.json` file.
+
+```bash
+    export PRIMARY_FORK_ID=1
+```
+
+### Run Integration Tests
+
+`forge test --match-contract LiveSystem -vvv`
 
 Integration tests inherit from `PostProposalCheck`, which will run the latest
 proposals from both base and moonbeam if they have not already been proposed on
@@ -74,8 +76,6 @@ this proposal. The following environment variables are available:
 - **DO_DEPLOY** - Whether or not to deploy the system. Defaults to true.
 - **DO_AFTER_DEPLOY** - Whether or not to run the after deploy script. Defaults
   to true.
-- **DO_PRE_BUILD_MOCK** - Whether or not to run the after deploy setup script.
-  Defaults to true.
 - **DO_BUILD** - Whether or not to build the calldata for the proposal. Defaults
   to true.
 - **DO_RUN** - Whether or not to simulate the execution of the proposal.
@@ -87,7 +87,7 @@ this proposal. The following environment variables are available:
   you would like to run.
 - **DO_AFTER_DEPLOY_MTOKEN_BROADCAST** - Whether or not to do the after deploy
   mtoken broadcast. Defaults to true. Only used when using the
-  [`mip-market-listing.sol`](./src/proposals/mips/examples/mip-market-listing/mip-market-listing.sol)
+  [`mip-market-listing.sol`](./proposals/mips/examples/mip-market-listing/mip-market-listing.sol)
   proposal.
 
 ### Sample Environment Variables For Deploying and Building Calldata for a Market Listing Proposal
@@ -95,7 +95,6 @@ this proposal. The following environment variables are available:
 ```
 export DO_DEPLOY=true
 export DO_AFTER_DEPLOY=true
-export DO_PRE_BUILD_MOCK=true
 export DO_BUILD=true
 export DO_RUN=false
 export DO_TEARDOWN=false
@@ -105,7 +104,6 @@ export DO_VALIDATE=false
 For a proposal where a new market is being listed:
 
 ```
-export DO_AFTER_DEPLOY_MTOKEN_BROADCAST=true
 export OVERRIDE_SUPPLY_CAP=false
 export OVERRIDE_BORROW_CAP=false
 ```
@@ -115,12 +113,10 @@ For a market listing proposal where the contracts have already been deployed:
 ```
 export DO_DEPLOY=false
 export DO_AFTER_DEPLOY=true
-export DO_PRE_BUILD_MOCK=true
 export DO_BUILD=true
 export DO_RUN=true
 export DO_TEARDOWN=true
 export DO_VALIDATE=true
-export DO_AFTER_DEPLOY_MTOKEN_BROADCAST=false
 
 ```
 
@@ -149,7 +145,6 @@ env setup to build and run without any other steps:
 ```bash
 export DO_DEPLOY=false
 export DO_AFTER_DEPLOY=false
-export DO_PRE_BUILD_MOCK=false
 export DO_BUILD=true
 export DO_RUN=true
 export DO_TEARDOWN=true
@@ -157,11 +152,11 @@ export DO_VALIDATE=false
 export DO_PRINT=true
 ```
 
-`forge script src/proposals/mips/mip-b02/mip-b02.sol:mipb02 --rpc-url base -vvvvv`
+`forge script proposals/mips/mip-b02/mip-b02.sol:mipb02 --rpc-url base -vvvvv`
 
 add the following flags to deploy and verify against the base network:
 
-`forge script src/proposals/mips/mip-b02/mip-b02.sol:mipb02 --rpc-url base -vvvvv --broadcast --etherscan-api-key base --verify --slow`
+`forge script proposals/mips/mip-b02/mip-b02.sol:mipb02 --rpc-url base -vvvvv --broadcast --etherscan-api-key base --verify --slow`
 
 ### Debugging
 

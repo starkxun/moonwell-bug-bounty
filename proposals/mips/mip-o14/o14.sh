@@ -1,0 +1,15 @@
+#!/bin/bash
+export DESCRIPTION_PATH=proposals/mips/mip-o14/MIP-O14.md
+echo "DESCRIPTION_PATH=$DESCRIPTION_PATH"
+
+export MTOKENS_PATH=proposals/mips/mip-o14/MTokens.json
+echo "MTOKENS_PATH=$MTOKENS_PATH"
+
+export EMISSION_CONFIGURATIONS_PATH=proposals/mips/mip-o14/RewardStreams.json
+echo "EMISSION_CONFIGURATIONS_PATH=$EMISSION_CONFIGURATIONS_PATH"
+
+export PRIMARY_FORK_ID=2
+echo "PRIMARY_FORK_ID=$PRIMARY_FORK_ID"
+
+
+

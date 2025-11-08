@@ -1,0 +1,23 @@
+{
+    "8453": [
+        {
+            "addressesString": "MOONWELL_cbXRP",
+            "borrowCap": 500000e6,
+            "collateralFactor": 0.7e18,
+            "initialMintAmount": 1e5,
+            "jrm": {
+                "baseRatePerYear": 0,
+                "jumpMultiplierPerYear": 5e18,
+                "kink": 0.45e18,
+                "multiplierPerYear": 0.23e18
+            },
+            "name": "Moonwell cbXRP",
+            "priceFeedName": "CHAINLINK_cbXRP_USD",
+            "reserveFactor": 0.3e18,
+            "seizeShare": 0.03e18,
+            "supplyCap": 1000000e6,
+            "symbol": "mcbXRP",
+            "tokenAddressName": "cbXRP"
+        }
+    ]
+}

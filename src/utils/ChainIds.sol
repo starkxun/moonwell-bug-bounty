@@ -175,13 +175,13 @@ library ChainIds {
             abi.encodeWithSignature("activeFork()")
         );
         (bool successSwitchFork, ) = address(vmInternal).call(
-            abi.encodeWithSignature("switchFork(uint256)", selectFork)
+            abi.encodeWithSignature("selectFork(uint256)", selectFork)
         );
 
         if (!success || !successSwitchFork) {
-            vmInternal.createFork(vmInternal.envString("MOONBEAM_RPC_URL"));
-            vmInternal.createFork(vmInternal.envString("BASE_RPC_URL"));
-            vmInternal.createFork(vmInternal.envString("OP_RPC_URL"));
+            vmInternal.createFork("moonbeam");
+            vmInternal.createFork("base");
+            vmInternal.createFork("optimism");
         }
 
         vmInternal.selectFork(selectFork);

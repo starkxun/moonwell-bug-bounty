@@ -22,9 +22,37 @@ contract WormholeRelayerAdapter {
     /// in the same chain and we need to skip the fork selection
     bool public isMultichainTest;
 
-    uint256 public nativePriceQuote = 0.01 ether;
+    // @notice some tests need to silence the failure while others expect it to revert
+    // e.g of silence failure: check for refunds
+    bool public silenceFailure;
+
+    /// @notice Mapping of wormhole chain ID to native price quote
+    mapping(uint16 => uint256) public nativePriceQuotes;
+
+    /// @notice Default price quote for backwards compatibility (used when no specific price is set)
+    uint256 public constant DEFAULT_NATIVE_PRICE_QUOTE = 0.1 ether;
 
     uint256 public callCounter;
+
+    /// @notice Constructor - accepts empty arrays for backwards compatibility
+    /// @param chainIds Array of wormhole chain IDs (can be empty for default behavior)
+    /// @param prices Array of native prices for each chain (can be empty for default behavior)
+    constructor(uint16[] memory chainIds, uint256[] memory prices) {
+        require(
+            chainIds.length == prices.length,
+            "WormholeRelayerAdapter: array length mismatch"
+        );
+        for (uint256 i = 0; i < chainIds.length; i++) {
+            nativePriceQuotes[chainIds[i]] = prices[i];
+        }
+    }
+
+    /// @notice Get the default native price quote (for backwards compatibility)
+    function nativePriceQuote() public pure returns (uint256) {
+        return DEFAULT_NATIVE_PRICE_QUOTE;
+    }
+
+    event MockWormholeRelayerError(string reason);
 
     mapping(uint256 chainId => bool shouldRevert) public shouldRevertAtChain;
 
@@ -47,6 +75,10 @@ contract WormholeRelayerAdapter {
         for (uint16 i = 0; i < chainIds.length; i++) {
             shouldRevertAtChain[chainIds[i]] = _shouldRevert;
         }
+    }
+
+    function setSilenceFailure(bool _silenceFailure) external {
+        silenceFailure = _silenceFailure;
     }
 
     function setSenderChainId(uint16 _senderChainId) external {
@@ -75,17 +107,42 @@ contract WormholeRelayerAdapter {
             revert("WormholeBridgeAdapter: sendPayloadToEvm revert");
         }
 
-        require(msg.value == nativePriceQuote, "incorrect value");
+        uint256 expectedValue = nativePriceQuotes[chainId];
+        if (expectedValue == 0) {
+            expectedValue = DEFAULT_NATIVE_PRICE_QUOTE;
+        }
+        require(msg.value == expectedValue, "incorrect value");
 
         uint256 initialFork;
 
+        uint256 timestamp = block.timestamp;
         if (isMultichainTest) {
             initialFork = vm.activeFork();
+
             vm.selectFork(chainId.toChainId().toForkId());
+
+            vm.warp(timestamp);
         }
 
-        if (senderChainId != 0) {
+        // TODO naming;
+        require(senderChainId != 0, "senderChainId not set");
+
+        if (silenceFailure) {
             /// immediately call the target
+            try
+                IWormholeReceiver(targetAddress).receiveWormholeMessages(
+                    payload,
+                    new bytes[](0),
+                    bytes32(uint256(uint160(msg.sender))),
+                    senderChainId, // chain not the target chain
+                    bytes32(++nonce)
+                )
+            {
+                // success
+            } catch Error(string memory reason) {
+                emit MockWormholeRelayerError(reason);
+            }
+        } else {
             IWormholeReceiver(targetAddress).receiveWormholeMessages(
                 payload,
                 new bytes[](0),
@@ -93,27 +150,18 @@ contract WormholeRelayerAdapter {
                 senderChainId, // chain not the target chain
                 bytes32(++nonce)
             );
-        } else {
-            /// immediately call the target
-            IWormholeReceiver(targetAddress).receiveWormholeMessages(
-                payload,
-                new bytes[](0),
-                bytes32(uint256(uint160(msg.sender))),
-                chainId == 16 ? 30 : 16, // flip chainId since this has to be the sender
-                // chain not the target chain
-                bytes32(++nonce)
-            );
         }
 
         if (isMultichainTest) {
             vm.selectFork(initialFork);
+            vm.warp(timestamp);
         }
 
         return uint64(nonce);
     }
 
     /// @notice Retrieve the price for relaying messages to another chain
-    /// currently hardcoded to 0.01 ether
+    /// Returns the price stored in nativePriceQuotes mapping for the target chain, or default if not set
     function quoteEVMDeliveryPrice(
         uint16 targetChain,
         uint256,
@@ -127,7 +175,10 @@ contract WormholeRelayerAdapter {
             revert("WormholeBridgeAdapter: quoteEVMDeliveryPrice revert");
         }
 
-        nativePrice = nativePriceQuote;
+        nativePrice = nativePriceQuotes[targetChain];
+        if (nativePrice == 0) {
+            nativePrice = DEFAULT_NATIVE_PRICE_QUOTE;
+        }
         targetChainRefundPerGasUnused = 0;
     }
 }

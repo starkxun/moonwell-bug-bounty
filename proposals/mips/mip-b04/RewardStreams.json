@@ -1,0 +1,10 @@
+[
+    {
+        "borrowEmissionsPerSec": 1,
+        "emissionToken": "GOVTOKEN",
+        "endTime": 1696629600,
+        "mToken": "MOONWELL_USDC",
+        "owner": "DEPRECATED_WARDEN_EMISSIONS_ADMIN",
+        "supplyEmissionPerSec": 0
+    }
+]

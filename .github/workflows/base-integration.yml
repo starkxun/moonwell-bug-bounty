@@ -1,15 +1,18 @@
-name: Foundry base integration tests
+name: Base 
 
 on: [pull_request]
 
 env:
-  BASE_RPC_URL: ${{secrets.BASE_RPC_URL}}
+    OP_RPC_URL: ${{secrets.OP_RPC_URL}}
+    BASE_RPC_URL: ${{secrets.BASE_RPC_URL}}
+    MOONBEAM_RPC_URL: ${{secrets.MOONBEAM_RPC_URL}}
+    PRIMARY_FORK_ID: 1
+    FOUNDRY_PROFILE: ci
 
 jobs:
-  run-base-tests:
-    name: base-integration-tests
+  live-system-integration-tests:
+    name: Live System Integration Test
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -19,6 +22,152 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions
 
-      - name: Integration Tests Base Mainnet
-        run: time forge test --match-contract LiveSystemBaseTest --fork-url base
-          -vvv --ffi
+      - name: Setup MIPs Permissions
+        uses: ./.github/actions/setup-mips-permissions
+
+      - name: Live System Integration Tests
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 50
+           max_attempts: 3
+           command: time forge test --match-contract LiveSystem -vvv --ffi
+
+  reserve-automation-integration-tests:
+    name: Reserve Automation Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Setup MIPs Permissions
+        uses: ./.github/actions/setup-mips-permissions
+
+      - name: Reserve Automation Integration Tests
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 50
+           max_attempts: 3
+           command: time forge test --match-contract 'ReserveAutomationLiveIntegrationTest|ERC20HoldingDepositLiveIntegrationTest' -vvv --fork-url base
+
+  fee-splitter-xwell-integration-tests:
+    name: Fee Splitter/xWell Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Run Integration Tests
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           # matches 2 contracts, they will run concurrently
+           command: time forge test --match-contract 'xWellIntegrationTest|FeeSplitterIntegrationTest' --fork-url base -vvv --ffi
+
+  erc4626-vault-integration-tests:
+    name: ERC4626 Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Run Integration Test
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           # since 'ERC4626' matches 4 contracts, they will run concurrently
+           command: time forge test --match-contract ERC4626 --fork-url base -vvv --ffi
+
+  cypher-integration-tests:
+    name: Cypher Integration Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Run Integration Test
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           command: time forge test --match-contract CypherIntegrationTest --fork-url base -vvv 
+
+  bounded-chainlink-composite-oracle:
+    name: Bounded Chainlink Composite Oracle Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Setup MIPs Permissions
+        uses: ./.github/actions/setup-mips-permissions
+
+      - name: Run Integration Tests
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           command: time forge test --mc "ChainlinkBoundedCompositeOracleIntegrationTest" -vvv --ffi
+
+  chainlink-oracle-proxy:
+    name: Chainlink Oracle Proxy Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Setup MIPs Permissions
+        uses: ./.github/actions/setup-mips-permissions
+
+      - name: Run Integration Tests
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           command: time forge test --mc "ChainlinkOracleProxyIntegrationTest" -vvv --ffi
+

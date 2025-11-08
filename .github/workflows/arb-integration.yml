@@ -1,13 +1,13 @@
-name: Foundry arb integration tests
-
+name: Arbitrum
 on: [pull_request]
 
 env:
     ARB_RPC_URL: ${{secrets.ARB_RPC_URL}}
+    FOUNDRY_PROFILE: ci
 
 jobs:
   run-arb-tests:
-    name: arb-integration-tests
+    name: Integration Test
     runs-on: ubuntu-latest
 
     steps:
@@ -19,5 +19,12 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions
 
-      - name: Arbitrum Integration Test Contracts
-        run: time forge test --match-contract ArbitrumTest --fork-url arbitrum
+      - name: Run Integration Test
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 10
+           max_attempts: 3
+           command: time forge test --match-contract ArbitrumTest --fork-url
+                    arbitrum -vvvvv

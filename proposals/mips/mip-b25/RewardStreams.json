@@ -1,0 +1,18 @@
+[
+    {
+        "borrowEmissionsPerSec": 1,
+        "emissionToken": "xWELL_PROXY",
+        "endTime": 1725593400,
+        "mToken": "MOONWELL_weETH",
+        "owner": "DEPRECATED_WARDEN_EMISSIONS_ADMIN",
+        "supplyEmissionPerSec": 0
+    },
+    {
+        "borrowEmissionsPerSec": 1,
+        "emissionToken": "USDC",
+        "endTime": 1725593400,
+        "mToken": "MOONWELL_weETH",
+        "owner": "DEPRECATED_WARDEN_EMISSIONS_ADMIN",
+        "supplyEmissionPerSec": 0
+    }
+]

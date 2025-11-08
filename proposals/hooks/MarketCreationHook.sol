@@ -1,0 +1,226 @@
+pragma solidity 0.8.19;
+
+import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+
+import {MErc20} from "@protocol/MErc20.sol";
+import {MToken} from "@protocol/MToken.sol";
+import {Comptroller} from "@protocol/Comptroller.sol";
+import {ProposalAction} from "@proposals/proposalTypes/IProposal.sol";
+
+abstract contract MarketCreationHook {
+    /// private so that contracts that inherit cannot write to functionDetectors
+    bytes4 private constant detector = Comptroller._supportMarket.selector;
+
+    /// ordered actions to verify:
+    /// 1. supportMarket on Comptroller
+    /// 2. set reserve factor on mToken
+    /// 3. set protocol seize share on mToken
+    /// 4. approve underlying on ERC20
+    /// 5. mint mToken
+    bytes4[5] public orderedActions = [
+        Comptroller._supportMarket.selector,
+        MToken._setReserveFactor.selector,
+        MToken._setProtocolSeizeShare.selector,
+        IERC20.approve.selector,
+        MErc20.mint.selector
+    ];
+
+    /// @notice array of created mTokens in proposal
+    address[] private createdMTokens;
+
+    /// @notice comptroller address as specified by an mToken being created
+    address private comptroller;
+
+    /// @notice Verify market creation actions in proposals
+    /// @dev Called by inheriting contracts to validate market listing pattern
+    /// @param proposal Array of proposal actions to validate
+    function _verifyMarketCreationActions(
+        ProposalAction[] memory proposal
+    ) internal {
+        address[] memory targets = new address[](proposal.length);
+        uint256[] memory values = new uint256[](proposal.length);
+        bytes[] memory datas = new bytes[](proposal.length);
+
+        for (uint256 i = 0; i < proposal.length; i++) {
+            targets[i] = proposal[i].target;
+            values[i] = proposal[i].value;
+            datas[i] = proposal[i].data;
+        }
+
+        _verifyActionsPreRunSignatures(targets, values, datas);
+    }
+
+    /// @notice function to verify market listing actions
+    /// run against every MIP cross chain proposal to ensure that the
+    /// proposal conforms to the expected market creation pattern.
+    function _verifyActionsPreRunSignatures(
+        address[] memory targets,
+        uint256[] memory,
+        bytes[] memory datas
+    ) internal {
+        require(comptroller == address(0), "proposal not cleaned up");
+
+        uint256 proposalLength = targets.length;
+        for (uint256 i = 0; i < proposalLength; i++) {
+            if (detector == bytesToBytes4(datas[i])) {
+                comptroller = targets[i];
+
+                require(
+                    datas.length >= 3,
+                    "MarketCreationHook: missing actions"
+                );
+
+                /// --------------- FUNCTION SIGNATURE VERIFICATION ---------------
+
+                require(
+                    bytesToBytes4(datas[i + 1]) == orderedActions[1],
+                    "action 1 must set reserve factor"
+                );
+                require(
+                    bytesToBytes4(datas[i + 2]) == orderedActions[2],
+                    "action 2 must set protocol seize share"
+                );
+                require(
+                    bytesToBytes4(datas[i + 3]) == orderedActions[3],
+                    "action 3 must approve underlying"
+                );
+                require(
+                    bytesToBytes4(datas[i + 4]) == orderedActions[4],
+                    "action 4 must mint mtoken"
+                );
+
+                /// --------------- ARGUMENT VERIFICATION ---------------
+
+                address mtoken = extractAddress(datas[i]);
+
+                address secondMToken = targets[i + 4];
+
+                address approvalMToken = extractAddress(datas[i + 3]);
+
+                uint256 tokenAmount = getTokenAmount(datas[i + 3]);
+
+                uint256 mintAmount = getMintAmount(datas[i + 4]);
+
+                require(mintAmount != 0, "mint amount must be greater than 0");
+                require(
+                    tokenAmount != 0,
+                    "token approve amount must be greater than 0"
+                );
+                require(
+                    mtoken == secondMToken,
+                    "mtoken supported and minted must be the same"
+                );
+                require(
+                    mtoken == approvalMToken,
+                    "must approve mtoken to spend tokens"
+                );
+
+                createdMTokens.push(mtoken); /// add mToken to created mTokens array
+
+                i += 3; /// skip to next action
+            }
+        }
+    }
+
+    function _verifyMTokensPostRun() internal {
+        /// if comptroller is not set, it means there are no mTokens to verify
+        if (comptroller == address(0)) {
+            return;
+        }
+
+        /// --------------- VERIFICATION ---------------
+
+        /// verify that all created mTokens have the same admin
+        /// and that they have been minted and sent to the burn address
+        for (uint256 i = 0; i < createdMTokens.length; i++) {
+            require(
+                MToken(createdMTokens[i]).admin() ==
+                    Comptroller(comptroller).admin(),
+                "mToken admin must be the same as comptroller admin"
+            );
+            require(
+                MToken(createdMTokens[i]).balanceOf(address(0)) >= 1,
+                "mToken not minted and burned"
+            );
+        }
+
+        MToken[] memory markets = Comptroller(comptroller).getAllMarkets();
+
+        for (uint256 i = 0; i < markets.length; i++) {
+            require(markets[i].totalSupply() >= 1_000, "empty market");
+            require(markets[i].balanceOf(address(0)) > 0, "no burnt tokens");
+        }
+
+        delete createdMTokens;
+        comptroller = address(0);
+    }
+
+    function getTokenAmount(
+        bytes memory input
+    ) public pure returns (uint256 result) {
+        require(input.length == 68, "invalid length, input must be 68 bytes");
+
+        /// first 32 bytes of a dynamic byte array is just the length of the array
+        /// next 4 bytes are function selector
+        /// next 32 bytes are address, final 32 bytes are uint256 amount
+        bytes32 rawBytes;
+        assembly {
+            let dataPointer := add(add(input, 0x40), 0x04) // Adjust for dynamic array and skip the function selector
+            rawBytes := mload(dataPointer) // Load 32 bytes
+        }
+
+        result = uint256(rawBytes);
+    }
+
+    function getMintAmount(
+        bytes memory input
+    ) public pure returns (uint256 result) {
+        require(input.length == 36, "invalid length, input must be 36 bytes");
+
+        /// first 32 bytes of a dynamic byte array is just the length of the array
+        /// next 4 bytes are function selector
+        /// final 32 bytes are uint256 amount
+        bytes32 rawBytes;
+        assembly {
+            let dataPointer := add(add(input, 0x20), 0x04) // Adjust for dynamic array and skip the function selector
+            rawBytes := mload(dataPointer) // Load 32 bytes
+        }
+
+        result = uint256(rawBytes);
+    }
+
+    function extractAddress(
+        bytes memory input
+    ) public pure returns (address result) {
+        /// first 32 bytes of a dynamic byte array is just the length of the array
+        bytes32 rawBytes;
+        assembly {
+            let dataPointer := add(add(input, 0x20), 0x04) // Adjust for dynamic array and skip the function selector
+            rawBytes := mload(dataPointer) // Load 32 bytes
+        }
+
+        result = address(uint160(uint256(rawBytes)));
+    }
+
+    /// @notice Extract the first 4 bytes (function selector) from calldata
+    /// @dev This function must be implemented by inheriting contracts
+    /// @param toSlice The bytes to extract from
+    /// @return functionSignature The extracted function selector
+    function bytesToBytes4(
+        bytes memory toSlice
+    ) public pure virtual returns (bytes4 functionSignature);
+
+    /// Credit ethereum stackexchange https://ethereum.stackexchange.com/a/58341
+    function toString(bytes memory data) public pure returns (string memory) {
+        bytes memory alphabet = "0123456789abcdef";
+
+        bytes memory str = new bytes(2 + data.length * 2);
+        str[0] = "0";
+        str[1] = "x";
+        for (uint256 i = 0; i < data.length; i++) {
+            str[2 + i * 2] = alphabet[uint256(uint8(data[i] >> 4))];
+            str[3 + i * 2] = alphabet[uint256(uint8(data[i] & 0x0f))];
+        }
+        return string(str);
+    }
+}

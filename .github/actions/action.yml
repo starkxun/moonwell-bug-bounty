@@ -9,13 +9,29 @@ runs:
       with:
         submodules: recursive
 
+    - name: Cache Foundry toolchain
+      uses: actions/cache@v3
+      with:
+        path: ~/.foundry
+        key: ${{ runner.os }}-foundry-${{ hashFiles('**/foundry.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-foundry-
+
     - name: Install Foundry
       uses: foundry-rs/foundry-toolchain@v1
       with:
-        version: nightly
+        version: nightly-e52076714ace23c7a68e14f0048a40be3c6c8f0b
 
     - name: Clean Contracts
       run: forge clean
+      shell: bash
+
+    - name: Compile Proposals
+      run: forge compile --contracts proposals/
+      shell: bash
+
+    - name: Compile MultiRewarder
+      run: forge compile --contracts crv-rewards/
       shell: bash
 
     - name: Compile Contracts

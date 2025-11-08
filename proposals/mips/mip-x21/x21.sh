@@ -1,0 +1,12 @@
+#!/bin/bash
+export MIP_REWARDS_PATH=proposals/mips/mip-x21/x21.json
+echo "MIP_REWARDS_PATH=$MIP_REWARDS_PATH"
+
+export DESCRIPTION_PATH=proposals/mips/mip-x21/x21.md
+echo "DESCRIPTION_PATH=$DESCRIPTION_PATH"
+
+export PRIMARY_FORK_ID=0
+echo "PRIMARY_FORK_ID=$PRIMARY_FORK_ID"
+
+export FORCE_ADD_REWARD=true
+echo "FORCE_ADD_REWARD=$FORCE_ADD_REWARD"

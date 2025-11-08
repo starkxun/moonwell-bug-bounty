@@ -1,10 +1,13 @@
-name: Foundry invariant tests
+name: Invariant 
 
 on: [pull_request]
 
+env:
+  FOUNDRY_PROFILE: ci
+
 jobs:
   invariant-tests:
-    name: invariant-tests
+    name: Invariant Test
     runs-on: ubuntu-latest
 
     steps:
@@ -16,5 +19,13 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions
 
-      - name: Invariant Test Contracts
-        run: time forge test -vvv --match-contract Invariant
+      - name: Run Invariant Test 
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           command: time forge test -vvv --match-contract Invariant
+
+

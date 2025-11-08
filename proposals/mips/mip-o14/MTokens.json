@@ -1,0 +1,23 @@
+{
+    "10": [
+        {
+            "addressesString": "MOONWELL_USDT0",
+            "borrowCap": 900000e6,
+            "collateralFactor": 0.83e18,
+            "initialMintAmount": 1e6,
+            "jrm": {
+                "baseRatePerYear": 0,
+                "jumpMultiplierPerYear": 9e18,
+                "kink": 0.9e18,
+                "multiplierPerYear": 0.0515e18
+            },
+            "name": "Moonwell USDT0",
+            "priceFeedName": "CHAINLINK_USDT_USD",
+            "reserveFactor": 0.1e18,
+            "seizeShare": 0.03e18,
+            "supplyCap": 1000000e6,
+            "symbol": "mUSDT0",
+            "tokenAddressName": "USDT0"
+        }
+    ]
+}

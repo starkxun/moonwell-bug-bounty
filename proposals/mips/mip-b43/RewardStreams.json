@@ -1,0 +1,20 @@
+{
+    "8453": [
+        {
+            "borrowEmissionsPerSec": 1,
+            "emissionToken": "xWELL_PROXY",
+            "endTime": 1752278400,
+            "mToken": "MOONWELL_cbXRP",
+            "owner": "TEMPORAL_GOVERNOR",
+            "supplyEmissionPerSec": 0
+        },
+        {
+            "borrowEmissionsPerSec": 1,
+            "emissionToken": "USDC",
+            "endTime": 1752278400,
+            "mToken": "MOONWELL_cbXRP",
+            "owner": "TEMPORAL_GOVERNOR",
+            "supplyEmissionPerSec": 0
+        }
+    ]
+}

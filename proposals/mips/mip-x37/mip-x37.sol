@@ -21,7 +21,7 @@ import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
 // 1. deploy new non-upgradeable ChainlinkOEVWrapper contracts for core markets
 // 2. upgrade existing ChainlinkOEVMorphoWrapper proxy contracts for Morpho markets => test that storage can still be accessed
 // 3. call setFeed on the ChainlinkOracle for all core markets, to point to the new ChainlinkOEVWrapper contracts
-contract x37 is HybridProposal, ChainlinkOracleConfigs, Networks {
+contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
     string public constant override name = "MIP-X37";
 
     string public constant MORPHO_IMPLEMENTATION_NAME =
@@ -34,7 +34,7 @@ contract x37 is HybridProposal, ChainlinkOracleConfigs, Networks {
     /// @dev description setup
     constructor() {
         _setProposalDescription(
-            bytes(vm.readFile("./proposals/mips/mip-x37/MIP-X37.md"))
+            bytes(vm.readFile("./proposals/mips/mip-x37/x37.md"))
         );
     }
 

@@ -86,11 +86,13 @@ abstract contract ChainlinkOracleConfigs is Test {
                 "MOONWELL_MAMO"
             )
         );
+
+        /// NOTE: stkWELL does not have an equivalent MToken to add reserves to, so use TEMPORAL_GOVERNOR as the fee recipient
         _MorphoOracleConfigs[BASE_CHAIN_ID].push(
             MorphoOracleConfig(
                 "CHAINLINK_stkWELL_USD",
                 "CHAINLINK_WELL_USD",
-                "MOONWELL_WELL"
+                "TEMPORAL_GOVERNOR"
             )
         );
     }

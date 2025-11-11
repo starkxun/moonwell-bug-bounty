@@ -452,12 +452,27 @@ contract ChainlinkOEVMorphoWrapper is
             liquidatorFee
         );
 
-        // transfer the remainder to the protocol's core market for this collateral
-        EIP20Interface(marketParams.collateralToken).approve(
-            feeRecipient,
-            protocolFee
+        // transfer the remainder to the fee recipient
+        // if the fee recipient is an MToken, add as reserves
+        // otherwise, just transfer the tokens directly
+        EIP20Interface collateralToken = EIP20Interface(
+            marketParams.collateralToken
         );
-        MErc20(feeRecipient)._addReserves(protocolFee);
+
+        // Check if fee recipient is an MToken by checking if it has isMToken constant
+        try MErc20(feeRecipient).isMToken() returns (bool isMToken) {
+            if (isMToken) {
+                // It's an MToken, add as reserves
+                collateralToken.approve(feeRecipient, protocolFee);
+                MErc20(feeRecipient)._addReserves(protocolFee);
+            } else {
+                // Not an MToken, just transfer
+                collateralToken.transfer(feeRecipient, protocolFee);
+            }
+        } catch {
+            // If the call fails, it's not an MToken, just transfer
+            collateralToken.transfer(feeRecipient, protocolFee);
+        }
 
         emit PriceUpdatedEarlyAndLiquidated(
             borrower,

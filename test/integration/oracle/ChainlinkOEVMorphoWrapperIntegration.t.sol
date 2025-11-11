@@ -190,6 +190,8 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
     }
 
     function testUpdatePriceEarlyAndLiquidate_stkWELL() public {
+        // Note: stkWELL has no market, so fee recipient should be set to treasury
+        // The wrapper will automatically detect this and transfer instead of calling _addReserves
         _testLiquidation(
             addresses.getAddress("CHAINLINK_stkWELL_USD_ORACLE_PROXY"),
             addresses.getAddress("STK_GOVTOKEN_PROXY"),
@@ -206,8 +208,8 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
             addresses.getAddress("MAMO"),
             addresses.getAddress("MORPHO_CHAINLINK_MAMO_USD_ORACLE"),
             0.385e18,
-            50_000e18, // More MAMO tokens
-            500e18
+            250_000e18, // Scale up collateral (5x from 50k to match WELL's economic value)
+            2_500e18 // Scale up seized amount proportionally (MAMO is 4x WELL price, so 10k/4 = 2.5k)
         );
     }
 
@@ -266,13 +268,36 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
             )
         );
 
-        // Execute liquidation and validate
+        // Execute liquidation
+        _executeLiquidation(
+            wrapper,
+            params,
+            loanToken,
+            borrowAmount,
+            seized,
+            collToken
+        );
+    }
+
+    function _executeLiquidation(
+        ChainlinkOEVMorphoWrapper wrapper,
+        MarketParams memory params,
+        address loanToken,
+        uint256 borrowAmount,
+        uint256 seized,
+        address collToken
+    ) internal {
         deal(loanToken, LIQUIDATOR, borrowAmount);
         vm.startPrank(LIQUIDATOR);
         IERC20(loanToken).approve(address(wrapper), borrowAmount);
 
         uint256 liqLoanBefore = IERC20(loanToken).balanceOf(LIQUIDATOR);
         uint256 liqCollBefore = IERC20(collToken).balanceOf(LIQUIDATOR);
+
+        // Capture fee recipient state before
+        address feeRecipient = wrapper.feeRecipient();
+        uint256 feeStateBefore = _getFeeRecipientState(feeRecipient, collToken);
+        bool isMToken = _isFeeRecipientMToken(feeRecipient);
 
         wrapper.updatePriceEarlyAndLiquidate(
             params,
@@ -282,6 +307,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
         );
         vm.stopPrank();
 
+        // Assertions
         assertEq(wrapper.cachedRoundId(), 777);
         assertGt(
             liqLoanBefore - IERC20(loanToken).balanceOf(LIQUIDATOR),
@@ -293,11 +319,37 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
             0,
             "no collateral received"
         );
+
+        // Verify protocol fee was collected
+        uint256 feeStateAfter = _getFeeRecipientState(feeRecipient, collToken);
         assertGt(
-            IERC20(collToken).balanceOf(wrapper.feeRecipient()),
-            0,
-            "no fee collected"
+            feeStateAfter,
+            feeStateBefore,
+            isMToken
+                ? "no fee collected (reserves)"
+                : "no fee collected (balance)"
         );
+    }
+
+    function _isFeeRecipientMToken(
+        address feeRecipient
+    ) internal view returns (bool) {
+        try MErc20(feeRecipient).isMToken() returns (bool _isMToken) {
+            return _isMToken;
+        } catch {
+            return false;
+        }
+    }
+
+    function _getFeeRecipientState(
+        address feeRecipient,
+        address collToken
+    ) internal view returns (uint256) {
+        if (_isFeeRecipientMToken(feeRecipient)) {
+            return MErc20(feeRecipient).totalReserves();
+        } else {
+            return IERC20(collToken).balanceOf(feeRecipient);
+        }
     }
 
     function testUpdatePriceEarlyAndLiquidate_RevertArgsZero() public {

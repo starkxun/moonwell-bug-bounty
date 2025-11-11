@@ -1,1 +1,2 @@
-- Always set the id in @proposals/mips/mips.json to 0 when creating new proposals
+- Always set the id in @proposals/mips/mips.json to 0 when creating new
+  proposals

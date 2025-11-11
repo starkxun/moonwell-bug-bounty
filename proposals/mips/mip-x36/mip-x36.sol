@@ -42,7 +42,7 @@ contract mipx36 is HybridProposal {
         _setProposalDescription(proposalDescription);
     }
 
-     function run() public override {
+    function run() public override {
         primaryForkId().createForksAndSelect();
 
         Addresses addresses = new Addresses();
@@ -72,7 +72,6 @@ contract mipx36 is HybridProposal {
         }
     }
 
-
     function primaryForkId() public pure override returns (uint256) {
         return BASE_FORK_ID;
     }
@@ -81,45 +80,61 @@ contract mipx36 is HybridProposal {
         // Deploy new ChainlinkCompositeOracle for Base wrsETH
         vm.selectFork(BASE_FORK_ID);
 
-        if(!addresses.isAddressSet("CHAINLINK_wrsETH_COMPOSITE_ORACLE")) {
-        vm.startBroadcast();
+        if (!addresses.isAddressSet("CHAINLINK_wrsETH_COMPOSITE_ORACLE")) {
+            vm.startBroadcast();
 
-        address baseEthUsdFeed = addresses.getAddress("CHAINLINK_ETH_USD");
-        address baseWrsethEthExchangeRateFeed = addresses.getAddress("CHAINLINK_wrsETH_ETH_EXCHANGE_RATE");
+            address baseEthUsdFeed = addresses.getAddress("CHAINLINK_ETH_USD");
+            address baseWrsethEthExchangeRateFeed = addresses.getAddress(
+                "CHAINLINK_wrsETH_ETH_EXCHANGE_RATE"
+            );
 
-        baseWrsethOracle = new ChainlinkCompositeOracle(
-            baseEthUsdFeed,
-            baseWrsethEthExchangeRateFeed,
-            address(0)
-        );
+            baseWrsethOracle = new ChainlinkCompositeOracle(
+                baseEthUsdFeed,
+                baseWrsethEthExchangeRateFeed,
+                address(0)
+            );
 
-        vm.stopBroadcast();
+            vm.stopBroadcast();
 
-        addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(baseWrsethOracle));
+            addresses.addAddress(
+                "CHAINLINK_wrsETH_COMPOSITE_ORACLE",
+                address(baseWrsethOracle)
+            );
         } else {
-            baseWrsethOracle = ChainlinkCompositeOracle(addresses.getAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE"));
+            baseWrsethOracle = ChainlinkCompositeOracle(
+                addresses.getAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE")
+            );
         }
 
         // Deploy new ChainlinkCompositeOracle for Optimism wrsETH
         vm.selectFork(OPTIMISM_FORK_ID);
 
-        if(!addresses.isAddressSet("CHAINLINK_wrsETH_COMPOSITE_ORACLE")) {
-        vm.startBroadcast();
+        if (!addresses.isAddressSet("CHAINLINK_wrsETH_COMPOSITE_ORACLE")) {
+            vm.startBroadcast();
 
-        address optimismEthUsdFeed = addresses.getAddress("CHAINLINK_ETH_USD");
-        address optimismWrsethEthExchangeRateFeed = addresses.getAddress("CHAINLINK_wrsETH_ETH_EXCHANGE_RATE");
+            address optimismEthUsdFeed = addresses.getAddress(
+                "CHAINLINK_ETH_USD"
+            );
+            address optimismWrsethEthExchangeRateFeed = addresses.getAddress(
+                "CHAINLINK_wrsETH_ETH_EXCHANGE_RATE"
+            );
 
-        optimismWrsethOracle = new ChainlinkCompositeOracle(
-            optimismEthUsdFeed,
-            optimismWrsethEthExchangeRateFeed,
-            address(0)
-        );
+            optimismWrsethOracle = new ChainlinkCompositeOracle(
+                optimismEthUsdFeed,
+                optimismWrsethEthExchangeRateFeed,
+                address(0)
+            );
 
-        vm.stopBroadcast();
+            vm.stopBroadcast();
 
-        addresses.addAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE", address(optimismWrsethOracle));
+            addresses.addAddress(
+                "CHAINLINK_wrsETH_COMPOSITE_ORACLE",
+                address(optimismWrsethOracle)
+            );
         } else {
-            optimismWrsethOracle = ChainlinkCompositeOracle(addresses.getAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE"));
+            optimismWrsethOracle = ChainlinkCompositeOracle(
+                addresses.getAddress("CHAINLINK_wrsETH_COMPOSITE_ORACLE")
+            );
         }
     }
 
@@ -198,7 +213,9 @@ contract mipx36 is HybridProposal {
         );
 
         // Update oracle price feed on Optimism
-        address optimismChainlinkOracle = addresses.getAddress("CHAINLINK_ORACLE");
+        address optimismChainlinkOracle = addresses.getAddress(
+            "CHAINLINK_ORACLE"
+        );
         _pushAction(
             optimismChainlinkOracle,
             abi.encodeWithSignature(
@@ -213,10 +230,7 @@ contract mipx36 is HybridProposal {
 
     function teardown(Addresses addresses, address) public pure override {}
 
-    function _testMintPaused(
-        address mToken,
-        address underlying
-    ) internal {
+    function _testMintPaused(address mToken, address underlying) internal {
         MErc20Delegator mTokenDelegator = MErc20Delegator(payable(mToken));
 
         uint256 mintAmount = 1e18;
@@ -233,7 +247,9 @@ contract mipx36 is HybridProposal {
         // ============ VALIDATE BASE CHAIN ============
         vm.selectFork(BASE_FORK_ID);
 
-        Comptroller baseComptroller = Comptroller(addresses.getAddress("UNITROLLER"));
+        Comptroller baseComptroller = Comptroller(
+            addresses.getAddress("UNITROLLER")
+        );
         address baseWrsethMToken = addresses.getAddress("MOONWELL_wrsETH");
 
         // Validate minting is paused
@@ -265,15 +281,14 @@ contract mipx36 is HybridProposal {
 
         // Test that minting is actually paused
         address baseWrsethUnderlying = MErc20(baseWrsethMToken).underlying();
-        _testMintPaused(
-            baseWrsethMToken,
-            baseWrsethUnderlying
-        );
+        _testMintPaused(baseWrsethMToken, baseWrsethUnderlying);
 
         // ============ VALIDATE OPTIMISM CHAIN ============
         vm.selectFork(OPTIMISM_FORK_ID);
 
-        Comptroller optimismComptroller = Comptroller(addresses.getAddress("UNITROLLER"));
+        Comptroller optimismComptroller = Comptroller(
+            addresses.getAddress("UNITROLLER")
+        );
         address optimismWrsethMToken = addresses.getAddress("MOONWELL_wrsETH");
 
         // Validate minting is paused
@@ -292,7 +307,9 @@ contract mipx36 is HybridProposal {
         ChainlinkOracle optimismChainlinkOracle = ChainlinkOracle(
             addresses.getAddress("CHAINLINK_ORACLE")
         );
-        AggregatorV3Interface optimismFeed = optimismChainlinkOracle.getFeed("wrsETH");
+        AggregatorV3Interface optimismFeed = optimismChainlinkOracle.getFeed(
+            "wrsETH"
+        );
         assertEq(
             address(optimismFeed),
             address(optimismWrsethOracle),
@@ -301,13 +318,15 @@ contract mipx36 is HybridProposal {
 
         // Validate price can be fetched
         (, int256 optimismPrice, , , ) = optimismFeed.latestRoundData();
-        assertGt(uint256(optimismPrice), 0, "Optimism wrsETH price check failed");
+        assertGt(
+            uint256(optimismPrice),
+            0,
+            "Optimism wrsETH price check failed"
+        );
 
         // Test that minting is actually paused
-        address optimismWrsethUnderlying = MErc20(optimismWrsethMToken).underlying();
-        _testMintPaused(
-            optimismWrsethMToken,
-            optimismWrsethUnderlying
-        );
+        address optimismWrsethUnderlying = MErc20(optimismWrsethMToken)
+            .underlying();
+        _testMintPaused(optimismWrsethMToken, optimismWrsethUnderlying);
     }
 }

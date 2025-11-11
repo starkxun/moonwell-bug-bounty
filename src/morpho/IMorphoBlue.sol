@@ -43,4 +43,22 @@ interface IMorphoBlue {
         address onBehalf,
         address receiver
     ) external returns (uint256 assetsBorrowed, uint256 sharesBorrowed);
+
+    /// @notice Liquidates the given `borrower` position.
+    /// @dev Either `seizedAssets` or `repaidShares` should be zero.
+    /// @dev Liquidating a position with bad debt (ie. with collateral value < borrowed value) will socialize the bad debt.
+    /// @param marketParams The market to liquidate in.
+    /// @param borrower The address of the borrower to liquidate.
+    /// @param seizedAssets The amount of collateral to seize.
+    /// @param repaidShares The amount of shares to repay.
+    /// @param data Arbitrary data to pass to the liquidation callback. Pass empty if no callback needed.
+    /// @return seizedAssets The amount of collateral seized.
+    /// @return repaidAssets The amount of assets repaid.
+    function liquidate(
+        MarketParams memory marketParams,
+        address borrower,
+        uint256 seizedAssets,
+        uint256 repaidShares,
+        bytes memory data
+    ) external returns (uint256, uint256);
 }

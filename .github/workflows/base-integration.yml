@@ -1,4 +1,4 @@
-name: Base 
+name: Base
 
 on: [pull_request]
 
@@ -121,7 +121,7 @@ jobs:
            retry_wait_seconds: 60
            timeout_minutes: 20
            max_attempts: 3
-           command: time forge test --match-contract CypherIntegrationTest --fork-url base -vvv 
+           command: time forge test --match-contract CypherIntegrationTest --fork-url base -vvv
 
   bounded-chainlink-composite-oracle:
     name: Bounded Chainlink Composite Oracle Test
@@ -147,8 +147,8 @@ jobs:
            max_attempts: 3
            command: time forge test --mc "ChainlinkBoundedCompositeOracleIntegrationTest" -vvv --ffi
 
-  chainlink-oracle-proxy:
-    name: Chainlink Oracle Proxy Test
+  chainlink-oev-wrapper:
+    name: Chainlink OEV Wrapper Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -169,5 +169,28 @@ jobs:
            retry_wait_seconds: 60
            timeout_minutes: 20
            max_attempts: 3
-           command: time forge test --mc "ChainlinkOracleProxyIntegrationTest" -vvv --ffi
+           command: time forge test --mc "ChainlinkOEVWrapperIntegration" -vvv --ffi
 
+  chainlink-oev-morpho-wrapper:
+    name: Chainlink OEV Morpho Wrapper Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Setup Environment
+        uses: ./.github/actions
+
+      - name: Setup MIPs Permissions
+        uses: ./.github/actions/setup-mips-permissions
+
+      - name: Run Integration Tests
+        uses: nick-fields/retry@v3
+        with:
+           polling_interval_seconds: 30
+           retry_wait_seconds: 60
+           timeout_minutes: 20
+           max_attempts: 3
+           command: time forge test --mc "ChainlinkOEVMorphoWrapperIntegration" -vvv --ffi

@@ -72,10 +72,12 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         // Validate Optimism
         vm.selectFork(OPTIMISM_FORK_ID);
         _validateFeedsPointToWrappers(addresses, OPTIMISM_CHAIN_ID);
+        _validateCoreWrappersConstructor(addresses, OPTIMISM_CHAIN_ID);
 
         // Validate Base
         vm.selectFork(BASE_FORK_ID);
         _validateFeedsPointToWrappers(addresses, BASE_CHAIN_ID);
+        _validateCoreWrappersConstructor(addresses, BASE_CHAIN_ID);
         _validateMorphoWrappersImplementations(addresses, BASE_CHAIN_ID);
         _validateMorphoWrappersState(addresses, BASE_CHAIN_ID);
     }
@@ -251,7 +253,6 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         vm.stopBroadcast();
     }
 
-    // FIX: test the contructor setting
     function _validateFeedsPointToWrappers(
         Addresses addresses,
         uint256 chainId
@@ -273,6 +274,95 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 configured,
                 expected,
                 string.concat("Feed not set to wrapper for ", symbol)
+            );
+        }
+    }
+
+    function _validateCoreWrappersConstructor(
+        Addresses addresses,
+        uint256 chainId
+    ) internal view {
+        OracleConfig[] memory oracleConfigs = getOracleConfigurations(chainId);
+        address expectedOwner = addresses.getAddress("TEMPORAL_GOVERNOR");
+        address expectedChainlinkOracle = addresses.getAddress(
+            "CHAINLINK_ORACLE"
+        );
+
+        for (uint256 i = 0; i < oracleConfigs.length; i++) {
+            OracleConfig memory config = oracleConfigs[i];
+            string memory wrapperName = string(
+                abi.encodePacked(config.oracleName, "_OEV_WRAPPER")
+            );
+
+            ChainlinkOEVWrapper wrapper = ChainlinkOEVWrapper(
+                payable(addresses.getAddress(wrapperName))
+            );
+
+            // Validate priceFeed
+            assertEq(
+                address(wrapper.priceFeed()),
+                addresses.getAddress(config.oracleName),
+                string.concat(
+                    "Core wrapper priceFeed mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate feeMultiplier
+            assertEq(
+                wrapper.feeMultiplier(),
+                FEE_MULTIPLIER,
+                string.concat(
+                    "Core wrapper feeMultiplier mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate cachedRoundId (should be > 0 as it's set to priceFeed.latestRound())
+            assertGt(
+                wrapper.cachedRoundId(),
+                0,
+                string.concat(
+                    "Core wrapper cachedRoundId should be > 0 for ",
+                    wrapperName
+                )
+            );
+
+            // Validate maxRoundDelay
+            assertEq(
+                wrapper.maxRoundDelay(),
+                MAX_ROUND_DELAY,
+                string.concat(
+                    "Core wrapper maxRoundDelay mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate maxDecrements
+            assertEq(
+                wrapper.maxDecrements(),
+                MAX_DECREMENTS,
+                string.concat(
+                    "Core wrapper maxDecrements mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate chainlinkOracle
+            assertEq(
+                address(wrapper.chainlinkOracle()),
+                expectedChainlinkOracle,
+                string.concat(
+                    "Core wrapper chainlinkOracle mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate owner
+            assertEq(
+                wrapper.owner(),
+                expectedOwner,
+                string.concat("Core wrapper owner mismatch for ", wrapperName)
             );
         }
     }
@@ -309,6 +399,11 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         if (morphoConfigs.length == 0) return;
 
         address morphoBlue = addresses.getAddress("MORPHO_BLUE");
+        address expectedOwner = addresses.getAddress("TEMPORAL_GOVERNOR");
+        address expectedChainlinkOracle = addresses.getAddress(
+            "CHAINLINK_ORACLE"
+        );
+
         for (uint256 i = 0; i < morphoConfigs.length; i++) {
             string memory wrapperName = string(
                 abi.encodePacked(morphoConfigs[i].proxyName, "_ORACLE_PROXY")
@@ -317,7 +412,7 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 addresses.getAddress(wrapperName)
             );
 
-            // priceFeed and morphoBlue wiring preserved
+            // Validate priceFeed
             assertEq(
                 address(wrapper.priceFeed()),
                 addresses.getAddress(morphoConfigs[i].priceFeedName),
@@ -326,6 +421,8 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                     wrapperName
                 )
             );
+
+            // Validate morphoBlue
             assertEq(
                 address(wrapper.morphoBlue()),
                 morphoBlue,
@@ -335,16 +432,74 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 )
             );
 
+            // Validate chainlinkOracle
             assertEq(
-                wrapper.feeMultiplier(),
-                FEE_MULTIPLIER,
+                address(wrapper.chainlinkOracle()),
+                expectedChainlinkOracle,
                 string.concat(
-                    "Morpho wrapper not using expected fee multiplier for ",
+                    "Morpho wrapper chainlinkOracle mismatch for ",
                     wrapperName
                 )
             );
 
-            // interface/decimals behavior intact
+            // Validate feeRecipient
+            assertEq(
+                wrapper.feeRecipient(),
+                addresses.getAddress(morphoConfigs[i].coreMarketAsFeeRecipient),
+                string.concat(
+                    "Morpho wrapper feeRecipient mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate feeMultiplier
+            assertEq(
+                wrapper.feeMultiplier(),
+                FEE_MULTIPLIER,
+                string.concat(
+                    "Morpho wrapper feeMultiplier mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate cachedRoundId (should be > 0 as it's set to priceFeed.latestRound())
+            assertGt(
+                wrapper.cachedRoundId(),
+                0,
+                string.concat(
+                    "Morpho wrapper cachedRoundId should be > 0 for ",
+                    wrapperName
+                )
+            );
+
+            // Validate maxRoundDelay
+            assertEq(
+                wrapper.maxRoundDelay(),
+                MAX_ROUND_DELAY,
+                string.concat(
+                    "Morpho wrapper maxRoundDelay mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate maxDecrements
+            assertEq(
+                wrapper.maxDecrements(),
+                MAX_DECREMENTS,
+                string.concat(
+                    "Morpho wrapper maxDecrements mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate owner
+            assertEq(
+                wrapper.owner(),
+                expectedOwner,
+                string.concat("Morpho wrapper owner mismatch for ", wrapperName)
+            );
+
+            // Validate decimals behavior
             uint8 d = wrapper.decimals();
             assertEq(
                 d,
@@ -357,7 +512,7 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 )
             );
 
-            // this should be the same as the priceFeed.latestRound()
+            // Validate latestRoundData behavior
             (uint80 roundId, int256 answer, , uint256 updatedAt, ) = wrapper
                 .latestRoundData();
             assertGt(

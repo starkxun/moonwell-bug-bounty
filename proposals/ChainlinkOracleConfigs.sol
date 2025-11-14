@@ -44,6 +44,12 @@ abstract contract ChainlinkOracleConfigs is Test {
         _oracleConfigs[BASE_CHAIN_ID].push(
             OracleConfig("CHAINLINK_VIRTUAL_USD", "VIRTUAL")
         );
+        _oracleConfigs[BASE_CHAIN_ID].push(
+            OracleConfig("CHAINLINK_AERO_ORACLE", "AERO")
+        );
+        _oracleConfigs[BASE_CHAIN_ID].push(
+            OracleConfig("cbETHETH_ORACLE", "cbETH")
+        );
 
         /// Initialize oracle configurations for Optimism
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(

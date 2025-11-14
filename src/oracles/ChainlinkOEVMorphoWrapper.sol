@@ -23,6 +23,9 @@ contract ChainlinkOEVMorphoWrapper is
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
 
+    /// @notice Price mantissa decimals (used by ChainlinkOracle)
+    uint8 private constant PRICE_MANTISSA_DECIMALS = 18;
+
     /// @notice The ChainlinkOracle contract
     IChainlinkOracle public chainlinkOracle;
 
@@ -556,32 +559,34 @@ contract ChainlinkOEVMorphoWrapper is
         uint256 collateralReceived,
         MarketParams memory marketParams
     ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
-        // Get the loan token price from ChainlinkOracle
         uint256 loanTokenPrice = _getLoanTokenPrice(
             EIP20Interface(marketParams.loanToken)
         );
-
-        // Get the fully adjusted collateral token price
         uint256 collateralTokenPrice = _getCollateralTokenPrice(
             collateralAnswer,
             EIP20Interface(marketParams.collateralToken)
         );
 
-        // Calculate USD value of the repay amount
-        uint256 repayValueUSD = (repayAmount * loanTokenPrice);
-        uint256 collateralValueUSD = (collateralReceived *
-            collateralTokenPrice);
+        uint256 usdNormalizer = 10 ** PRICE_MANTISSA_DECIMALS; // 1e18
+        uint256 repayUSD = (repayAmount * loanTokenPrice) / usdNormalizer;
+        uint256 collateralUSD = (collateralReceived * collateralTokenPrice) /
+            usdNormalizer;
 
-        // Liquidator receives: collateral worth repay amount + bonus (remainder * feeMultiplier)
-        uint256 liquidatorPaymentUSD = repayValueUSD +
-            ((collateralValueUSD - repayValueUSD) * uint256(feeMultiplier)) /
+        // If collateral is worth less than repayment, liquidator gets all collateral
+        if (collateralUSD <= repayUSD) {
+            liquidatorFee = collateralReceived;
+            protocolFee = 0;
+            return (liquidatorFee, protocolFee);
+        }
+
+        // Liquidator gets the repayment amount + bonus (remainder * feeMultiplier)
+        uint256 liquidatorUSD = repayUSD +
+            ((collateralUSD - repayUSD) * uint256(feeMultiplier)) /
             MAX_BPS;
 
-        // Convert USD value back to collateral token amount
-        // Both prices from oracle are already scaled for token decimals, so simple division works
-        liquidatorFee = liquidatorPaymentUSD / collateralTokenPrice;
+        // Convert back to collateral token amount
+        liquidatorFee = (liquidatorUSD * usdNormalizer) / collateralTokenPrice;
 
-        // Protocol gets the remainder
         protocolFee = collateralReceived - liquidatorFee;
     }
 }

@@ -14,22 +14,25 @@ import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {ChainlinkOracleConfigs} from "@proposals/ChainlinkOracleConfigs.sol";
+import {LiquidationData, Liquidations, LiquidationState} from "@test/utils/Liquidations.sol";
+import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 
 contract ChainlinkOEVWrapperIntegrationTest is
     PostProposalCheck,
-    ChainlinkOracleConfigs
+    ChainlinkOracleConfigs,
+    Liquidations
 {
     event FeeMultiplierChanged(
         uint16 oldFeeMultiplier,
         uint16 newFeeMultiplier
     );
     event PriceUpdatedEarlyAndLiquidated(
-        address indexed sender,
         address indexed borrower,
         uint256 repayAmount,
         address mTokenCollateral,
         address mTokenLoan,
-        uint256 fee
+        uint256 protocolFee,
+        uint256 liquidatorFee
     );
 
     // Array of wrappers to test, resolved from oracle configs
@@ -59,13 +62,18 @@ contract ChainlinkOEVWrapperIntegrationTest is
                 abi.encodePacked(oracleConfigs[i].oracleName, "_OEV_WRAPPER")
             );
             if (addresses.isAddressSet(wrapperName)) {
-                wrappers.push(
-                    ChainlinkOEVWrapper(
-                        payable(addresses.getAddress(wrapperName))
-                    )
+                ChainlinkOEVWrapper wrapper = ChainlinkOEVWrapper(
+                    payable(addresses.getAddress(wrapperName))
                 );
+                wrappers.push(wrapper);
+
+                // Make wrapper persistent so it survives fork rolls
+                vm.makePersistent(address(wrapper));
             }
         }
+
+        ChainlinkOracle oracle = ChainlinkOracle(address(comptroller.oracle()));
+        vm.makePersistent(address(oracle));
     }
 
     function _perWrapperActor(
@@ -596,10 +604,10 @@ contract ChainlinkOEVWrapperIntegrationTest is
                     (10_000 * 10 ** decimals * 1e8) /
                     uint256(currentPrice);
 
-                // Borrow at 80% of the collateral factor (safe margin)
+                // Borrow at 70% of the collateral factor (safe margin)
                 // maxBorrow = $10k * CF, actualBorrow = maxBorrow * 0.8
                 borrowAmount =
-                    ((10_000 * collateralFactorBps * 80) / (10000 * 100)) *
+                    ((10_000 * collateralFactorBps * 70) / (10000 * 100)) *
                     1e6; // Result in USDC (6 decimals)
             }
 
@@ -1193,6 +1201,14 @@ contract ChainlinkOEVWrapperIntegrationTest is
         }
     }
 
+    /// @notice Simulate some real liquidations from 10/10
+    function testRealLiquidations() public {
+        LiquidationData[] memory liquidations = getLiquidations();
+        for (uint256 i = 0; i < liquidations.length; i++) {
+            _testRealLiquidation(liquidations[i]);
+        }
+    }
+
     function _mockValidRound(
         ChainlinkOEVWrapper wrapper,
         uint80 roundId_,
@@ -1205,5 +1221,412 @@ contract ChainlinkOEVWrapperIntegrationTest is
             ),
             abi.encode(roundId_, price_, uint256(0), block.timestamp, roundId_)
         );
+    }
+
+    /// @notice Test liquidation using real liquidation data
+    function _testRealLiquidation(LiquidationData memory liquidation) internal {
+        (
+            address mTokenCollateralAddr,
+            address mTokenBorrowAddr,
+            ChainlinkOEVWrapper wrapper
+        ) = _setupLiquidation(liquidation);
+
+        bool shouldContinue = _prepareLiquidation(
+            liquidation,
+            mTokenCollateralAddr,
+            mTokenBorrowAddr,
+            wrapper
+        );
+        if (!shouldContinue) {
+            return; // Position doesn't exist, skip
+        }
+
+        LiquidationState memory state = _executeLiquidation(
+            liquidation,
+            wrapper,
+            mTokenCollateralAddr,
+            mTokenBorrowAddr
+        );
+
+        _verifyLiquidationResults(
+            liquidation,
+            state,
+            mTokenCollateralAddr,
+            mTokenBorrowAddr
+        );
+    }
+
+    /// @notice Setup liquidation by getting addresses and finding wrapper
+    function _setupLiquidation(
+        LiquidationData memory liquidation
+    )
+        internal
+        view
+        returns (
+            address mTokenCollateralAddr,
+            address mTokenBorrowAddr,
+            ChainlinkOEVWrapper wrapper
+        )
+    {
+        string memory mTokenCollateralKey = string(
+            abi.encodePacked("MOONWELL_", liquidation.collateralToken)
+        );
+        string memory mTokenBorrowKey = string(
+            abi.encodePacked("MOONWELL_", liquidation.borrowedToken)
+        );
+
+        require(
+            addresses.isAddressSet(mTokenCollateralKey),
+            "Collateral mToken not found"
+        );
+        require(
+            addresses.isAddressSet(mTokenBorrowKey),
+            "Borrow mToken not found"
+        );
+
+        mTokenCollateralAddr = addresses.getAddress(mTokenCollateralKey);
+        mTokenBorrowAddr = addresses.getAddress(mTokenBorrowKey);
+
+        bool found;
+        (wrapper, found) = _findWrapperForCollateral(
+            liquidation.collateralToken
+        );
+        require(found, "Wrapper not found for collateral token");
+    }
+
+    /// @notice Prepare liquidation by warping time and validating position
+    /// @return shouldContinue True if liquidation should proceed, false if position doesn't exist
+    function _prepareLiquidation(
+        LiquidationData memory liquidation,
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr,
+        ChainlinkOEVWrapper wrapper
+    ) internal returns (bool shouldContinue) {
+        vm.rollFork(liquidation.blockNumber - 1); // ensure onchain state
+        vm.warp(liquidation.timestamp - 1); // ensures mToken accrual timestamps
+
+        // NOTE: doing this caused some liquidations to fail, but then its needed to get past some "delta" errors on others
+        // uint256 targetTimestamp = liquidation.timestamp - 1;
+        // vm.store(mTokenBorrowAddr, bytes32(uint256(9)), bytes32(targetTimestamp));
+        // vm.store(mTokenCollateralAddr, bytes32(uint256(9)), bytes32(targetTimestamp));
+
+        address borrower = liquidation.borrower;
+        MToken mTokenBorrow = MToken(mTokenBorrowAddr);
+        MToken mTokenCollateral = MToken(mTokenCollateralAddr);
+
+        // NOTE: this seems to be needed to get past some "delta" errors
+        // Explicitly accrue interest at the current timestamp to ensure accrual timestamps are set correctly
+        mTokenBorrow.accrueInterest();
+        mTokenCollateral.accrueInterest();
+
+        uint256 borrowBalance = mTokenBorrow.borrowBalanceStored(borrower);
+        if (borrowBalance == 0) {
+            return false; // Position doesn't exist, skip
+        }
+
+        // Mock collateral price down to make position underwater
+        AggregatorV3Interface priceFeed = wrapper.priceFeed();
+        (uint80 feedRoundId, int256 price, , , ) = priceFeed.latestRoundData();
+        int256 crashedPrice = (price * 75) / 100; // 25% price drop
+        uint80 latestRoundId = feedRoundId;
+        vm.mockCall(
+            address(wrapper.priceFeed()),
+            abi.encodeWithSelector(
+                wrapper.priceFeed().latestRoundData.selector
+            ),
+            abi.encode(
+                latestRoundId,
+                crashedPrice,
+                uint256(0),
+                block.timestamp,
+                latestRoundId
+            )
+        );
+
+        // Mock getRoundData for previous rounds
+        _mockPreviousRounds(
+            wrapper,
+            latestRoundId,
+            crashedPrice,
+            block.timestamp
+        );
+
+        // Verify position is now underwater after price crash
+        (uint256 err, , uint256 shortfall) = comptroller.getAccountLiquidity(
+            borrower
+        );
+        require(err == 0 && shortfall > 0, "Position not underwater");
+        return true;
+    }
+
+    /// @notice Mock previous rounds for price feed to handle wrapper's round search logic
+    function _mockPreviousRounds(
+        ChainlinkOEVWrapper wrapper,
+        uint80 latestRoundId,
+        int256 crashedPrice,
+        uint256 timestamp
+    ) internal {
+        uint256 maxDecrements = wrapper.maxDecrements();
+        AggregatorV3Interface priceFeed = wrapper.priceFeed();
+
+        uint80 startRound = latestRoundId > maxDecrements
+            ? uint80(latestRoundId - maxDecrements)
+            : 1;
+
+        for (uint80 i = startRound; i < latestRoundId; i++) {
+            uint256 roundTimestamp = timestamp -
+                uint256(latestRoundId - i) *
+                12;
+            vm.mockCall(
+                address(priceFeed),
+                abi.encodeWithSelector(priceFeed.getRoundData.selector, i),
+                abi.encode(i, crashedPrice, uint256(0), roundTimestamp, i)
+            );
+        }
+    }
+
+    /// @notice Execute the liquidation
+    function _executeLiquidation(
+        LiquidationData memory liquidation,
+        ChainlinkOEVWrapper wrapper,
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr
+    ) internal returns (LiquidationState memory state) {
+        address borrower = liquidation.borrower;
+        address liquidator = liquidation.liquidator;
+        uint256 repayAmount = liquidation.repayAmount;
+
+        address borrowUnderlying = MErc20(mTokenBorrowAddr).underlying();
+        address collateralUnderlying = MErc20(mTokenCollateralAddr)
+            .underlying();
+
+        deal(borrowUnderlying, liquidator, repayAmount * 2);
+        vm.warp(liquidation.timestamp);
+
+        MToken mTokenBorrow = MToken(mTokenBorrowAddr);
+        MToken mTokenCollateral = MToken(mTokenCollateralAddr);
+
+        // Get balances before liquidation
+        state.borrowerBorrowBefore = mTokenBorrow.borrowBalanceStored(borrower);
+        state.borrowerCollateralBefore = mTokenCollateral.balanceOf(borrower);
+        state.reservesBefore = mTokenCollateral.totalReserves();
+        state.liquidatorCollateralBefore = IERC20(collateralUnderlying)
+            .balanceOf(liquidator);
+
+        // Execute liquidation
+        vm.startPrank(liquidator);
+        IERC20(borrowUnderlying).approve(address(wrapper), repayAmount);
+
+        vm.recordLogs();
+        wrapper.updatePriceEarlyAndLiquidate(
+            borrower,
+            repayAmount,
+            mTokenCollateralAddr,
+            mTokenBorrowAddr
+        );
+        vm.stopPrank();
+
+        (
+            state.protocolFee,
+            state.liquidatorFeeReceived
+        ) = _parseLiquidationEvent();
+
+        // Get balances after liquidation
+        state.borrowerBorrowAfter = mTokenBorrow.borrowBalanceStored(borrower);
+        state.borrowerCollateralAfter = mTokenCollateral.balanceOf(borrower);
+        state.reservesAfter = mTokenCollateral.totalReserves();
+        state.liquidatorCollateralAfter = IERC20(collateralUnderlying)
+            .balanceOf(liquidator);
+    }
+
+    /// @notice Parse liquidation event to extract fees
+    function _parseLiquidationEvent()
+        internal
+        returns (uint256 protocolFee, uint256 liquidatorFee)
+    {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 eventSig = keccak256(
+            "PriceUpdatedEarlyAndLiquidated(address,uint256,address,address,uint256,uint256)"
+        );
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSig) {
+                (, , , uint256 _protocolFee, uint256 _liquidatorFee) = abi
+                    .decode(
+                        logs[i].data,
+                        (uint256, address, address, uint256, uint256)
+                    );
+
+                protocolFee = _protocolFee;
+                liquidatorFee = _liquidatorFee;
+            }
+        }
+    }
+
+    /// @notice Struct to hold price and decimal info
+    struct PriceInfo {
+        uint256 collateralPriceUSD;
+        uint256 borrowPriceUSD;
+        uint8 collateralDecimals;
+        uint8 borrowDecimals;
+    }
+
+    /// @notice Verify liquidation results and log
+    function _verifyLiquidationResults(
+        LiquidationData memory liquidation,
+        LiquidationState memory state,
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr
+    ) internal view {
+        PriceInfo memory priceInfo = _getPriceInfo(
+            mTokenCollateralAddr,
+            mTokenBorrowAddr
+        );
+        USDValues memory usdValues = _calculateUSDValues(
+            liquidation,
+            state,
+            priceInfo
+        );
+
+        _logLiquidationResults(liquidation, state, usdValues);
+        _assertLiquidationResults(state);
+    }
+
+    /// @notice Get price and decimal information
+    function _getPriceInfo(
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr
+    ) internal view returns (PriceInfo memory) {
+        ChainlinkOracle chainlinkOracle = ChainlinkOracle(
+            address(comptroller.oracle())
+        );
+
+        uint256 collateralPriceUSD = chainlinkOracle.getUnderlyingPrice(
+            MToken(mTokenCollateralAddr)
+        );
+        uint256 borrowPriceUSD = chainlinkOracle.getUnderlyingPrice(
+            MToken(mTokenBorrowAddr)
+        );
+
+        address collateralUnderlying = MErc20(mTokenCollateralAddr)
+            .underlying();
+        address borrowUnderlying = MErc20(mTokenBorrowAddr).underlying();
+        uint8 collateralDecimals = IERC20(collateralUnderlying).decimals();
+        uint8 borrowDecimals = IERC20(borrowUnderlying).decimals();
+
+        return
+            PriceInfo({
+                collateralPriceUSD: collateralPriceUSD,
+                borrowPriceUSD: borrowPriceUSD,
+                collateralDecimals: collateralDecimals,
+                borrowDecimals: borrowDecimals
+            });
+    }
+
+    /// @notice Struct to hold USD values
+    struct USDValues {
+        uint256 protocolFeeUSD;
+        uint256 liquidatorFeeUSD;
+        uint256 repayAmountUSD;
+    }
+
+    /// @notice Calculate USD values from token amounts
+    /// @dev getUnderlyingPrice returns prices scaled by 1e18 and already adjusted for token decimals
+    /// So: USD = (amount * price) / 1e18
+    function _calculateUSDValues(
+        LiquidationData memory liquidation,
+        LiquidationState memory state,
+        PriceInfo memory priceInfo
+    ) internal pure returns (USDValues memory) {
+        uint256 repayAmount = liquidation.repayAmount;
+        uint256 protocolFeeUSD = (state.protocolFee *
+            priceInfo.collateralPriceUSD) / 1e18;
+        uint256 liquidatorFeeUSD = (state.liquidatorFeeReceived *
+            priceInfo.collateralPriceUSD) / 1e18;
+        uint256 repayAmountUSD = (repayAmount * priceInfo.borrowPriceUSD) /
+            1e18;
+
+        return
+            USDValues({
+                protocolFeeUSD: protocolFeeUSD,
+                liquidatorFeeUSD: liquidatorFeeUSD,
+                repayAmountUSD: repayAmountUSD
+            });
+    }
+
+    /// @notice Log liquidation results
+    function _logLiquidationResults(
+        LiquidationData memory liquidation,
+        LiquidationState memory state,
+        USDValues memory usdValues
+    ) internal pure {
+        console2.log("=== Liquidation Results ===");
+        console2.log("Borrower:", liquidation.borrower);
+        console2.log("Liquidator:", liquidation.liquidator);
+        console2.log("Collateral Token:", liquidation.collateralToken);
+        console2.log("Borrow Token:", liquidation.borrowedToken);
+        console2.log("Repay Amount:", liquidation.repayAmount);
+        console2.log("Repay Amount USD:", usdValues.repayAmountUSD);
+        console2.log("Protocol Fee:", state.protocolFee);
+        console2.log("Protocol Fee USD:", usdValues.protocolFeeUSD);
+        console2.log("Liquidator Fee:", state.liquidatorFeeReceived);
+        console2.log("Liquidator Fee USD:", usdValues.liquidatorFeeUSD);
+        console2.log("Borrower Borrow Before:", state.borrowerBorrowBefore);
+        console2.log("Borrower Borrow After:", state.borrowerBorrowAfter);
+        console2.log(
+            "Borrower Collateral Before:",
+            state.borrowerCollateralBefore
+        );
+        console2.log(
+            "Borrower Collateral After:",
+            state.borrowerCollateralAfter
+        );
+    }
+
+    /// @notice Assert liquidation results
+    function _assertLiquidationResults(
+        LiquidationState memory state
+    ) internal pure {
+        assertLt(
+            state.borrowerBorrowAfter,
+            state.borrowerBorrowBefore,
+            "Borrow not reduced"
+        );
+        assertLt(
+            state.borrowerCollateralAfter,
+            state.borrowerCollateralBefore,
+            "Collateral not seized"
+        );
+        assertGt(state.protocolFee, 0, "Protocol fee should be > 0");
+        assertGt(
+            state.liquidatorFeeReceived,
+            0,
+            "Liquidator fee should be > 0"
+        );
+        assertGt(
+            state.reservesAfter,
+            state.reservesBefore,
+            "Reserves should increase"
+        );
+    }
+
+    /// @notice Find the wrapper for a given collateral token symbol
+    function _findWrapperForCollateral(
+        string memory collateralSymbol
+    ) internal view returns (ChainlinkOEVWrapper wrapper, bool found) {
+        ChainlinkOracle chainlinkOracle = ChainlinkOracle(
+            address(comptroller.oracle())
+        );
+        for (uint256 i = 0; i < wrappers.length; i++) {
+            try chainlinkOracle.getFeed(collateralSymbol) returns (
+                AggregatorV3Interface feed
+            ) {
+                if (address(feed) == address(wrappers[i])) {
+                    return (wrappers[i], true);
+                }
+            } catch {
+                continue;
+            }
+        }
+        return (ChainlinkOEVWrapper(payable(address(0))), false);
     }
 }

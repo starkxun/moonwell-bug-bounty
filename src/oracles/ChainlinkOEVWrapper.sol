@@ -9,8 +9,6 @@ import {MToken} from "../MToken.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
 
-import {console} from "forge-std/console.sol";
-
 /**
  * @title ChainlinkOEVWrapper
  * @notice A wrapper for Chainlink price feeds that allows early updates for liquidation
@@ -19,6 +17,12 @@ import {console} from "forge-std/console.sol";
 contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
+
+    /// @notice Chainlink feed decimals (USD feeds use 8 decimals)
+    uint8 private constant CHAINLINK_FEED_DECIMALS = 8;
+
+    /// @notice Price mantissa decimals (used by ChainlinkOracle)
+    uint8 private constant PRICE_MANTISSA_DECIMALS = 18;
 
     /// @notice The ChainlinkOracle contract
     IChainlinkOracle public immutable chainlinkOracle;
@@ -368,7 +372,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         }
 
         // execute liquidation and redeem collateral
-        uint256 collateralReceived = _executeLiquidationAndRedeem(
+        uint256 collateralSeized = _executeLiquidationAndRedeem(
             borrower,
             repayAmount,
             mTokenCollateral,
@@ -377,8 +381,6 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             underlyingCollateral
         );
 
-        console.log("collateralReceived", collateralReceived);
-
         // Calculate the split of collateral between liquidator and protocol
         (
             uint256 liquidatorFee,
@@ -386,7 +388,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         ) = _calculateCollateralSplit(
                 repayAmount,
                 collateralAnswer,
-                collateralReceived,
+                collateralSeized,
                 mTokenLoan,
                 underlyingCollateral
             );
@@ -441,7 +443,6 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
                 (10 ** decimalDelta);
         }
 
-        // Adjust for token decimals (same logic as ChainlinkOracle)
         uint256 collateralDecimalDelta = uint256(18) -
             uint256(underlyingCollateral.decimals());
         if (collateralDecimalDelta > 0) {
@@ -457,7 +458,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     /// @param mTokenLoan The mToken market for the loan token
     /// @param underlyingLoan The underlying loan token interface
     /// @param underlyingCollateral The underlying collateral token interface
-    /// @return collateralReceived The amount of underlying collateral received
+    /// @return collateralSeized The amount of underlying collateral received
     function _executeLiquidationAndRedeem(
         address borrower,
         uint256 repayAmount,
@@ -465,16 +466,14 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         address mTokenLoan,
         EIP20Interface underlyingLoan,
         EIP20Interface underlyingCollateral
-    ) internal returns (uint256 collateralReceived) {
+    ) internal returns (uint256 collateralSeized) {
         uint256 collateralBefore = underlyingCollateral.balanceOf(
             address(this)
         );
         uint256 nativeBalanceBefore = address(this).balance;
 
-        // approve the mToken loan market to spend the loan tokens for liquidation
         underlyingLoan.approve(mTokenLoan, repayAmount);
 
-        // liquidate the borrower's position: repay their loan and seize their collateral
         uint256 mTokenCollateralBalanceBefore = MTokenInterface(
             mTokenCollateral
         ).balanceOf(address(this));
@@ -487,7 +486,6 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             "ChainlinkOEVWrapper: liquidation failed"
         );
 
-        // get the amount of mToken collateral received from liquidation
         uint256 mTokenBalanceDelta = MTokenInterface(mTokenCollateral)
             .balanceOf(address(this)) - mTokenCollateralBalanceBefore;
 
@@ -507,20 +505,14 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             require(success, "ChainlinkOEVWrapper: WETH deposit failed");
         }
 
-        console.log(
-            "underlyingCollateral.balanceOf(address(this))",
-            underlyingCollateral.balanceOf(address(this))
-        );
-        console.log("collateralBefore", collateralBefore);
-
-        collateralReceived =
+        collateralSeized =
             underlyingCollateral.balanceOf(address(this)) -
             collateralBefore;
     }
 
     /// @notice Calculate the split of seized collateral between liquidator and fee recipient
     /// @param repayAmount The amount of loan tokens being repaid
-    /// @param collateralReceived The amount of collateral tokens seized
+    /// @param collateralSeized The amount of collateral tokens seized
     /// @param mTokenLoan The mToken for the loan being repaid
     /// @param underlyingCollateral The underlying collateral token interface
     /// @return liquidatorFee The amount of collateral to send to the liquidator (repayment + bonus)
@@ -528,35 +520,38 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     function _calculateCollateralSplit(
         uint256 repayAmount,
         int256 collateralAnswer,
-        uint256 collateralReceived,
+        uint256 collateralSeized,
         address mTokenLoan,
         EIP20Interface underlyingCollateral
     ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
-        uint256 loanTokenPrice = chainlinkOracle.getUnderlyingPrice(
+        uint256 loanPrice = chainlinkOracle.getUnderlyingPrice(
             MToken(mTokenLoan)
         );
-
-        // Get the fully adjusted collateral token price
-        uint256 collateralTokenPrice = _getCollateralTokenPrice(
+        uint256 collateralPrice = _getCollateralTokenPrice(
             collateralAnswer,
             underlyingCollateral
         );
 
-        // Calculate USD value of the repay amount
-        uint256 repayValueUSD = (repayAmount * loanTokenPrice);
-        uint256 collateralValueUSD = (collateralReceived *
-            collateralTokenPrice);
+        uint256 usdNormalizer = 10 ** PRICE_MANTISSA_DECIMALS; // 1e18
+        uint256 repayUSD = (repayAmount * loanPrice) / usdNormalizer;
+        uint256 collateralUSD = (collateralSeized * collateralPrice) /
+            usdNormalizer;
 
-        // Liquidator receives: collateral worth repay amount + bonus (remainder * feeMultiplier)
-        uint256 liquidatorPaymentUSD = repayValueUSD +
-            ((collateralValueUSD - repayValueUSD) * uint256(feeMultiplier)) /
+        // If collateral is worth less than repayment, liquidator gets all collateral
+        if (collateralUSD <= repayUSD) {
+            liquidatorFee = collateralSeized;
+            protocolFee = 0;
+            return (liquidatorFee, protocolFee);
+        }
+
+        // Liquidator gets the repayment amount + bonus (remainder * feeMultiplier)
+        uint256 liquidatorUSD = repayUSD +
+            ((collateralUSD - repayUSD) * uint256(feeMultiplier)) /
             MAX_BPS;
 
-        // Convert USD value back to collateral token amount
-        // Both prices from oracle are already scaled for token decimals, so simple division works
-        liquidatorFee = liquidatorPaymentUSD / collateralTokenPrice;
+        // Convert back to collateral token amount
+        liquidatorFee = (liquidatorUSD * usdNormalizer) / collateralPrice;
 
-        // Protocol gets the remainder
-        protocolFee = collateralReceived - liquidatorFee;
+        protocolFee = collateralSeized - liquidatorFee;
     }
 }

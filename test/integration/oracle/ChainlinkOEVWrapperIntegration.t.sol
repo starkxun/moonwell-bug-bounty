@@ -1238,6 +1238,12 @@ contract ChainlinkOEVWrapperIntegrationTest is
     /// @notice Simulate some real liquidations from 10/10
     function testRealLiquidations() public {
         LiquidationData[] memory liquidations = getLiquidations();
+
+        // Skip test if no liquidation data for this chain
+        if (liquidations.length == 0) {
+            return;
+        }
+
         for (uint256 i = 0; i < liquidations.length; i++) {
             _testRealLiquidation(liquidations[i]);
         }

@@ -1092,6 +1092,24 @@ contract ChainlinkOEVWrapperIntegrationTest is
         address borrower = _borrower(wrapper);
         uint256 borrowAmount;
 
+        // 0) Mock ETH price to fixed $3,000 for deterministic test
+        {
+            int256 fixedEthPrice = 3_000 * 1e8; // $3,000 in Chainlink format (1e8)
+            vm.mockCall(
+                address(wrapper.priceFeed()),
+                abi.encodeWithSelector(
+                    wrapper.priceFeed().latestRoundData.selector
+                ),
+                abi.encode(
+                    uint80(100),
+                    fixedEthPrice,
+                    uint256(0),
+                    block.timestamp,
+                    uint80(100)
+                )
+            );
+        }
+
         // 1) Deposit WETH as collateral
         {
             uint256 accrualTsPre = mTokenCollateral.accrualBlockTimestamp();
@@ -1121,7 +1139,10 @@ contract ChainlinkOEVWrapperIntegrationTest is
                 vm.warp(accrualTsPre + 1);
             }
 
-            borrowAmount = 2_600 * 1e6; // 2,600 USDC
+            // With mocked ETH price at $3,000:
+            // 1 WETH = $3,000, with 81% CF = $2,430 max borrow
+            // Borrow $1,800 (74% of max) - safe margin
+            borrowAmount = 1_800 * 1e6; // 1,800 USDC
 
             uint256 currentBorrowCap = comptroller.borrowCaps(
                 address(mTokenBorrow)
@@ -1149,9 +1170,12 @@ contract ChainlinkOEVWrapperIntegrationTest is
             );
         }
 
-        // 3) Force position underwater by crashing ETH price to $2,000
+        // 3) Force position underwater by crashing ETH price to $1,800
         {
-            int256 crashedPrice = 2_000 * 1e8;
+            // Crash ETH from $3,000 to $1,800 (40% drop)
+            // After crash: 1 WETH = $1,800, with 81% CF = $1,458 max borrow
+            // But we borrowed $1,800, so position is underwater
+            int256 crashedPrice = 1_800 * 1e8;
 
             vm.mockCall(
                 address(wrapper.priceFeed()),

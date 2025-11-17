@@ -560,6 +560,16 @@ contract ChainlinkOEVWrapperIntegrationTest is
         for (uint256 i = 0; i < wrappers.length; i++) {
             ChainlinkOEVWrapper wrapper = wrappers[i];
 
+            if (
+                keccak256(abi.encodePacked(oracleConfigs[i].symbol)) ==
+                keccak256(abi.encodePacked("cbETH"))
+            ) {
+                console2.log(
+                    "Skipping cbETH wrapper due to borrow liquidity issues"
+                );
+                continue;
+            }
+
             // Get the collateral mToken
             string memory mTokenKey = string(
                 abi.encodePacked("MOONWELL_", oracleConfigs[i].symbol)

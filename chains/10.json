@@ -719,7 +719,7 @@
         "isContract": true,
         "name": "CHAINLINK_wrsETH_ETH_EXCHANGE_RATE"
     },
-      {
+    {
         "addr": "0x5fddda4866db63685018faa1bfc9bfce7072014c",
         "isContract": true,
         "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE"

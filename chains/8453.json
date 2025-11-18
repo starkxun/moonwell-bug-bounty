@@ -1242,6 +1242,6 @@
     {
         "addr": "0x9917Ea34179D87F06C8b9D4AfB8BD78248B434ef",
         "isContract": false,
-        "name": "ANA_EOA"
+        "name": "BAD_DEBT_REPAYER_EOA"
     }
 ]

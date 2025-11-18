@@ -11,13 +11,12 @@ import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
-/// @title MIP-X37: Reserve Reduction for Token Swap
-/// @author Moonwell Contributors
-/// @notice Proposal to reduce reserves from three Base markets and transfer to EOA for swapping:
+/// @title MIP-X37: Reserve Reduction for repaying bad debt
+/// @notice Proposal to reduce reserves from three Base markets and transfer to EOA for repaying bad debt:
 ///         1. Reduce 347 WETH from MOONWELL_WETH market
 ///         2. Reduce 490,000 USDC from MOONWELL_USDC market
 ///         3. Reduce 3 cbBTC from MOONWELL_cbBTC market
-///         4. Transfer all tokens to ANA_EOA for swapping to VIRTUALS and cbXRP
+///         4. Transfer all tokens to BAD_DEBT_REPAYER_EOA for swapping to VIRTUALS and cbXRP
 contract mipx37 is HybridProposal {
     using ProposalActions for *;
 
@@ -44,7 +43,7 @@ contract mipx37 is HybridProposal {
     function build(Addresses addresses) public override {
         vm.selectFork(BASE_FORK_ID);
 
-        address anaEoa = addresses.getAddress("ANA_EOA");
+        address anaEoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
 
         // === WETH Reserve Reduction ===
         address moonwellWeth = addresses.getAddress("MOONWELL_WETH");
@@ -64,7 +63,7 @@ contract mipx37 is HybridProposal {
                 anaEoa,
                 WETH_AMOUNT
             ),
-            "Transfer 347 WETH to ANA_EOA",
+            "Transfer 347 WETH to BAD_DEBT_REPAYER_EOA",
             ActionType.Base
         );
 
@@ -86,7 +85,7 @@ contract mipx37 is HybridProposal {
                 anaEoa,
                 USDC_AMOUNT
             ),
-            "Transfer 490,000 USDC to ANA_EOA",
+            "Transfer 490,000 USDC to BAD_DEBT_REPAYER_EOA",
             ActionType.Base
         );
 
@@ -108,7 +107,7 @@ contract mipx37 is HybridProposal {
                 anaEoa,
                 cbBTC_AMOUNT
             ),
-            "Transfer 3 cbBTC to ANA_EOA",
+            "Transfer 3 cbBTC to BAD_DEBT_REPAYER_EOA",
             ActionType.Base
         );
     }
@@ -118,19 +117,27 @@ contract mipx37 is HybridProposal {
     function validate(Addresses addresses, address) public override {
         vm.selectFork(BASE_FORK_ID);
 
-        address anaEoa = addresses.getAddress("ANA_EOA");
+        address anaEoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
 
         // Validate WETH transfer
         address weth = MErc20(addresses.getAddress("MOONWELL_WETH"))
             .underlying();
         uint256 wethBalance = IERC20(weth).balanceOf(anaEoa);
-        assertGe(wethBalance, WETH_AMOUNT, "ANA_EOA should have received WETH");
+        assertGe(
+            wethBalance,
+            WETH_AMOUNT,
+            "BAD_DEBT_REPAYER_EOA should have received WETH"
+        );
 
         // Validate USDC transfer
         address usdc = MErc20(addresses.getAddress("MOONWELL_USDC"))
             .underlying();
         uint256 usdcBalance = IERC20(usdc).balanceOf(anaEoa);
-        assertGe(usdcBalance, USDC_AMOUNT, "ANA_EOA should have received USDC");
+        assertGe(
+            usdcBalance,
+            USDC_AMOUNT,
+            "BAD_DEBT_REPAYER_EOA should have received USDC"
+        );
 
         // Validate cbBTC transfer
         address cbBtc = MErc20(addresses.getAddress("MOONWELL_cbBTC"))
@@ -139,7 +146,7 @@ contract mipx37 is HybridProposal {
         assertGe(
             cbBtcBalance,
             cbBTC_AMOUNT,
-            "ANA_EOA should have received cbBTC"
+            "BAD_DEBT_REPAYER_EOA should have received cbBTC"
         );
     }
 }

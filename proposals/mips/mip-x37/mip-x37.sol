@@ -43,7 +43,7 @@ contract mipx37 is HybridProposal {
     function build(Addresses addresses) public override {
         vm.selectFork(BASE_FORK_ID);
 
-        address anaEoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
+        address eoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
 
         // === WETH Reserve Reduction ===
         address moonwellWeth = addresses.getAddress("MOONWELL_WETH");
@@ -60,7 +60,7 @@ contract mipx37 is HybridProposal {
             weth,
             abi.encodeWithSignature(
                 "transfer(address,uint256)",
-                anaEoa,
+                eoa,
                 WETH_AMOUNT
             ),
             "Transfer 347 WETH to BAD_DEBT_REPAYER_EOA",
@@ -82,7 +82,7 @@ contract mipx37 is HybridProposal {
             usdc,
             abi.encodeWithSignature(
                 "transfer(address,uint256)",
-                anaEoa,
+                eoa,
                 USDC_AMOUNT
             ),
             "Transfer 490,000 USDC to BAD_DEBT_REPAYER_EOA",
@@ -104,7 +104,7 @@ contract mipx37 is HybridProposal {
             cbBtc,
             abi.encodeWithSignature(
                 "transfer(address,uint256)",
-                anaEoa,
+                eoa,
                 cbBTC_AMOUNT
             ),
             "Transfer 3 cbBTC to BAD_DEBT_REPAYER_EOA",
@@ -117,12 +117,12 @@ contract mipx37 is HybridProposal {
     function validate(Addresses addresses, address) public override {
         vm.selectFork(BASE_FORK_ID);
 
-        address anaEoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
+        address eoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
 
         // Validate WETH transfer
         address weth = MErc20(addresses.getAddress("MOONWELL_WETH"))
             .underlying();
-        uint256 wethBalance = IERC20(weth).balanceOf(anaEoa);
+        uint256 wethBalance = IERC20(weth).balanceOf(eoa);
         assertGe(
             wethBalance,
             WETH_AMOUNT,
@@ -132,7 +132,7 @@ contract mipx37 is HybridProposal {
         // Validate USDC transfer
         address usdc = MErc20(addresses.getAddress("MOONWELL_USDC"))
             .underlying();
-        uint256 usdcBalance = IERC20(usdc).balanceOf(anaEoa);
+        uint256 usdcBalance = IERC20(usdc).balanceOf(eoa);
         assertGe(
             usdcBalance,
             USDC_AMOUNT,
@@ -142,7 +142,7 @@ contract mipx37 is HybridProposal {
         // Validate cbBTC transfer
         address cbBtc = MErc20(addresses.getAddress("MOONWELL_cbBTC"))
             .underlying();
-        uint256 cbBtcBalance = IERC20(cbBtc).balanceOf(anaEoa);
+        uint256 cbBtcBalance = IERC20(cbBtc).balanceOf(eoa);
         assertGe(
             cbBtcBalance,
             cbBTC_AMOUNT,

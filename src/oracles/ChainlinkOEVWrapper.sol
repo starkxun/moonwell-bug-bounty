@@ -4,7 +4,6 @@ pragma solidity 0.8.19;
 import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
 import {AggregatorV3Interface} from "./AggregatorV3Interface.sol";
 import {MErc20Storage, MTokenInterface, MErc20Interface} from "../MTokenInterfaces.sol";
-import {MErc20} from "../MErc20.sol";
 import {MToken} from "../MToken.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";

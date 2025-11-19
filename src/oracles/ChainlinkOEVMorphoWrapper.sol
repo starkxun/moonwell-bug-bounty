@@ -9,7 +9,7 @@ import {IMorphoBlue} from "../morpho/IMorphoBlue.sol";
 import {MarketParams} from "../morpho/IMetaMorpho.sol";
 import {IMorphoChainlinkOracleV2} from "../morpho/IMorphoChainlinkOracleV2.sol";
 import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
-import {MErc20} from "../MErc20.sol";
+
 /**
  * @title ChainlinkOEVMorphoWrapper
  * @notice A wrapper for Chainlink price feeds that allows early updates for liquidation

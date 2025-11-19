@@ -16,11 +16,13 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
+import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
 // this proposal should
-// 1. deploy new non-upgradeable ChainlinkOEVWrapper contracts for core markets
-// 2. upgrade existing ChainlinkOEVMorphoWrapper proxy contracts for Morpho markets => test that storage can still be accessed
-// 3. call setFeed on the ChainlinkOracle for all core markets, to point to the new ChainlinkOEVWrapper contracts
+// 1. deploy once instance of OEVProtocolFeeRedeemer (fee recipient)
+// 2. deploy new non-upgradeable ChainlinkOEVWrapper contracts for core markets
+// 3. upgrade existing ChainlinkOEVMorphoWrapper proxy contracts for Morpho markets => test that storage can still be accessed
+// 4. call setFeed on the ChainlinkOracle for all core markets, to point to the new ChainlinkOEVWrapper contracts
 contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
     string public constant override name = "MIP-X37";
 
@@ -42,20 +44,24 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         return BASE_FORK_ID;
     }
 
-    // Deploy new instances of ChainlinkOEVWrapper (core markets) and ensure ChainlinkOEVMorphoWrapper implementation exists (Morpho)
+    // Deploy new instances of ChainlinkOEVWrapper (core markets) and ensure ChainlinkOEVMorphoWrapper implementation
+    // exists (Morpho). Also deploy once instance of OEVProtocolFeeRedeemer (fee recipient).
     function deploy(Addresses addresses, address) public override {
+        _deployOEVProtocolFeeRedeemer(addresses);
         _deployCoreWrappers(addresses);
         _deployMorphoWrappers(addresses);
 
         vm.selectFork(OPTIMISM_FORK_ID);
+        _deployOEVProtocolFeeRedeemer(addresses);
         _deployCoreWrappers(addresses);
+
         // no morpho markets on optimism
 
         // switch back
         vm.selectFork(BASE_FORK_ID);
     }
 
-    //
+    // Upgrade Morpho wrappers and wire core feeds
     function build(Addresses addresses) public override {
         // Base: upgrade Morpho wrappers and wire core feeds
         _upgradeMorphoWrappers(addresses, BASE_CHAIN_ID);
@@ -119,9 +125,7 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                         addresses.getAddress("TEMPORAL_GOVERNOR"),
                         addresses.getAddress("MORPHO_BLUE"),
                         addresses.getAddress("CHAINLINK_ORACLE"),
-                        addresses.getAddress(
-                            morphoConfigs[i].coreMarketAsFeeRecipient
-                        ),
+                        addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER"),
                         FEE_MULTIPLIER,
                         MAX_ROUND_DELAY,
                         MAX_DECREMENTS
@@ -167,6 +171,19 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         console.log("=== Finished wiring core feeds ===");
     }
 
+    function _deployOEVProtocolFeeRedeemer(Addresses addresses) internal {
+        if (addresses.isAddressSet("OEV_PROTOCOL_FEE_REDEEMER")) {
+            return;
+        }
+
+        vm.startBroadcast();
+        OEVProtocolFeeRedeemer feeRedeemer = new OEVProtocolFeeRedeemer(
+            addresses.getAddress("MOONWELL_WETH")
+        );
+        addresses.addAddress("OEV_PROTOCOL_FEE_REDEEMER", address(feeRedeemer));
+        vm.stopBroadcast();
+    }
+
     /// @dev deploy direct instances (non-upgradeable) for all core markets
     function _deployCoreWrappers(Addresses addresses) internal {
         OracleConfig[] memory oracleConfigs = getOracleConfigurations(
@@ -198,6 +215,7 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 addresses.getAddress(config.oracleName),
                 addresses.getAddress("TEMPORAL_GOVERNOR"),
                 addresses.getAddress("CHAINLINK_ORACLE"),
+                addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER"),
                 FEE_MULTIPLIER,
                 MAX_ROUND_DELAY,
                 MAX_DECREMENTS
@@ -314,6 +332,16 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 FEE_MULTIPLIER,
                 string.concat(
                     "Core wrapper feeMultiplier mismatch for ",
+                    wrapperName
+                )
+            );
+
+            // Validate feeRecipient
+            assertEq(
+                wrapper.feeRecipient(),
+                addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER"),
+                string.concat(
+                    "Core wrapper feeRecipient mismatch for ",
                     wrapperName
                 )
             );
@@ -445,7 +473,7 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
             // Validate feeRecipient
             assertEq(
                 wrapper.feeRecipient(),
-                addresses.getAddress(morphoConfigs[i].coreMarketAsFeeRecipient),
+                addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER"),
                 string.concat(
                     "Morpho wrapper feeRecipient mismatch for ",
                     wrapperName

@@ -9,12 +9,12 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
-// TODO: update for new ChainlinkOEVWrapper
+/// @dev deprecated, no longer compatible with new wrapper
 contract DeployChainlinkOEVWrapper is Script {
     function deploy(
-        Addresses addresses
-    ) public returns (TransparentUpgradeableProxy, ChainlinkOEVWrapper) {
-        // no longer compatible with old wrapper
+        Addresses // addresses
+    ) public pure returns (TransparentUpgradeableProxy, ChainlinkOEVWrapper) {
+        // no longer compatible with new wrapper
         return (
             TransparentUpgradeableProxy(payable(address(0))),
             ChainlinkOEVWrapper(payable(address(0)))
@@ -26,7 +26,7 @@ contract DeployChainlinkOEVWrapper is Script {
         TransparentUpgradeableProxy proxy,
         ChainlinkOEVWrapper implementation
     ) public view {
-        // no longer compatible with old wrapper
+        // no longer compatible with new wrapper
     }
 
     function run()

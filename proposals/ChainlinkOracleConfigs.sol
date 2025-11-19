@@ -6,13 +6,12 @@ import "@utils/ChainIds.sol";
 abstract contract ChainlinkOracleConfigs is Test {
     struct OracleConfig {
         string oracleName; /// e.g., CHAINLINK_ETH_USD
-        string symbol; /// e.g., WETH
+        string symbol; /// e.g., as found in addresses
     }
 
     struct MorphoOracleConfig {
         string proxyName; /// e.g., CHAINLINK_stkWELL_USD (used for proxy identifier)
         string priceFeedName; /// e.g., CHAINLINK_WELL_USD (the actual price feed oracle)
-        string coreMarketAsFeeRecipient; /// e.g.MOONWELL_WELL (the equivalent core maket to call `#_addReserves`)
     }
 
     /// oracle configurations per chain id
@@ -79,27 +78,15 @@ abstract contract ChainlinkOracleConfigs is Test {
 
         /// Initialize Morpho market configurations for Base
         _MorphoOracleConfigs[BASE_CHAIN_ID].push(
-            MorphoOracleConfig(
-                "CHAINLINK_WELL_USD",
-                "CHAINLINK_WELL_USD",
-                "MOONWELL_WELL"
-            )
+            MorphoOracleConfig("CHAINLINK_WELL_USD", "CHAINLINK_WELL_USD")
         );
         _MorphoOracleConfigs[BASE_CHAIN_ID].push(
-            MorphoOracleConfig(
-                "CHAINLINK_MAMO_USD",
-                "CHAINLINK_MAMO_USD",
-                "MOONWELL_MAMO"
-            )
+            MorphoOracleConfig("CHAINLINK_MAMO_USD", "CHAINLINK_MAMO_USD")
         );
 
         /// NOTE: stkWELL does not have an equivalent MToken to add reserves to, so use TEMPORAL_GOVERNOR as the fee recipient
         _MorphoOracleConfigs[BASE_CHAIN_ID].push(
-            MorphoOracleConfig(
-                "CHAINLINK_stkWELL_USD",
-                "CHAINLINK_WELL_USD",
-                "TEMPORAL_GOVERNOR"
-            )
+            MorphoOracleConfig("CHAINLINK_stkWELL_USD", "CHAINLINK_WELL_USD")
         );
     }
 
@@ -136,9 +123,7 @@ abstract contract ChainlinkOracleConfigs is Test {
                 configs[i] = MorphoOracleConfig({
                     proxyName: _MorphoOracleConfigs[chainId][i].proxyName,
                     priceFeedName: _MorphoOracleConfigs[chainId][i]
-                        .priceFeedName,
-                    coreMarketAsFeeRecipient: _MorphoOracleConfigs[chainId][i]
-                        .coreMarketAsFeeRecipient
+                        .priceFeedName
                 });
             }
         }

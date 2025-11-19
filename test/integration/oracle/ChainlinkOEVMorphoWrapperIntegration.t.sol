@@ -10,6 +10,7 @@ import {IMorphoBlue} from "@protocol/morpho/IMorphoBlue.sol";
 import {MErc20} from "@protocol/MErc20.sol";
 import {IMetaMorpho, MarketParams, MarketAllocation} from "@protocol/morpho/IMetaMorpho.sol";
 import {ChainlinkOracleConfigs} from "@proposals/ChainlinkOracleConfigs.sol";
+import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
 contract ChainlinkOEVMorphoWrapperIntegrationTest is
     PostProposalCheck,
@@ -28,6 +29,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
     );
 
     ChainlinkOEVMorphoWrapper[] public wrappers;
+    OEVProtocolFeeRedeemer public redeemer;
 
     // Test actors
     address internal constant BORROWER =
@@ -39,6 +41,11 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
         uint256 primaryForkId = vm.envUint("PRIMARY_FORK_ID");
         super.setUp();
         vm.selectFork(primaryForkId);
+
+        // Get redeemer contract from addresses
+        redeemer = OEVProtocolFeeRedeemer(
+            addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER")
+        );
 
         // Resolve morpho wrappers from shared morpho oracle configurations
         MorphoOracleConfig[]
@@ -293,12 +300,11 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
 
         uint256 liqLoanBefore = IERC20(loanToken).balanceOf(LIQUIDATOR);
         uint256 liqCollBefore = IERC20(collToken).balanceOf(LIQUIDATOR);
+        uint256 redeemerCollBefore = IERC20(collToken).balanceOf(
+            address(redeemer)
+        );
 
-        // Capture fee recipient state before
-        address feeRecipient = wrapper.feeRecipient();
-        uint256 feeStateBefore = _getFeeRecipientState(feeRecipient, collToken);
-        bool isMToken = _isFeeRecipientMToken(feeRecipient);
-
+        vm.recordLogs();
         wrapper.updatePriceEarlyAndLiquidate(
             params,
             BORROWER,
@@ -306,6 +312,9 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
             borrowAmount
         );
         vm.stopPrank();
+
+        // Parse event to get protocol fee
+        (uint256 protocolFee, ) = _parseLiquidationEvent();
 
         // Assertions
         assertEq(wrapper.cachedRoundId(), 777);
@@ -320,36 +329,102 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
             "no collateral received"
         );
 
-        // Verify protocol fee was collected
-        uint256 feeStateAfter = _getFeeRecipientState(feeRecipient, collToken);
-        assertGt(
-            feeStateAfter,
-            feeStateBefore,
-            isMToken
-                ? "no fee collected (reserves)"
-                : "no fee collected (balance)"
+        // Verify redeemer received protocol fee (underlying tokens)
+        uint256 redeemerCollAfter = IERC20(collToken).balanceOf(
+            address(redeemer)
         );
-    }
+        if (protocolFee > 0) {
+            assertGt(
+                redeemerCollAfter,
+                redeemerCollBefore,
+                "Redeemer should receive protocol fee"
+            );
+            assertEq(
+                redeemerCollAfter - redeemerCollBefore,
+                protocolFee,
+                "Redeemer balance should match protocol fee from event"
+            );
 
-    function _isFeeRecipientMToken(
-        address feeRecipient
-    ) internal view returns (bool) {
-        try MErc20(feeRecipient).isMToken() returns (bool _isMToken) {
-            return _isMToken;
-        } catch {
-            return false;
-        }
-    }
-
-    function _getFeeRecipientState(
-        address feeRecipient,
-        address collToken
-    ) internal view returns (uint256) {
-        if (_isFeeRecipientMToken(feeRecipient)) {
-            return MErc20(feeRecipient).totalReserves();
+            address mTokenCollateral = _findMTokenForUnderlying(collToken);
+            if (mTokenCollateral != address(0)) {
+                _addReservesAndVerify(mTokenCollateral);
+            } else {
+                console2.log(
+                    "No mToken market found for collateral token",
+                    IERC20(collToken).symbol()
+                );
+            }
         } else {
-            return IERC20(collToken).balanceOf(feeRecipient);
+            // When protocolFee is 0, redeemer should not receive any tokens
+            assertEq(
+                redeemerCollAfter,
+                redeemerCollBefore,
+                "Redeemer should not receive tokens when protocolFee is 0"
+            );
         }
+    }
+
+    /// @notice Parse liquidation event to extract fees
+    function _parseLiquidationEvent()
+        internal
+        returns (uint256 protocolFee, uint256 liquidatorFee)
+    {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 eventSig = keccak256(
+            "PriceUpdatedEarlyAndLiquidated(address,uint256,uint256,uint256,uint256)"
+        );
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == eventSig) {
+                (, , uint256 _protocolFee, uint256 _liquidatorFee) = abi.decode(
+                    logs[i].data,
+                    (uint256, uint256, uint256, uint256)
+                );
+
+                protocolFee = _protocolFee;
+                liquidatorFee = _liquidatorFee;
+            }
+        }
+    }
+
+    /// @notice Find mToken address for a given underlying token
+    /// @param underlyingToken The underlying token address
+    /// @return mToken The mToken address, or address(0) if not found
+    function _findMTokenForUnderlying(
+        address underlyingToken
+    ) internal view returns (address mToken) {
+        // Try common mToken names based on token symbol
+        string memory symbol = IERC20(underlyingToken).symbol();
+
+        // Map common symbols to mToken address keys
+        string memory mTokenKey = string(abi.encodePacked("MOONWELL_", symbol));
+
+        if (addresses.isAddressSet(mTokenKey)) {
+            return addresses.getAddress(mTokenKey);
+        }
+        return address(0);
+    }
+
+    /// @notice Add reserves from underlying token balance and verify
+    /// @param mTokenCollateralAddr Address of the collateral mToken
+    function _addReservesAndVerify(address mTokenCollateralAddr) internal {
+        uint256 reservesBefore = MErc20(mTokenCollateralAddr).totalReserves();
+        redeemer.addReserves(mTokenCollateralAddr);
+        uint256 reservesAfter = MErc20(mTokenCollateralAddr).totalReserves();
+
+        // Verify reserves increased after adding
+        assertGt(
+            reservesAfter,
+            reservesBefore,
+            "Reserves should increase after adding protocol fees"
+        );
+
+        // Verify redeemer no longer has underlying tokens
+        address underlying = MErc20(mTokenCollateralAddr).underlying();
+        assertEq(
+            IERC20(underlying).balanceOf(address(redeemer)),
+            0,
+            "Redeemer should have no underlying tokens after adding reserves"
+        );
     }
 
     function testUpdatePriceEarlyAndLiquidate_RevertArgsZero() public {

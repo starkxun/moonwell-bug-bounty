@@ -30,7 +30,10 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     /// @notice The Chainlink price feed this proxy forwards to
     AggregatorV3Interface public priceFeed;
 
-    /// @notice The fee multiplier for the OEV fees
+    /// @notice The address that will receive the OEV fees
+    address public feeRecipient;
+
+    /// @notice The fee multiplier for the OEV fees, to be paid to the liquidator
     /// @dev Represented as a percentage
     uint16 public feeMultiplier;
 
@@ -42,6 +45,9 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
 
     /// @notice The max decrements
     uint256 public maxDecrements;
+
+    /// @notice Emitted when the fee recipient is changed
+    event FeeRecipientChanged(address oldFeeRecipient, address newFeeRecipient);
 
     /// @notice Emitted when the fee multiplier is changed
     event FeeMultiplierChanged(
@@ -83,6 +89,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         address _priceFeed,
         address _owner,
         address _chainlinkOracle,
+        address _feeRecipient,
         uint16 _feeMultiplier,
         uint256 _maxRoundDelay,
         uint256 _maxDecrements
@@ -111,6 +118,10 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             _chainlinkOracle != address(0),
             "ChainlinkOEVWrapper: chainlink oracle cannot be zero address"
         );
+        require(
+            _feeRecipient != address(0),
+            "ChainlinkOEVWrapper: fee recipient cannot be zero address"
+        );
 
         priceFeed = AggregatorV3Interface(_priceFeed);
         feeMultiplier = _feeMultiplier;
@@ -118,6 +129,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         maxRoundDelay = _maxRoundDelay;
         maxDecrements = _maxDecrements;
         chainlinkOracle = IChainlinkOracle(_chainlinkOracle);
+        feeRecipient = _feeRecipient;
 
         _transferOwnership(_owner);
     }
@@ -291,6 +303,22 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     }
 
     /**
+     * @notice Sets the fee recipient address
+     * @param _feeRecipient The new fee recipient address
+     */
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
+        require(
+            _feeRecipient != address(0),
+            "ChainlinkOEVWrapper: fee recipient cannot be zero address"
+        );
+
+        address oldFeeRecipient = feeRecipient;
+        feeRecipient = _feeRecipient;
+
+        emit FeeRecipientChanged(oldFeeRecipient, _feeRecipient);
+    }
+
+    /**
      * @notice Allows the contract to receive ETH (needed for mWETH redemption which unwraps to ETH)
      */
     receive() external payable {}
@@ -343,6 +371,10 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             MErc20Storage(mTokenCollateral).underlying()
         );
 
+        MTokenInterface mTokenCollateralInterface = MTokenInterface(
+            mTokenCollateral
+        );
+
         require(
             address(chainlinkOracle.getFeed(underlyingCollateral.symbol())) ==
                 address(this),
@@ -371,14 +403,13 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             collateralAnswer = answer;
         }
 
-        // execute liquidation and redeem collateral
-        uint256 collateralSeized = _executeLiquidationAndRedeem(
+        // execute liquidation
+        uint256 collateralSeized = _executeLiquidation(
             borrower,
             repayAmount,
-            mTokenCollateral,
+            mTokenCollateralInterface,
             mTokenLoan,
-            underlyingLoan,
-            underlyingCollateral
+            underlyingLoan
         );
 
         // Calculate the split of collateral between liquidator and protocol
@@ -394,11 +425,10 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             );
 
         // transfer the liquidator's payment (repayment + bonus) to the liquidator
-        underlyingCollateral.transfer(msg.sender, liquidatorFee);
+        mTokenCollateralInterface.transfer(msg.sender, liquidatorFee);
 
-        // transfer the remainder to the protocol
-        underlyingCollateral.approve(mTokenCollateral, protocolFee);
-        MErc20(mTokenCollateral)._addReserves(protocolFee);
+        // transfer the remainder to the fee recipient
+        mTokenCollateralInterface.transfer(feeRecipient, protocolFee);
 
         emit PriceUpdatedEarlyAndLiquidated(
             borrower,
@@ -451,63 +481,36 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         return collateralPricePerUnit;
     }
 
-    /// @notice Execute liquidation and redeem collateral
+    /// @notice Execute liquidation
     /// @param borrower The address of the borrower to liquidate
     /// @param repayAmount The amount to repay on behalf of the borrower
     /// @param mTokenCollateral The mToken market for the collateral token
-    /// @param mTokenLoan The mToken market for the loan token
+    /// @param _mTokenLoan The mToken market for the loan token
     /// @param underlyingLoan The underlying loan token interface
-    /// @param underlyingCollateral The underlying collateral token interface
-    /// @return collateralSeized The amount of underlying collateral received
-    function _executeLiquidationAndRedeem(
+    /// @return collateralSeized The amount of mToken collateral seized
+    function _executeLiquidation(
         address borrower,
         uint256 repayAmount,
-        address mTokenCollateral,
-        address mTokenLoan,
-        EIP20Interface underlyingLoan,
-        EIP20Interface underlyingCollateral
+        MTokenInterface mTokenCollateral,
+        address _mTokenLoan,
+        EIP20Interface underlyingLoan
     ) internal returns (uint256 collateralSeized) {
-        uint256 collateralBefore = underlyingCollateral.balanceOf(
+        uint256 mTokenCollateralBalanceBefore = mTokenCollateral.balanceOf(
             address(this)
         );
-        uint256 nativeBalanceBefore = address(this).balance;
-
-        underlyingLoan.approve(mTokenLoan, repayAmount);
-
-        uint256 mTokenCollateralBalanceBefore = MTokenInterface(
-            mTokenCollateral
-        ).balanceOf(address(this));
+        underlyingLoan.approve(_mTokenLoan, repayAmount);
         require(
-            MErc20Interface(mTokenLoan).liquidateBorrow(
+            MErc20Interface(_mTokenLoan).liquidateBorrow(
                 borrower,
                 repayAmount,
-                MTokenInterface(mTokenCollateral)
+                mTokenCollateral
             ) == 0,
             "ChainlinkOEVWrapper: liquidation failed"
         );
 
-        uint256 mTokenBalanceDelta = MTokenInterface(mTokenCollateral)
-            .balanceOf(address(this)) - mTokenCollateralBalanceBefore;
-
-        // redeem all the mToken collateral to get the underlying collateral tokens
-        // Note: mWETH will unwrap to native ETH via WETH_UNWRAPPER
-        require(
-            MErc20Interface(mTokenCollateral).redeem(mTokenBalanceDelta) == 0,
-            "ChainlinkOEVWrapper: redemption failed"
-        );
-
-        // If we received native ETH (from mWETH), wrap it back to WETH
-        uint256 nativeDelta = address(this).balance - nativeBalanceBefore;
-        if (nativeDelta > 0) {
-            (bool success, ) = address(underlyingCollateral).call{
-                value: nativeDelta
-            }(abi.encodeWithSignature("deposit()"));
-            require(success, "ChainlinkOEVWrapper: WETH deposit failed");
-        }
-
         collateralSeized =
-            underlyingCollateral.balanceOf(address(this)) -
-            collateralBefore;
+            mTokenCollateral.balanceOf(address(this)) -
+            mTokenCollateralBalanceBefore;
     }
 
     /// @notice Calculate the split of seized collateral between liquidator and fee recipient

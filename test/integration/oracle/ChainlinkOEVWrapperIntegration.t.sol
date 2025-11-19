@@ -16,6 +16,7 @@ import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {ChainlinkOracleConfigs} from "@proposals/ChainlinkOracleConfigs.sol";
 import {LiquidationData, Liquidations, LiquidationState} from "@test/utils/Liquidations.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
+import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
 contract ChainlinkOEVWrapperIntegrationTest is
     PostProposalCheck,
@@ -39,6 +40,7 @@ contract ChainlinkOEVWrapperIntegrationTest is
     ChainlinkOEVWrapper[] public wrappers;
     Comptroller comptroller;
     MarketBase public marketBase;
+    OEVProtocolFeeRedeemer public redeemer;
 
     // Test actors
     address internal constant BORROWER =
@@ -74,6 +76,11 @@ contract ChainlinkOEVWrapperIntegrationTest is
 
         ChainlinkOracle oracle = ChainlinkOracle(address(comptroller.oracle()));
         vm.makePersistent(address(oracle));
+
+        redeemer = OEVProtocolFeeRedeemer(
+            addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER")
+        );
+        vm.makePersistent(address(redeemer));
     }
 
     function _perWrapperActor(
@@ -587,198 +594,232 @@ contract ChainlinkOEVWrapperIntegrationTest is
             }
             address mTokenBorrowAddr = addresses.getAddress("MOONWELL_USDC");
 
-            // Calculate amounts based on price and collateral factor
-            uint256 collateralAmount;
-            uint256 borrowAmount;
-            {
-                (, int256 currentPrice, , , ) = wrapper.latestRoundData();
-                require(currentPrice > 0, "invalid price");
-
-                address underlying = MErc20(mTokenCollateralAddr).underlying();
-                (bool success, bytes memory data) = underlying.staticcall(
-                    abi.encodeWithSignature("decimals()")
-                );
-                require(success && data.length >= 32, "decimals() call failed");
-                uint8 decimals = abi.decode(data, (uint8));
-
-                // Get the actual collateral factor for this market
-                (bool isListed, uint256 collateralFactorMantissa) = comptroller
-                    .markets(mTokenCollateralAddr);
-                require(isListed, "market not listed");
-                // collateralFactorMantissa is scaled by 1e18 (e.g., 0.65e18 = 65%)
-                uint256 collateralFactorBps = (collateralFactorMantissa *
-                    10000) / 1e18; // Convert to basis points
-
-                // $10k worth of collateral
-                collateralAmount =
-                    (10_000 * 10 ** decimals * 1e8) /
-                    uint256(currentPrice);
-
-                // Borrow at 70% of the collateral factor (safe margin)
-                // maxBorrow = $10k * CF, actualBorrow = maxBorrow * 0.8
-                borrowAmount =
-                    ((10_000 * collateralFactorBps * 70) / (10000 * 100)) *
-                    1e6; // Result in USDC (6 decimals)
-            }
-
+            // Set up synthetic position
             address borrower = _borrower(wrapper);
+            address liquidator = _liquidator(wrapper);
+            (, uint256 borrowAmount) = _setupSyntheticPosition(
+                wrapper,
+                mTokenCollateralAddr,
+                mTokenBorrowAddr,
+                borrower
+            );
 
-            // 1) Deposit collateral
-            {
-                MToken mToken = MToken(mTokenCollateralAddr);
-                if (block.timestamp <= mToken.accrualBlockTimestamp()) {
-                    vm.warp(mToken.accrualBlockTimestamp() + 1);
-                }
+            // Crash price to make position underwater
+            _crashPriceForLiquidation(wrapper, borrower);
 
-                // Check and increase supply cap if needed
-                uint256 supplyCap = comptroller.supplyCaps(
-                    mTokenCollateralAddr
-                );
-                if (supplyCap != 0) {
-                    uint256 totalSupply = mToken.totalSupply();
-                    uint256 exchangeRate = mToken.exchangeRateStored();
-                    uint256 totalUnderlyingSupply = (totalSupply *
-                        exchangeRate) / 1e18;
+            // Create synthetic liquidation data
+            LiquidationData memory liquidation = LiquidationData({
+                timestamp: block.timestamp,
+                blockNumber: block.number,
+                borrowedToken: "USDC",
+                collateralToken: IERC20(
+                    addresses.getAddress(oracleConfigs[i].symbol)
+                ).symbol(),
+                borrower: borrower,
+                liquidator: liquidator,
+                repayAmount: borrowAmount / 10,
+                seizedCollateralAmount: 0, // Will be determined during liquidation
+                liquidationSizeUSD: 0 // Not used in test
+            });
 
-                    if (totalUnderlyingSupply + collateralAmount >= supplyCap) {
-                        vm.startPrank(
-                            addresses.getAddress("TEMPORAL_GOVERNOR")
-                        );
-                        MToken[] memory mTokens = new MToken[](1);
-                        mTokens[0] = mToken;
-                        uint256[] memory newCaps = new uint256[](1);
-                        newCaps[0] =
-                            (totalUnderlyingSupply + collateralAmount) *
-                            2;
-                        comptroller._setMarketSupplyCaps(mTokens, newCaps);
-                        vm.stopPrank();
-                    }
-                }
-
-                _mintMToken(borrower, mTokenCollateralAddr, collateralAmount);
-
-                address[] memory markets = new address[](2);
-                markets[0] = mTokenCollateralAddr;
-                markets[1] = mTokenBorrowAddr;
-                vm.prank(borrower);
-                comptroller.enterMarkets(markets);
-            }
-
-            // 2) Borrow USDC
-            {
-                MToken mToken = MToken(mTokenBorrowAddr);
-                if (block.timestamp <= mToken.accrualBlockTimestamp()) {
-                    vm.warp(mToken.accrualBlockTimestamp() + 1);
-                }
-
-                uint256 cap = comptroller.borrowCaps(mTokenBorrowAddr);
-                uint256 total = mToken.totalBorrows();
-
-                if (cap != 0 && total + borrowAmount >= cap) {
-                    vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
-                    MToken[] memory mTokens = new MToken[](1);
-                    mTokens[0] = mToken;
-                    uint256[] memory newCaps = new uint256[](1);
-                    newCaps[0] = (total + borrowAmount) * 2;
-                    comptroller._setMarketBorrowCaps(mTokens, newCaps);
-                    vm.stopPrank();
-                }
-
-                vm.prank(borrower);
-                assertEq(
-                    MErc20Delegator(payable(mTokenBorrowAddr)).borrow(
-                        borrowAmount
-                    ),
-                    0,
-                    string(
-                        abi.encodePacked(
-                            "borrow failed for ",
-                            oracleConfigs[i].symbol
-                        )
-                    )
-                );
-            }
-
-            // 3) Crash price 60% to make position underwater
-            {
-                (, int256 price, , , ) = wrapper.latestRoundData();
-                int256 crashedPrice = (price * 40) / 100;
-
-                vm.mockCall(
-                    address(wrapper.priceFeed()),
-                    abi.encodeWithSelector(
-                        wrapper.priceFeed().latestRoundData.selector
-                    ),
-                    abi.encode(
-                        uint80(777),
-                        crashedPrice,
-                        uint256(0),
-                        block.timestamp,
-                        uint80(777)
-                    )
-                );
-
-                (uint256 err, , uint256 shortfall) = comptroller
-                    .getAccountLiquidity(borrower);
-                require(err == 0 && shortfall > 0, "position not underwater");
-            }
-
-            // 4) Execute liquidation
-            {
-                address liquidator = _liquidator(wrapper);
-                uint256 repayAmount = borrowAmount / 10;
-                address borrowUnderlying = MErc20(mTokenBorrowAddr)
-                    .underlying();
-                deal(borrowUnderlying, liquidator, repayAmount);
-
-                vm.startPrank(liquidator);
-                IERC20(borrowUnderlying).approve(address(wrapper), repayAmount);
-
-                uint256 borrowBefore = MErc20(mTokenBorrowAddr)
-                    .borrowBalanceStored(borrower);
-                uint256 collateralBefore = MErc20(mTokenCollateralAddr)
-                    .balanceOf(borrower);
-                uint256 reservesBefore = MErc20(mTokenCollateralAddr)
-                    .totalReserves();
-
-                if (
-                    block.timestamp <=
-                    MToken(mTokenBorrowAddr).accrualBlockTimestamp()
-                ) {
-                    vm.warp(
-                        MToken(mTokenBorrowAddr).accrualBlockTimestamp() + 1
-                    );
-                }
-
-                wrapper.updatePriceEarlyAndLiquidate(
-                    borrower,
-                    repayAmount,
-                    mTokenCollateralAddr,
-                    mTokenBorrowAddr
-                );
-                vm.stopPrank();
-
-                // 5) Validate results
-                assertEq(wrapper.cachedRoundId(), 777);
-                assertLt(
-                    MErc20(mTokenBorrowAddr).borrowBalanceStored(borrower),
-                    borrowBefore
-                );
-                assertLt(
-                    MErc20(mTokenCollateralAddr).balanceOf(borrower),
-                    collateralBefore
-                );
-
-                address collateralUnderlying = MErc20(mTokenCollateralAddr)
-                    .underlying();
-                assertGt(IERC20(collateralUnderlying).balanceOf(liquidator), 0);
-                // Protocol fee is now added to mToken reserves
-                assertGt(
-                    MErc20(mTokenCollateralAddr).totalReserves(),
-                    reservesBefore
-                );
-            }
+            _testRealLiquidation(liquidation);
         }
+    }
+
+    /// @notice Set up synthetic position by depositing collateral and borrowing
+    /// @return collateralAmount The amount of collateral deposited
+    /// @return borrowAmount The amount borrowed
+    function _setupSyntheticPosition(
+        ChainlinkOEVWrapper wrapper,
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr,
+        address borrower
+    ) internal returns (uint256 collateralAmount, uint256 borrowAmount) {
+        (collateralAmount, borrowAmount) = _calculateSyntheticAmounts(
+            wrapper,
+            mTokenCollateralAddr
+        );
+        _depositCollateral(
+            mTokenCollateralAddr,
+            mTokenBorrowAddr,
+            borrower,
+            collateralAmount
+        );
+        _borrowUSDC(mTokenBorrowAddr, borrower, borrowAmount);
+    }
+
+    /// @notice Calculate collateral and borrow amounts for synthetic position
+    function _calculateSyntheticAmounts(
+        ChainlinkOEVWrapper wrapper,
+        address mTokenCollateralAddr
+    ) internal view returns (uint256 collateralAmount, uint256 borrowAmount) {
+        (, int256 currentPrice, , , ) = wrapper.latestRoundData();
+        require(currentPrice > 0, "invalid price");
+
+        address underlying = MErc20(mTokenCollateralAddr).underlying();
+        (bool success, bytes memory data) = underlying.staticcall(
+            abi.encodeWithSignature("decimals()")
+        );
+        require(success && data.length >= 32, "decimals() call failed");
+        uint8 decimals = abi.decode(data, (uint8));
+
+        (bool isListed, uint256 collateralFactorMantissa) = comptroller.markets(
+            mTokenCollateralAddr
+        );
+        require(isListed, "market not listed");
+        uint256 collateralFactorBps = (collateralFactorMantissa * 10000) / 1e18;
+
+        collateralAmount =
+            (10_000 * 10 ** decimals * 1e8) /
+            uint256(currentPrice);
+        borrowAmount =
+            ((10_000 * collateralFactorBps * 70) / (10000 * 100)) *
+            1e6;
+    }
+
+    /// @notice Deposit collateral and enter markets
+    function _depositCollateral(
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr,
+        address borrower,
+        uint256 collateralAmount
+    ) internal {
+        MToken mToken = MToken(mTokenCollateralAddr);
+        if (block.timestamp <= mToken.accrualBlockTimestamp()) {
+            vm.warp(mToken.accrualBlockTimestamp() + 1);
+        }
+
+        _adjustSupplyCapIfNeeded(mTokenCollateralAddr, collateralAmount);
+        _mintMToken(borrower, mTokenCollateralAddr, collateralAmount);
+
+        address[] memory markets = new address[](2);
+        markets[0] = mTokenCollateralAddr;
+        markets[1] = mTokenBorrowAddr;
+        vm.prank(borrower);
+        comptroller.enterMarkets(markets);
+    }
+
+    /// @notice Adjust supply cap if needed
+    function _adjustSupplyCapIfNeeded(
+        address mTokenCollateralAddr,
+        uint256 collateralAmount
+    ) internal {
+        uint256 supplyCap = comptroller.supplyCaps(mTokenCollateralAddr);
+        if (supplyCap == 0) return;
+
+        MToken mToken = MToken(mTokenCollateralAddr);
+        uint256 totalSupply = mToken.totalSupply();
+        uint256 exchangeRate = mToken.exchangeRateStored();
+        uint256 totalUnderlyingSupply = (totalSupply * exchangeRate) / 1e18;
+
+        if (totalUnderlyingSupply + collateralAmount >= supplyCap) {
+            vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
+            MToken[] memory mTokens = new MToken[](1);
+            mTokens[0] = mToken;
+            uint256[] memory newCaps = new uint256[](1);
+            newCaps[0] = (totalUnderlyingSupply + collateralAmount) * 2;
+            comptroller._setMarketSupplyCaps(mTokens, newCaps);
+            vm.stopPrank();
+        }
+    }
+
+    /// @notice Borrow USDC
+    function _borrowUSDC(
+        address mTokenBorrowAddr,
+        address borrower,
+        uint256 borrowAmount
+    ) internal {
+        MToken mToken = MToken(mTokenBorrowAddr);
+        if (block.timestamp <= mToken.accrualBlockTimestamp()) {
+            vm.warp(mToken.accrualBlockTimestamp() + 1);
+        }
+
+        _adjustBorrowCapIfNeeded(mTokenBorrowAddr, borrowAmount);
+
+        vm.prank(borrower);
+        assertEq(
+            MErc20Delegator(payable(mTokenBorrowAddr)).borrow(borrowAmount),
+            0,
+            "borrow failed"
+        );
+    }
+
+    /// @notice Adjust borrow cap if needed
+    function _adjustBorrowCapIfNeeded(
+        address mTokenBorrowAddr,
+        uint256 borrowAmount
+    ) internal {
+        uint256 cap = comptroller.borrowCaps(mTokenBorrowAddr);
+        if (cap == 0) return;
+
+        MToken mToken = MToken(mTokenBorrowAddr);
+        uint256 total = mToken.totalBorrows();
+
+        if (total + borrowAmount >= cap) {
+            vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
+            MToken[] memory mTokens = new MToken[](1);
+            mTokens[0] = mToken;
+            uint256[] memory newCaps = new uint256[](1);
+            newCaps[0] = (total + borrowAmount) * 2;
+            comptroller._setMarketBorrowCaps(mTokens, newCaps);
+            vm.stopPrank();
+        }
+    }
+
+    /// @notice Crash price to make position underwater (for synthetic tests)
+    function _crashPriceForLiquidation(
+        ChainlinkOEVWrapper wrapper,
+        address borrower
+    ) internal {
+        (, int256 price, , , ) = wrapper.latestRoundData();
+        int256 crashedPrice = (price * 40) / 100; // 60% price drop
+
+        uint80 roundId = 777;
+        vm.mockCall(
+            address(wrapper.priceFeed()),
+            abi.encodeWithSelector(
+                wrapper.priceFeed().latestRoundData.selector
+            ),
+            abi.encode(
+                roundId,
+                crashedPrice,
+                uint256(0),
+                block.timestamp,
+                roundId
+            )
+        );
+
+        // Verify position is now underwater
+        (uint256 err, , uint256 shortfall) = comptroller.getAccountLiquidity(
+            borrower
+        );
+        require(err == 0 && shortfall > 0, "position not underwater");
+    }
+
+    /// @notice Helper function to redeem protocol fees and verify the redemption
+    /// @param mTokenCollateralAddr Address of the collateral mToken
+    function _redeemAndVerifyProtocolFees(
+        address mTokenCollateralAddr
+    ) internal {
+        uint256 reservesBeforeRedeem = MErc20(mTokenCollateralAddr)
+            .totalReserves();
+        redeemer.redeemAndAddReserves(mTokenCollateralAddr);
+        uint256 reservesAfterRedeem = MErc20(mTokenCollateralAddr)
+            .totalReserves();
+
+        // Verify reserves increased after redemption
+        assertGt(
+            reservesAfterRedeem,
+            reservesBeforeRedeem,
+            "Reserves should increase after redeeming protocol fees"
+        );
+
+        // Verify redeemer no longer has mTokens
+        assertEq(
+            MErc20(mTokenCollateralAddr).balanceOf(address(redeemer)),
+            0,
+            "Redeemer should have no mTokens after redemption"
+        );
     }
 
     function testUpdatePriceEarlyAndLiquidate_RevertZeroRepay() public {
@@ -1082,159 +1123,6 @@ contract ChainlinkOEVWrapperIntegrationTest is
         }
     }
 
-    function testUpdatePriceEarlyAndLiquidate_RevertRedemptionFailed() public {
-        // Use ETH/WETH for this test
-        ChainlinkOEVWrapper wrapper = ChainlinkOEVWrapper(
-            payable(addresses.getAddress("CHAINLINK_ETH_USD_OEV_WRAPPER"))
-        );
-        MToken mTokenCollateral = MToken(addresses.getAddress("MOONWELL_WETH"));
-        MToken mTokenBorrow = MToken(addresses.getAddress("MOONWELL_USDC"));
-        address borrower = _borrower(wrapper);
-        uint256 borrowAmount;
-
-        // 0) Mock ETH price to fixed $3,000 for deterministic test
-        {
-            int256 fixedEthPrice = 3_000 * 1e8; // $3,000 in Chainlink format (1e8)
-            vm.mockCall(
-                address(wrapper.priceFeed()),
-                abi.encodeWithSelector(
-                    wrapper.priceFeed().latestRoundData.selector
-                ),
-                abi.encode(
-                    uint80(100),
-                    fixedEthPrice,
-                    uint256(0),
-                    block.timestamp,
-                    uint80(100)
-                )
-            );
-        }
-
-        // 1) Deposit WETH as collateral
-        {
-            uint256 accrualTsPre = mTokenCollateral.accrualBlockTimestamp();
-            if (block.timestamp <= accrualTsPre) {
-                vm.warp(accrualTsPre + 1);
-            }
-
-            uint256 supplyAmount = 1 ether;
-            _mintMToken(borrower, address(mTokenCollateral), supplyAmount);
-
-            address[] memory markets = new address[](2);
-            markets[0] = address(mTokenCollateral);
-            markets[1] = address(mTokenBorrow);
-            vm.prank(borrower);
-            comptroller.enterMarkets(markets);
-
-            assertTrue(
-                comptroller.checkMembership(borrower, mTokenCollateral),
-                "not in collateral market"
-            );
-        }
-
-        // 2) Borrow USDC against WETH collateral
-        {
-            uint256 accrualTsPre = mTokenBorrow.accrualBlockTimestamp();
-            if (block.timestamp <= accrualTsPre) {
-                vm.warp(accrualTsPre + 1);
-            }
-
-            // With mocked ETH price at $3,000:
-            // 1 WETH = $3,000, with 81% CF = $2,430 max borrow
-            // Borrow $1,800 (74% of max) - safe margin
-            borrowAmount = 1_800 * 1e6; // 1,800 USDC
-
-            uint256 currentBorrowCap = comptroller.borrowCaps(
-                address(mTokenBorrow)
-            );
-            uint256 totalBorrows = mTokenBorrow.totalBorrows();
-            uint256 nextTotalBorrows = totalBorrows + borrowAmount;
-
-            if (currentBorrowCap != 0 && nextTotalBorrows >= currentBorrowCap) {
-                vm.startPrank(addresses.getAddress("TEMPORAL_GOVERNOR"));
-                MToken[] memory mTokens = new MToken[](1);
-                mTokens[0] = mTokenBorrow;
-                uint256[] memory newBorrowCaps = new uint256[](1);
-                newBorrowCaps[0] = nextTotalBorrows * 2;
-                comptroller._setMarketBorrowCaps(mTokens, newBorrowCaps);
-                vm.stopPrank();
-            }
-
-            vm.prank(borrower);
-            assertEq(
-                MErc20Delegator(payable(address(mTokenBorrow))).borrow(
-                    borrowAmount
-                ),
-                0,
-                "borrow failed"
-            );
-        }
-
-        // 3) Force position underwater by crashing ETH price to $1,800
-        {
-            // Crash ETH from $3,000 to $1,800 (40% drop)
-            // After crash: 1 WETH = $1,800, with 81% CF = $1,458 max borrow
-            // But we borrowed $1,800, so position is underwater
-            int256 crashedPrice = 1_800 * 1e8;
-
-            vm.mockCall(
-                address(wrapper.priceFeed()),
-                abi.encodeWithSelector(
-                    wrapper.priceFeed().latestRoundData.selector
-                ),
-                abi.encode(
-                    uint80(777),
-                    crashedPrice,
-                    uint256(0),
-                    block.timestamp,
-                    uint80(777)
-                )
-            );
-
-            (uint256 err, uint256 liq, uint256 shortfall) = comptroller
-                .getAccountLiquidity(borrower);
-            assertEq(err, 0, "liquidity error");
-            assertEq(liq, 0, "expected no liquidity");
-            assertGt(shortfall, 0, "no shortfall created");
-        }
-
-        // 4) Mock redeem to fail, then attempt liquidation
-        {
-            address liquidator = _liquidator(wrapper);
-            uint256 repayAmount = borrowAmount / 10; // 260 USDC
-            address borrowUnderlying = MErc20(address(mTokenBorrow))
-                .underlying();
-            deal(borrowUnderlying, liquidator, repayAmount);
-
-            vm.startPrank(liquidator);
-            IERC20(borrowUnderlying).approve(address(wrapper), repayAmount);
-
-            if (block.timestamp <= mTokenBorrow.accrualBlockTimestamp()) {
-                vm.warp(mTokenBorrow.accrualBlockTimestamp() + 1);
-            }
-
-            // Mock redeem to fail (return error code 1)
-            vm.mockCall(
-                address(mTokenCollateral),
-                abi.encodeWithSelector(
-                    MErc20Delegator(payable(address(mTokenCollateral)))
-                        .redeem
-                        .selector
-                ),
-                abi.encode(uint256(1))
-            );
-
-            vm.expectRevert(bytes("ChainlinkOEVWrapper: redemption failed"));
-            wrapper.updatePriceEarlyAndLiquidate(
-                borrower,
-                repayAmount,
-                address(mTokenCollateral),
-                address(mTokenBorrow)
-            );
-            vm.stopPrank();
-        }
-    }
-
     /// @notice Simulate some real liquidations from 10/10
     function testRealLiquidations() public {
         LiquidationData[] memory liquidations = getLiquidations();
@@ -1308,8 +1196,14 @@ contract ChainlinkOEVWrapperIntegrationTest is
             ChainlinkOEVWrapper wrapper
         )
     {
+        // HACK: symbol in addresses not matching onchain token symbol
+        string memory collateralToken = (keccak256(
+            bytes(liquidation.collateralToken)
+        ) == keccak256(bytes("tBTC")))
+            ? "TBTC"
+            : liquidation.collateralToken;
         string memory mTokenCollateralKey = string(
-            abi.encodePacked("MOONWELL_", liquidation.collateralToken)
+            abi.encodePacked("MOONWELL_", collateralToken)
         );
         string memory mTokenBorrowKey = string(
             abi.encodePacked("MOONWELL_", liquidation.borrowedToken)
@@ -1342,13 +1236,12 @@ contract ChainlinkOEVWrapperIntegrationTest is
         address mTokenBorrowAddr,
         ChainlinkOEVWrapper wrapper
     ) internal returns (bool shouldContinue) {
-        vm.rollFork(liquidation.blockNumber - 1); // ensure onchain state
-        vm.warp(liquidation.timestamp - 1); // ensures mToken accrual timestamps
-
-        // NOTE: doing this caused some liquidations to fail, but then its needed to get past some "delta" errors on others
-        // uint256 targetTimestamp = liquidation.timestamp - 1;
-        // vm.store(mTokenBorrowAddr, bytes32(uint256(9)), bytes32(targetTimestamp));
-        // vm.store(mTokenCollateralAddr, bytes32(uint256(9)), bytes32(targetTimestamp));
+        // Skip fork rolling for synthetic tests (blockNumber == current block.number)
+        // Real liquidations have historical block numbers
+        if (liquidation.blockNumber != block.number) {
+            vm.rollFork(liquidation.blockNumber - 1); // ensure onchain state
+            vm.warp(liquidation.timestamp - 1); // ensures mToken accrual timestamps
+        }
 
         address borrower = liquidation.borrower;
         MToken mTokenBorrow = MToken(mTokenBorrowAddr);
@@ -1364,32 +1257,37 @@ contract ChainlinkOEVWrapperIntegrationTest is
             return false; // Position doesn't exist, skip
         }
 
-        // Mock collateral price down to make position underwater
-        AggregatorV3Interface priceFeed = wrapper.priceFeed();
-        (uint80 feedRoundId, int256 price, , , ) = priceFeed.latestRoundData();
-        int256 crashedPrice = (price * 75) / 100; // 25% price drop
-        uint80 latestRoundId = feedRoundId;
-        vm.mockCall(
-            address(wrapper.priceFeed()),
-            abi.encodeWithSelector(
-                wrapper.priceFeed().latestRoundData.selector
-            ),
-            abi.encode(
+        // Skip price mocking for synthetic tests (price already crashed in _crashPriceForLiquidation)
+        // Only mock price for real liquidations
+        if (liquidation.blockNumber != block.number) {
+            // Mock collateral price down to make position underwater
+            AggregatorV3Interface priceFeed = wrapper.priceFeed();
+            (uint80 feedRoundId, int256 price, , , ) = priceFeed
+                .latestRoundData();
+            int256 crashedPrice = (price * 75) / 100; // 25% price drop
+            uint80 latestRoundId = feedRoundId;
+            vm.mockCall(
+                address(wrapper.priceFeed()),
+                abi.encodeWithSelector(
+                    wrapper.priceFeed().latestRoundData.selector
+                ),
+                abi.encode(
+                    latestRoundId,
+                    crashedPrice,
+                    uint256(0),
+                    block.timestamp,
+                    latestRoundId
+                )
+            );
+
+            // Mock getRoundData for previous rounds
+            _mockPreviousRounds(
+                wrapper,
                 latestRoundId,
                 crashedPrice,
-                uint256(0),
-                block.timestamp,
-                latestRoundId
-            )
-        );
-
-        // Mock getRoundData for previous rounds
-        _mockPreviousRounds(
-            wrapper,
-            latestRoundId,
-            crashedPrice,
-            block.timestamp
-        );
+                block.timestamp
+            );
+        }
 
         // Verify position is now underwater after price crash
         (uint256 err, , uint256 shortfall) = comptroller.getAccountLiquidity(
@@ -1453,6 +1351,11 @@ contract ChainlinkOEVWrapperIntegrationTest is
         state.liquidatorCollateralBefore = IERC20(collateralUnderlying)
             .balanceOf(liquidator);
 
+        uint256 liquidatorMTokenBefore = mTokenCollateral.balanceOf(liquidator);
+        uint256 redeemerMTokenBefore = mTokenCollateral.balanceOf(
+            address(redeemer)
+        );
+
         // Execute liquidation
         vm.startPrank(liquidator);
         IERC20(borrowUnderlying).approve(address(wrapper), repayAmount);
@@ -1470,6 +1373,46 @@ contract ChainlinkOEVWrapperIntegrationTest is
             state.protocolFee,
             state.liquidatorFeeReceived
         ) = _parseLiquidationEvent();
+
+        // Verify liquidator received mTokens
+        uint256 liquidatorMTokenAfter = mTokenCollateral.balanceOf(liquidator);
+        assertGt(
+            liquidatorMTokenAfter,
+            liquidatorMTokenBefore,
+            "Liquidator should receive mTokens"
+        );
+        assertEq(
+            liquidatorMTokenAfter - liquidatorMTokenBefore,
+            state.liquidatorFeeReceived,
+            "Liquidator mToken balance should match liquidator fee from event"
+        );
+
+        // Verify redeemer received mTokens (protocol fee) - only if protocolFee > 0
+        uint256 redeemerMTokenAfter = mTokenCollateral.balanceOf(
+            address(redeemer)
+        );
+        if (state.protocolFee > 0) {
+            assertGt(
+                redeemerMTokenAfter,
+                redeemerMTokenBefore,
+                "Redeemer should receive protocol fee mTokens"
+            );
+            assertEq(
+                redeemerMTokenAfter - redeemerMTokenBefore,
+                state.protocolFee,
+                "Redeemer mToken balance should match protocol fee from event"
+            );
+
+            // Redeem protocol fees and add to reserves
+            _redeemAndVerifyProtocolFees(mTokenCollateralAddr);
+        } else {
+            // When protocolFee is 0, redeemer should not receive any mTokens
+            assertEq(
+                redeemerMTokenAfter,
+                redeemerMTokenBefore,
+                "Redeemer should not receive mTokens when protocolFee is 0"
+            );
+        }
 
         // Get balances after liquidation
         state.borrowerBorrowAfter = mTokenBorrow.borrowBalanceStored(borrower);
@@ -1636,17 +1579,20 @@ contract ChainlinkOEVWrapperIntegrationTest is
             state.borrowerCollateralBefore,
             "Collateral not seized"
         );
-        assertGt(state.protocolFee, 0, "Protocol fee should be > 0");
         assertGt(
             state.liquidatorFeeReceived,
             0,
             "Liquidator fee should be > 0"
         );
-        assertGt(
-            state.reservesAfter,
-            state.reservesBefore,
-            "Reserves should increase"
-        );
+        // Protocol fee can be 0 when collateral value <= repayment value
+        // Reserves only increase if protocolFee > 0 (after redemption)
+        if (state.protocolFee > 0) {
+            assertGt(
+                state.reservesAfter,
+                state.reservesBefore,
+                "Reserves should increase when protocolFee > 0"
+            );
+        }
     }
 
     /// @notice Find the wrapper for a given collateral token symbol

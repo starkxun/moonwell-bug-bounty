@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {BASE_CHAIN_ID} from "@utils/ChainIds.sol";
 
-/// @notice Struct to represent a real liquidation event
+/// @notice Struct to represent a liquidation event
 struct LiquidationData {
     uint256 timestamp;
     uint256 blockNumber;

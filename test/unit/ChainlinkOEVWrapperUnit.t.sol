@@ -9,7 +9,7 @@ import {MockChainlinkOracleWithoutLatestRound} from "@test/mock/MockChainlinkOra
 contract ChainlinkOEVWrapperUnitTest is Test {
     address public owner = address(0x1);
     address public chainlinkOracle = address(0x4);
-
+    address public feeRecipient = address(0x5);
     uint16 public defaultFeeBps = 100; // 1%
     uint256 public defaultMaxRoundDelay = 300; // 5 minutes
     uint256 public defaultMaxDecrements = 5;
@@ -36,6 +36,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             feed,
             owner,
             chainlinkOracle,
+            feeRecipient,
             defaultFeeBps,
             defaultMaxRoundDelay,
             defaultMaxDecrements
@@ -56,6 +57,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             address(mockFeed),
             owner,
             chainlinkOracle,
+            feeRecipient,
             defaultFeeBps,
             defaultMaxRoundDelay,
             defaultMaxDecrements

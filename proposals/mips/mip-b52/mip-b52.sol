@@ -11,16 +11,16 @@ import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
-/// @title MIP-X37: Reserve Reduction for repaying bad debt
+/// @title MIP-B52: Bad Debt Remediation
 /// @notice Proposal to reduce reserves from three Base markets and transfer to EOA for repaying bad debt:
 ///         1. Reduce 347 WETH from MOONWELL_WETH market
 ///         2. Reduce 490,000 USDC from MOONWELL_USDC market
 ///         3. Reduce 3 cbBTC from MOONWELL_cbBTC market
 ///         4. Transfer all tokens to BAD_DEBT_REPAYER_EOA for swapping to VIRTUALS and cbXRP
-contract mipx37 is HybridProposal {
+contract mipb52 is HybridProposal {
     using ProposalActions for *;
 
-    string public constant override name = "MIP-X37";
+    string public constant override name = "MIP-B52";
 
     // Reserve amounts to reduce
     uint256 public constant WETH_AMOUNT = 347e18; // 347 WETH
@@ -29,7 +29,7 @@ contract mipx37 is HybridProposal {
 
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
-            vm.readFile("./proposals/mips/mip-x37/x37.md")
+            vm.readFile("./proposals/mips/mip-b52/b52.md")
         );
         _setProposalDescription(proposalDescription);
     }

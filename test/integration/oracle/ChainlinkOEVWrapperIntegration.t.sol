@@ -567,16 +567,6 @@ contract ChainlinkOEVWrapperIntegrationTest is
         for (uint256 i = 0; i < wrappers.length; i++) {
             ChainlinkOEVWrapper wrapper = wrappers[i];
 
-            if (
-                keccak256(abi.encodePacked(oracleConfigs[i].symbol)) ==
-                keccak256(abi.encodePacked("cbETH"))
-            ) {
-                console2.log(
-                    "Skipping cbETH wrapper due to borrow liquidity issues"
-                );
-                continue;
-            }
-
             // Get the collateral mToken
             string memory mTokenKey = string(
                 abi.encodePacked("MOONWELL_", oracleConfigs[i].symbol)
@@ -653,15 +643,12 @@ contract ChainlinkOEVWrapperIntegrationTest is
         ChainlinkOEVWrapper wrapper,
         address mTokenCollateralAddr
     ) internal view returns (uint256 collateralAmount, uint256 borrowAmount) {
-        (, int256 currentPrice, , , ) = wrapper.latestRoundData();
-        require(currentPrice > 0, "invalid price");
-
-        address underlying = MErc20(mTokenCollateralAddr).underlying();
-        (bool success, bytes memory data) = underlying.staticcall(
-            abi.encodeWithSignature("decimals()")
+        // Use oracle's getUnderlyingPrice which normalizes all prices to USD
+        ChainlinkOracle oracle = ChainlinkOracle(address(comptroller.oracle()));
+        uint256 priceInUSD = oracle.getUnderlyingPrice(
+            MToken(mTokenCollateralAddr)
         );
-        require(success && data.length >= 32, "decimals() call failed");
-        uint8 decimals = abi.decode(data, (uint8));
+        require(priceInUSD > 0, "invalid price");
 
         (bool isListed, uint256 collateralFactorMantissa) = comptroller.markets(
             mTokenCollateralAddr
@@ -669,9 +656,7 @@ contract ChainlinkOEVWrapperIntegrationTest is
         require(isListed, "market not listed");
         uint256 collateralFactorBps = (collateralFactorMantissa * 10000) / 1e18;
 
-        collateralAmount =
-            (10_000 * 10 ** decimals * 1e8) /
-            uint256(currentPrice);
+        collateralAmount = (10_000 * 1e18 * 1e18) / priceInUSD;
         borrowAmount =
             ((10_000 * collateralFactorBps * 70) / (10000 * 100)) *
             1e6;

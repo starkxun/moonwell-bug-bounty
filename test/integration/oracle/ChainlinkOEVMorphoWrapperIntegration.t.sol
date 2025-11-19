@@ -197,8 +197,6 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
     }
 
     function testUpdatePriceEarlyAndLiquidate_stkWELL() public {
-        // Note: stkWELL has no market, so fee recipient should be set to treasury
-        // The wrapper will automatically detect this and transfer instead of calling _addReserves
         _testLiquidation(
             addresses.getAddress("CHAINLINK_stkWELL_USD_ORACLE_PROXY"),
             addresses.getAddress("STK_GOVTOKEN_PROXY"),
@@ -252,14 +250,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
         IERC20(collToken).approve(address(morpho), collateralAmount);
         morpho.supplyCollateral(params, collateralAmount, BORROWER, "");
 
-        // Try to borrow - if it fails due to insufficient liquidity, skip the test
-        try morpho.borrow(params, borrowAmount, 0, BORROWER, BORROWER) {
-            // Borrow succeeded, continue with test
-        } catch {
-            vm.stopPrank();
-            // Market doesn't have liquidity in current fork state, skip test
-            return;
-        }
+        morpho.borrow(params, borrowAmount, 0, BORROWER, BORROWER);
         vm.stopPrank();
 
         // Mock price crash

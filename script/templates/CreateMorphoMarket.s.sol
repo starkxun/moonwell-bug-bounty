@@ -275,15 +275,18 @@ contract CreateMorphoMarket is Script, Test {
         }
 
         ProxyAdmin proxyAdmin;
-        if (!addresses.isAddressSet("CHAINLINK_PROXY_ADMIN")) {
+        if (!addresses.isAddressSet("CHAINLINK_ORACLE_PROXY_ADMIN")) {
             proxyAdmin = new ProxyAdmin();
-            addresses.addAddress("CHAINLINK_PROXY_ADMIN", address(proxyAdmin));
+            addresses.addAddress(
+                "CHAINLINK_ORACLE_PROXY_ADMIN",
+                address(proxyAdmin)
+            );
             proxyAdmin.transferOwnership(
                 addresses.getAddress("TEMPORAL_GOVERNOR")
             );
         } else {
             proxyAdmin = ProxyAdmin(
-                addresses.getAddress("CHAINLINK_PROXY_ADMIN")
+                addresses.getAddress("CHAINLINK_ORACLE_PROXY_ADMIN")
             );
         }
 

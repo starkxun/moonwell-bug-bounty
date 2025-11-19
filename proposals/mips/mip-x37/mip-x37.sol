@@ -180,6 +180,25 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         OEVProtocolFeeRedeemer feeRedeemer = new OEVProtocolFeeRedeemer(
             addresses.getAddress("MOONWELL_WETH")
         );
+
+        // Whitelist all mTokens
+        OracleConfig[] memory oracleConfigs = getOracleConfigurations(
+            block.chainid
+        );
+        for (uint256 i = 0; i < oracleConfigs.length; i++) {
+            OracleConfig memory config = oracleConfigs[i];
+
+            // Only skip if mTokenKey is explicitly set to empty string
+            if (bytes(config.mTokenKey).length == 0) {
+                continue;
+            }
+            feeRedeemer.whitelistMarket(addresses.getAddress(config.mTokenKey));
+        }
+
+        feeRedeemer.transferOwnership(
+            addresses.getAddress("TEMPORAL_GOVERNOR")
+        );
+
         addresses.addAddress("OEV_PROTOCOL_FEE_REDEEMER", address(feeRedeemer));
         vm.stopBroadcast();
     }

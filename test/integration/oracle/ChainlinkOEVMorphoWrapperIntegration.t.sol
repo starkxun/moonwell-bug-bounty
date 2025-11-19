@@ -44,7 +44,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
 
         // Get redeemer contract from addresses
         redeemer = OEVProtocolFeeRedeemer(
-            addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER")
+            payable(addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER"))
         );
 
         // Resolve morpho wrappers from shared morpho oracle configurations
@@ -337,11 +337,14 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
             );
 
             address mTokenCollateral = _findMTokenForUnderlying(collToken);
-            if (mTokenCollateral != address(0)) {
+            if (
+                mTokenCollateral != address(0) &&
+                redeemer.whitelistedMarkets(mTokenCollateral)
+            ) {
                 _addReservesAndVerify(mTokenCollateral);
             } else {
                 console2.log(
-                    "No mToken market found for collateral token",
+                    "No mToken market found or not whitelisted for collateral token",
                     IERC20(collToken).symbol()
                 );
             }

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity 0.8.19;
 
-import {MErc20Interface, MTokenInterface} from "./MTokenInterfaces.sol";
+import {MErc20Interface} from "./MTokenInterfaces.sol";
 import {EIP20Interface} from "./EIP20Interface.sol";
+import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /**
  * @title OEVProtocolFeeRedeemer
@@ -11,8 +12,18 @@ import {EIP20Interface} from "./EIP20Interface.sol";
  * @dev This contract receives fees from ChainlinkOEVWrapper and ChainlinkOEVMorphoWrapper. Handles mToken,
  * underlying token, and native ETH balances.
  */
-contract OEVProtocolFeeRedeemer {
+contract OEVProtocolFeeRedeemer is Ownable {
     event ReservesAddedFromOEV(address indexed mToken, uint256 amount);
+
+    modifier onlyWhitelistedMarkets(address _market) {
+        require(
+            whitelistedMarkets[_market],
+            "OEVProtocolFeeRedeemer: not whitelisted market"
+        );
+        _;
+    }
+
+    mapping(address => bool) public whitelistedMarkets;
 
     address public immutable MOONWELL_WETH;
 
@@ -22,13 +33,25 @@ contract OEVProtocolFeeRedeemer {
      */
     constructor(address _moonwellWETH) {
         MOONWELL_WETH = _moonwellWETH;
+        whitelistedMarkets[_moonwellWETH] = true;
+
+        _transferOwnership(msg.sender);
+    }
+
+    /**
+     * @notice Allows the contract
+     */
+    function whitelistMarket(address _market) external onlyOwner {
+        whitelistedMarkets[_market] = true;
     }
 
     /**
      * @notice Allows anyone to redeem this contract's mTokens and add the reserves to the mToken
      * @param _mToken Address of the mToken to redeem and add reserves to
      */
-    function redeemAndAddReserves(address _mToken) external {
+    function redeemAndAddReserves(
+        address _mToken
+    ) external onlyWhitelistedMarkets(_mToken) {
         (
             MErc20Interface mToken,
             EIP20Interface underlyingToken
@@ -61,7 +84,9 @@ contract OEVProtocolFeeRedeemer {
      * @notice Add reserves from underlying token balance
      * @param _mToken Address of the mToken to add reserves to
      */
-    function addReserves(address _mToken) external {
+    function addReserves(
+        address _mToken
+    ) external onlyWhitelistedMarkets(_mToken) {
         (
             MErc20Interface mToken,
             EIP20Interface underlyingToken
@@ -102,10 +127,6 @@ contract OEVProtocolFeeRedeemer {
         view
         returns (MErc20Interface mToken, EIP20Interface underlyingToken)
     {
-        require(
-            MTokenInterface(_mToken).isMToken(),
-            "OEVProtocolFeeRedeemer: not an mToken"
-        );
         mToken = MErc20Interface(_mToken);
         underlyingToken = EIP20Interface(mToken.underlying());
     }
@@ -142,4 +163,6 @@ contract OEVProtocolFeeRedeemer {
         mToken._addReserves(amount);
         emit ReservesAddedFromOEV(address(mToken), amount);
     }
+
+    receive() external payable {}
 }

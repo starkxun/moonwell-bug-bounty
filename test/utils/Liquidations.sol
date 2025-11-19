@@ -9,6 +9,8 @@ struct LiquidationData {
     uint256 blockNumber;
     string borrowedToken;
     string collateralToken;
+    string borrowMTokenKey;
+    string collateralMTokenKey;
     address borrower;
     address liquidator;
     uint256 repayAmount;
@@ -45,6 +47,8 @@ abstract contract Liquidations {
                 blockNumber: 36671043,
                 borrowedToken: "USDC",
                 collateralToken: "AERO",
+                borrowMTokenKey: "MOONWELL_USDC",
+                collateralMTokenKey: "MOONWELL_AERO",
                 borrower: 0x46560b7207bb490A2115c334E36a70D6aD4BdEBD,
                 liquidator: 0x4de911f6b0a3ACE9c25cf198Fe6027415051Eb60,
                 repayAmount: 409205466639,
@@ -71,6 +75,9 @@ abstract contract Liquidations {
                     blockNumber: chainLiquidations[i].blockNumber,
                     borrowedToken: chainLiquidations[i].borrowedToken,
                     collateralToken: chainLiquidations[i].collateralToken,
+                    borrowMTokenKey: chainLiquidations[i].borrowMTokenKey,
+                    collateralMTokenKey: chainLiquidations[i]
+                        .collateralMTokenKey,
                     borrower: chainLiquidations[i].borrower,
                     liquidator: chainLiquidations[i].liquidator,
                     repayAmount: chainLiquidations[i].repayAmount,

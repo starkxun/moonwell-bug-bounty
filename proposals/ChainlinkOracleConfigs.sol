@@ -7,6 +7,7 @@ abstract contract ChainlinkOracleConfigs is Test {
     struct OracleConfig {
         string oracleName; /// e.g., CHAINLINK_ETH_USD
         string symbol; /// e.g., as found in addresses
+        string mTokenKey; /// e.g., MOONWELL_WETH (defaults to MOONWELL_[symbol] if not specified)
     }
 
     struct MorphoOracleConfig {
@@ -23,57 +24,60 @@ abstract contract ChainlinkOracleConfigs is Test {
     constructor() {
         /// Initialize oracle configurations for Base
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_ETH_USD", "WETH")
+            OracleConfig("CHAINLINK_ETH_USD", "WETH", "MOONWELL_WETH")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_BTC_USD", "cbBTC")
+            OracleConfig("CHAINLINK_BTC_USD", "cbBTC", "MOONWELL_cbBTC")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_EURC_USD", "EURC")
+            OracleConfig("CHAINLINK_EURC_USD", "EURC", "MOONWELL_EURC")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_WELL_USD", "xWELL_PROXY")
+            OracleConfig("CHAINLINK_WELL_USD", "xWELL_PROXY", "MOONWELL_WELL")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_USDS_USD", "USDS")
+            OracleConfig("CHAINLINK_USDS_USD", "USDS", "MOONWELL_USDS")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_TBTC_USD", "TBTC")
+            OracleConfig("CHAINLINK_TBTC_USD", "TBTC", "MOONWELL_TBTC")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_VIRTUAL_USD", "VIRTUAL")
+            OracleConfig("CHAINLINK_VIRTUAL_USD", "VIRTUAL", "MOONWELL_VIRTUAL")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_AERO_ORACLE", "AERO")
+            OracleConfig("CHAINLINK_AERO_ORACLE", "AERO", "MOONWELL_AERO")
         );
         _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("cbETHETH_ORACLE", "cbETH")
+            OracleConfig("cbETHETH_ORACLE", "cbETH", "MOONWELL_cbETH")
+        );
+        _oracleConfigs[BASE_CHAIN_ID].push(
+            OracleConfig("DAI_ORACLE", "DAI", "MOONWELL_DAI")
         );
 
         /// Initialize oracle configurations for Optimism
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_ETH_USD", "WETH")
+            OracleConfig("CHAINLINK_ETH_USD", "WETH", "MOONWELL_WETH")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_USDC_USD", "USDC")
+            OracleConfig("CHAINLINK_USDC_USD", "USDC", "MOONWELL_USDC")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_DAI_USD", "DAI")
+            OracleConfig("CHAINLINK_DAI_USD", "DAI", "MOONWELL_DAI")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_USDT_USD", "USDT")
+            OracleConfig("CHAINLINK_USDT_USD", "USDT", "MOONWELL_USDT")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_WBTC_USD", "WBTC")
+            OracleConfig("CHAINLINK_WBTC_USD", "WBTC", "MOONWELL_WBTC")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_OP_USD", "OP")
+            OracleConfig("CHAINLINK_OP_USD", "OP", "MOONWELL_OP")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_VELO_USD", "VELO")
+            OracleConfig("CHAINLINK_VELO_USD", "VELO", "MOONWELL_VELO")
         );
         _oracleConfigs[OPTIMISM_CHAIN_ID].push(
-            OracleConfig("CHAINLINK_WELL_USD", "xWELL_PROXY")
+            OracleConfig("CHAINLINK_WELL_USD", "xWELL_PROXY", "")
         );
 
         /// Initialize Morpho market configurations for Base
@@ -84,7 +88,6 @@ abstract contract ChainlinkOracleConfigs is Test {
             MorphoOracleConfig("CHAINLINK_MAMO_USD", "CHAINLINK_MAMO_USD")
         );
 
-        /// NOTE: stkWELL does not have an equivalent MToken to add reserves to, so use TEMPORAL_GOVERNOR as the fee recipient
         _MorphoOracleConfigs[BASE_CHAIN_ID].push(
             MorphoOracleConfig("CHAINLINK_stkWELL_USD", "CHAINLINK_WELL_USD")
         );
@@ -102,7 +105,8 @@ abstract contract ChainlinkOracleConfigs is Test {
             for (uint256 i = 0; i < configLength; i++) {
                 configs[i] = OracleConfig({
                     oracleName: _oracleConfigs[chainId][i].oracleName,
-                    symbol: _oracleConfigs[chainId][i].symbol
+                    symbol: _oracleConfigs[chainId][i].symbol,
+                    mTokenKey: _oracleConfigs[chainId][i].mTokenKey
                 });
             }
         }

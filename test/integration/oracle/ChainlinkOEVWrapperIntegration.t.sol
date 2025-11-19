@@ -78,7 +78,7 @@ contract ChainlinkOEVWrapperIntegrationTest is
         vm.makePersistent(address(oracle));
 
         redeemer = OEVProtocolFeeRedeemer(
-            addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER")
+            payable(addresses.getAddress("OEV_PROTOCOL_FEE_REDEEMER"))
         );
         vm.makePersistent(address(redeemer));
     }
@@ -588,7 +588,6 @@ contract ChainlinkOEVWrapperIntegrationTest is
             address borrower = _borrower(wrapper);
             address liquidator = _liquidator(wrapper);
             (, uint256 borrowAmount) = _setupSyntheticPosition(
-                wrapper,
                 mTokenCollateralAddr,
                 mTokenBorrowAddr,
                 borrower
@@ -605,6 +604,8 @@ contract ChainlinkOEVWrapperIntegrationTest is
                 collateralToken: IERC20(
                     addresses.getAddress(oracleConfigs[i].symbol)
                 ).symbol(),
+                borrowMTokenKey: "MOONWELL_USDC",
+                collateralMTokenKey: oracleConfigs[i].mTokenKey,
                 borrower: borrower,
                 liquidator: liquidator,
                 repayAmount: borrowAmount / 10,
@@ -620,13 +621,11 @@ contract ChainlinkOEVWrapperIntegrationTest is
     /// @return collateralAmount The amount of collateral deposited
     /// @return borrowAmount The amount borrowed
     function _setupSyntheticPosition(
-        ChainlinkOEVWrapper wrapper,
         address mTokenCollateralAddr,
         address mTokenBorrowAddr,
         address borrower
     ) internal returns (uint256 collateralAmount, uint256 borrowAmount) {
         (collateralAmount, borrowAmount) = _calculateSyntheticAmounts(
-            wrapper,
             mTokenCollateralAddr
         );
         _depositCollateral(
@@ -640,7 +639,6 @@ contract ChainlinkOEVWrapperIntegrationTest is
 
     /// @notice Calculate collateral and borrow amounts for synthetic position
     function _calculateSyntheticAmounts(
-        ChainlinkOEVWrapper wrapper,
         address mTokenCollateralAddr
     ) internal view returns (uint256 collateralAmount, uint256 borrowAmount) {
         // Use oracle's getUnderlyingPrice which normalizes all prices to USD
@@ -1181,30 +1179,19 @@ contract ChainlinkOEVWrapperIntegrationTest is
             ChainlinkOEVWrapper wrapper
         )
     {
-        // HACK: symbol in addresses not matching onchain token symbol
-        string memory collateralToken = (keccak256(
-            bytes(liquidation.collateralToken)
-        ) == keccak256(bytes("tBTC")))
-            ? "TBTC"
-            : liquidation.collateralToken;
-        string memory mTokenCollateralKey = string(
-            abi.encodePacked("MOONWELL_", collateralToken)
-        );
-        string memory mTokenBorrowKey = string(
-            abi.encodePacked("MOONWELL_", liquidation.borrowedToken)
-        );
-
         require(
-            addresses.isAddressSet(mTokenCollateralKey),
+            addresses.isAddressSet(liquidation.collateralMTokenKey),
             "Collateral mToken not found"
         );
         require(
-            addresses.isAddressSet(mTokenBorrowKey),
+            addresses.isAddressSet(liquidation.borrowMTokenKey),
             "Borrow mToken not found"
         );
 
-        mTokenCollateralAddr = addresses.getAddress(mTokenCollateralKey);
-        mTokenBorrowAddr = addresses.getAddress(mTokenBorrowKey);
+        mTokenCollateralAddr = addresses.getAddress(
+            liquidation.collateralMTokenKey
+        );
+        mTokenBorrowAddr = addresses.getAddress(liquidation.borrowMTokenKey);
 
         bool found;
         (wrapper, found) = _findWrapperForCollateral(
@@ -1445,17 +1432,18 @@ contract ChainlinkOEVWrapperIntegrationTest is
         address mTokenCollateralAddr,
         address mTokenBorrowAddr
     ) internal view {
-        PriceInfo memory priceInfo = _getPriceInfo(
-            mTokenCollateralAddr,
-            mTokenBorrowAddr
-        );
-        USDValues memory usdValues = _calculateUSDValues(
-            liquidation,
-            state,
-            priceInfo
-        );
+        // NOTE: only needed to verify USD values on real liquidations
+        // PriceInfo memory priceInfo = _getPriceInfo(
+        //     mTokenCollateralAddr,
+        //     mTokenBorrowAddr
+        // );
+        // USDValues memory usdValues = _calculateUSDValues(
+        //     liquidation,
+        //     state,
+        //     priceInfo
+        // );
 
-        _logLiquidationResults(liquidation, state, usdValues);
+        // _logLiquidationResults(liquidation, state, usdValues);
         _assertLiquidationResults(state);
     }
 

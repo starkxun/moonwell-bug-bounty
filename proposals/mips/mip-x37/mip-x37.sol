@@ -112,8 +112,6 @@ contract mipx37 is HybridProposal {
         );
     }
 
-    function teardown(Addresses, address) public pure override {}
-
     function validate(Addresses addresses, address) public override {
         vm.selectFork(BASE_FORK_ID);
 

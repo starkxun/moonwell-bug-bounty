@@ -12,18 +12,16 @@ import {BASE_FORK_ID} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
 /// @title MIP-B52: Bad Debt Remediation
-/// @notice Proposal to reduce reserves from three Base markets and transfer to EOA for repaying bad debt:
-///         1. Reduce 347 WETH from MOONWELL_WETH market
-///         2. Reduce 490,000 USDC from MOONWELL_USDC market
-///         3. Reduce 3 cbBTC from MOONWELL_cbBTC market
-///         4. Transfer all tokens to BAD_DEBT_REPAYER_EOA for swapping to VIRTUALS and cbXRP
+/// @notice Proposal to reduce reserves from two Base markets and transfer to EOA for repaying bad debt:
+///         1. Reduce 490,000 USDC from MOONWELL_USDC market
+///         2. Reduce 3 cbBTC from MOONWELL_cbBTC market
+///         3. Transfer all tokens to BAD_DEBT_REPAYER_EOA for swapping to VIRTUALS and cbXRP
 contract mipb52 is HybridProposal {
     using ProposalActions for *;
 
     string public constant override name = "MIP-B52";
 
     // Reserve amounts to reduce
-    uint256 public constant WETH_AMOUNT = 347e18; // 347 WETH
     uint256 public constant USDC_AMOUNT = 490_000e6; // 490,000 USDC
     uint256 public constant cbBTC_AMOUNT = 3e8; // 3 cbBTC
 
@@ -44,28 +42,6 @@ contract mipb52 is HybridProposal {
         vm.selectFork(BASE_FORK_ID);
 
         address eoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
-
-        // === WETH Reserve Reduction ===
-        address moonwellWeth = addresses.getAddress("MOONWELL_WETH");
-        address weth = MErc20(moonwellWeth).underlying();
-
-        _pushAction(
-            moonwellWeth,
-            abi.encodeWithSignature("_reduceReserves(uint256)", WETH_AMOUNT),
-            "Reduce 347 WETH reserves from MOONWELL_WETH",
-            ActionType.Base
-        );
-
-        _pushAction(
-            weth,
-            abi.encodeWithSignature(
-                "transfer(address,uint256)",
-                eoa,
-                WETH_AMOUNT
-            ),
-            "Transfer 347 WETH to BAD_DEBT_REPAYER_EOA",
-            ActionType.Base
-        );
 
         // === USDC Reserve Reduction ===
         address moonwellUsdc = addresses.getAddress("MOONWELL_USDC");
@@ -116,16 +92,6 @@ contract mipb52 is HybridProposal {
         vm.selectFork(BASE_FORK_ID);
 
         address eoa = addresses.getAddress("BAD_DEBT_REPAYER_EOA");
-
-        // Validate WETH transfer
-        address weth = MErc20(addresses.getAddress("MOONWELL_WETH"))
-            .underlying();
-        uint256 wethBalance = IERC20(weth).balanceOf(eoa);
-        assertGe(
-            wethBalance,
-            WETH_AMOUNT,
-            "BAD_DEBT_REPAYER_EOA should have received WETH"
-        );
 
         // Validate USDC transfer
         address usdc = MErc20(addresses.getAddress("MOONWELL_USDC"))

@@ -1149,7 +1149,8 @@ contract ChainlinkOEVWrapperIntegrationTest is
             wrapper
         );
         if (!shouldContinue) {
-            return; // Position doesn't exist, skip
+            console2.log("Position doesn't exist, skipping");
+            return;
         }
 
         LiquidationState memory state = _executeLiquidation(
@@ -1313,6 +1314,24 @@ contract ChainlinkOEVWrapperIntegrationTest is
         deal(borrowUnderlying, liquidator, repayAmount * 2);
         vm.warp(liquidation.timestamp);
 
+        // WIP
+        // // For historical liquidations, set up the necessary state
+        // // At block N-1, they may not have had the position yet or been underwater
+        // if (liquidation.blockNumber != block.number) {
+        //     // Give borrower enough collateral (accountTokens is at slot 14)
+        //     bytes32 collateralSlot = keccak256(abi.encode(borrower, uint256(14)));
+        //     vm.store(mTokenCollateralAddr, collateralSlot, bytes32(uint256(1e25))); // 10M mTokens
+
+        //     // Mock liquidateBorrowAllowed to always return success
+        //     vm.mockCall(
+        //         address(comptroller),
+        //         abi.encodeWithSignature(
+        //             "liquidateBorrowAllowed(address,address,address,address,uint256)"
+        //         ),
+        //         abi.encode(uint256(0)) // Return 0 = success
+        //     );
+        // }
+
         MToken mTokenBorrow = MToken(mTokenBorrowAddr);
         MToken mTokenCollateral = MToken(mTokenCollateralAddr);
 
@@ -1320,8 +1339,6 @@ contract ChainlinkOEVWrapperIntegrationTest is
         state.borrowerBorrowBefore = mTokenBorrow.borrowBalanceStored(borrower);
         state.borrowerCollateralBefore = mTokenCollateral.balanceOf(borrower);
         state.reservesBefore = mTokenCollateral.totalReserves();
-        state.liquidatorCollateralBefore = IERC20(collateralUnderlying)
-            .balanceOf(liquidator);
 
         uint256 liquidatorMTokenBefore = mTokenCollateral.balanceOf(liquidator);
         uint256 redeemerMTokenBefore = mTokenCollateral.balanceOf(
@@ -1375,8 +1392,19 @@ contract ChainlinkOEVWrapperIntegrationTest is
                 "Redeemer mToken balance should match protocol fee from event"
             );
 
+            // Get reserves before redemption
+            uint256 reservesBeforeRedemption = mTokenCollateral.totalReserves();
+
             // Redeem protocol fees and add to reserves
             _redeemAndVerifyProtocolFees(mTokenCollateralAddr);
+
+            // Get reserves after redemption
+            uint256 reservesAfterRedemption = mTokenCollateral.totalReserves();
+
+            // Calculate how much underlying was added to reserves
+            state.protocolFeeRedeemed =
+                reservesAfterRedemption -
+                reservesBeforeRedemption;
         } else {
             // When protocolFee is 0, redeemer should not receive any mTokens
             assertEq(
@@ -1384,14 +1412,13 @@ contract ChainlinkOEVWrapperIntegrationTest is
                 redeemerMTokenBefore,
                 "Redeemer should not receive mTokens when protocolFee is 0"
             );
+            state.protocolFeeRedeemed = 0;
         }
 
-        // Get balances after liquidation
+        // Get balances after liquidation and redemption
         state.borrowerBorrowAfter = mTokenBorrow.borrowBalanceStored(borrower);
         state.borrowerCollateralAfter = mTokenCollateral.balanceOf(borrower);
         state.reservesAfter = mTokenCollateral.totalReserves();
-        state.liquidatorCollateralAfter = IERC20(collateralUnderlying)
-            .balanceOf(liquidator);
     }
 
     /// @notice Parse liquidation event to extract fees
@@ -1433,17 +1460,23 @@ contract ChainlinkOEVWrapperIntegrationTest is
         address mTokenBorrowAddr
     ) internal view {
         // NOTE: only needed to verify USD values on real liquidations
-        // PriceInfo memory priceInfo = _getPriceInfo(
-        //     mTokenCollateralAddr,
-        //     mTokenBorrowAddr
-        // );
-        // USDValues memory usdValues = _calculateUSDValues(
-        //     liquidation,
-        //     state,
-        //     priceInfo
-        // );
+        PriceInfo memory priceInfo = _getPriceInfo(
+            mTokenCollateralAddr,
+            mTokenBorrowAddr
+        );
+        USDValues memory usdValues = _calculateUSDValues(
+            liquidation,
+            state,
+            priceInfo,
+            mTokenCollateralAddr
+        );
 
-        // _logLiquidationResults(liquidation, state, usdValues);
+        _logLiquidationResults(
+            liquidation,
+            state,
+            usdValues,
+            mTokenCollateralAddr
+        );
         _assertLiquidationResults(state);
     }
 
@@ -1483,29 +1516,54 @@ contract ChainlinkOEVWrapperIntegrationTest is
         uint256 protocolFeeUSD;
         uint256 liquidatorFeeUSD;
         uint256 repayAmountUSD;
+        uint256 protocolFeeUnderlying;
+        uint256 liquidatorFeeUnderlying;
+        uint256 protocolFeeRedeemedUSD;
     }
 
     /// @notice Calculate USD values from token amounts
+    /// @dev Protocol and liquidator fees are in mToken units, need to convert to underlying using exchange rate
     /// @dev getUnderlyingPrice returns prices scaled by 1e18 and already adjusted for token decimals
-    /// So: USD = (amount * price) / 1e18
+    /// So: USD = (underlyingAmount * price) / 1e18
     function _calculateUSDValues(
         LiquidationData memory liquidation,
         LiquidationState memory state,
-        PriceInfo memory priceInfo
-    ) internal pure returns (USDValues memory) {
+        PriceInfo memory priceInfo,
+        address mTokenCollateralAddr
+    ) internal view returns (USDValues memory) {
         uint256 repayAmount = liquidation.repayAmount;
-        uint256 protocolFeeUSD = (state.protocolFee *
+
+        // Get exchange rate to convert mToken amounts to underlying amounts
+        uint256 exchangeRate = MToken(mTokenCollateralAddr)
+            .exchangeRateStored();
+
+        // Convert mToken amounts to underlying amounts
+        // exchangeRate has 18 decimals, so: underlying = (mTokenAmount * exchangeRate) / 1e18
+        uint256 protocolFeeUnderlying = (state.protocolFee * exchangeRate) /
+            1e18;
+        uint256 liquidatorFeeUnderlying = (state.liquidatorFeeReceived *
+            exchangeRate) / 1e18;
+
+        // Calculate USD values from underlying amounts
+        uint256 protocolFeeUSD = (protocolFeeUnderlying *
             priceInfo.collateralPriceUSD) / 1e18;
-        uint256 liquidatorFeeUSD = (state.liquidatorFeeReceived *
+        uint256 liquidatorFeeUSD = (liquidatorFeeUnderlying *
             priceInfo.collateralPriceUSD) / 1e18;
         uint256 repayAmountUSD = (repayAmount * priceInfo.borrowPriceUSD) /
             1e18;
+
+        // Calculate USD value of redeemed protocol fee (already in underlying units)
+        uint256 protocolFeeRedeemedUSD = (state.protocolFeeRedeemed *
+            priceInfo.collateralPriceUSD) / 1e18;
 
         return
             USDValues({
                 protocolFeeUSD: protocolFeeUSD,
                 liquidatorFeeUSD: liquidatorFeeUSD,
-                repayAmountUSD: repayAmountUSD
+                repayAmountUSD: repayAmountUSD,
+                protocolFeeUnderlying: protocolFeeUnderlying,
+                liquidatorFeeUnderlying: liquidatorFeeUnderlying,
+                protocolFeeRedeemedUSD: protocolFeeRedeemedUSD
             });
     }
 
@@ -1513,29 +1571,100 @@ contract ChainlinkOEVWrapperIntegrationTest is
     function _logLiquidationResults(
         LiquidationData memory liquidation,
         LiquidationState memory state,
-        USDValues memory usdValues
-    ) internal pure {
-        console2.log("=== Liquidation Results ===");
+        USDValues memory usdValues,
+        address mTokenCollateralAddr
+    ) internal view {
+        console2.log("\n=== Liquidation Results ===\n");
         console2.log("Borrower:", liquidation.borrower);
         console2.log("Liquidator:", liquidation.liquidator);
         console2.log("Collateral Token:", liquidation.collateralToken);
         console2.log("Borrow Token:", liquidation.borrowedToken);
+        console2.log("\n--- Repayment ---");
         console2.log("Repay Amount:", liquidation.repayAmount);
         console2.log("Repay Amount USD:", usdValues.repayAmountUSD);
-        console2.log("Protocol Fee:", state.protocolFee);
+        console2.log("\n--- Protocol Fee (OEV capture) ---");
+        console2.log("Protocol Fee (mTokens):", state.protocolFee);
+        console2.log(
+            "Protocol Fee (underlying):",
+            usdValues.protocolFeeUnderlying
+        );
         console2.log("Protocol Fee USD:", usdValues.protocolFeeUSD);
-        console2.log("Liquidator Fee:", state.liquidatorFeeReceived);
+        if (state.protocolFee > 0) {
+            console2.log(
+                "Protocol Fee Redeemed (underlying added to reserves):",
+                state.protocolFeeRedeemed
+            );
+            console2.log(
+                "Protocol Fee Redeemed USD:",
+                usdValues.protocolFeeRedeemedUSD
+            );
+        }
+        console2.log("\n--- Liquidator Fee ---");
+        console2.log("Liquidator Fee (mTokens):", state.liquidatorFeeReceived);
+        console2.log(
+            "Liquidator Fee (underlying):",
+            usdValues.liquidatorFeeUnderlying
+        );
         console2.log("Liquidator Fee USD:", usdValues.liquidatorFeeUSD);
+        console2.log("\n--- Collateral Seized (mTokens) ---");
+        uint256 totalSeized = state.borrowerCollateralBefore -
+            state.borrowerCollateralAfter;
+        uint256 burnedMTokens = totalSeized -
+            state.liquidatorFeeReceived -
+            state.protocolFee;
+        console2.log("Total Seized from Borrower:", totalSeized);
+        console2.log("Distributed to Liquidator:", state.liquidatorFeeReceived);
+        console2.log(
+            "Distributed to Protocol (OEV Redeemer):",
+            state.protocolFee
+        );
+        console2.log("Burned (protocol seize share):", burnedMTokens);
+
+        // Calculate expected underlying from burned mTokens
+        uint256 exchangeRate = MToken(mTokenCollateralAddr)
+            .exchangeRateStored();
+        uint256 burnedUnderlyingExpected = (burnedMTokens * exchangeRate) /
+            1e18;
+        console2.log(
+            "Burned mTokens -> underlying (expected):",
+            burnedUnderlyingExpected
+        );
+
+        console2.log("\n--- Borrower Position ---");
         console2.log("Borrower Borrow Before:", state.borrowerBorrowBefore);
         console2.log("Borrower Borrow After:", state.borrowerBorrowAfter);
         console2.log(
-            "Borrower Collateral Before:",
+            "Borrower Collateral Before (mTokens):",
             state.borrowerCollateralBefore
         );
         console2.log(
-            "Borrower Collateral After:",
+            "Borrower Collateral After (mTokens):",
             state.borrowerCollateralAfter
         );
+        console2.log("\n--- Reserves (underlying tokens) ---");
+        console2.log("Reserves Before:", state.reservesBefore);
+        console2.log("Reserves After:", state.reservesAfter);
+        console2.log(
+            "Reserves Increase:",
+            state.reservesAfter - state.reservesBefore
+        );
+        if (state.protocolFee > 0) {
+            uint256 reservesFromBurn = (state.reservesAfter -
+                state.reservesBefore) - state.protocolFeeRedeemed;
+            console2.log(
+                "  - From protocol seize share (burned mTokens):",
+                reservesFromBurn
+            );
+            console2.log(
+                "  - From OEV capture (redeemed mTokens):",
+                state.protocolFeeRedeemed
+            );
+        } else {
+            console2.log("  - All from protocol seize share (burned mTokens)");
+        }
+        console2.log("\n--- Exchange Rate ---");
+        console2.log("Exchange Rate:", exchangeRate);
+        console2.log("\n==============================================\n");
     }
 
     /// @notice Assert liquidation results

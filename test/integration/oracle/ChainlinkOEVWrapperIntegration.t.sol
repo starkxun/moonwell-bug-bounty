@@ -480,6 +480,8 @@ contract ChainlinkOEVWrapperIntegrationTest is
         // Mock the feed to return valid data for specific rounds
         uint256 latestRound = 100;
         for (uint256 i = 0; i < wrappers.length; i++) {
+            vm.clearMockedCalls();
+
             ChainlinkOEVWrapper wrapper = wrappers[i];
 
             // Mock valid price data for round 100 (latest)
@@ -565,6 +567,8 @@ contract ChainlinkOEVWrapperIntegrationTest is
         );
 
         for (uint256 i = 0; i < wrappers.length; i++) {
+            vm.clearMockedCalls();
+
             ChainlinkOEVWrapper wrapper = wrappers[i];
 
             // Get the collateral mToken
@@ -575,14 +579,13 @@ contract ChainlinkOEVWrapperIntegrationTest is
 
             address mTokenCollateralAddr = addresses.getAddress(mTokenKey);
 
-            // Use USDC as borrow token
-            if (
-                !addresses.isAddressSet("MOONWELL_USDC") ||
-                addresses.getAddress("MOONWELL_USDC") == mTokenCollateralAddr
-            ) {
-                continue;
-            }
-            address mTokenBorrowAddr = addresses.getAddress("MOONWELL_USDC");
+            // Get borrow token based on collateral type
+            (
+                string memory borrowMTokenKey,
+                string memory borrowTokenSymbol
+            ) = _getBorrowTokenForCollateral(oracleConfigs[i].symbol);
+
+            address mTokenBorrowAddr = addresses.getAddress(borrowMTokenKey);
 
             // Set up synthetic position
             address borrower = _borrower(wrapper);
@@ -600,11 +603,11 @@ contract ChainlinkOEVWrapperIntegrationTest is
             LiquidationData memory liquidation = LiquidationData({
                 timestamp: block.timestamp,
                 blockNumber: block.number,
-                borrowedToken: "USDC",
+                borrowedToken: borrowTokenSymbol,
                 collateralToken: IERC20(
                     addresses.getAddress(oracleConfigs[i].symbol)
                 ).symbol(),
-                borrowMTokenKey: "MOONWELL_USDC",
+                borrowMTokenKey: borrowMTokenKey,
                 collateralMTokenKey: oracleConfigs[i].mTokenKey,
                 borrower: borrower,
                 liquidator: liquidator,
@@ -617,6 +620,28 @@ contract ChainlinkOEVWrapperIntegrationTest is
         }
     }
 
+    /// @notice Get appropriate borrow token based on collateral type
+    /// @dev Uses DAI for stablecoin collateral to avoid price correlation during liquidation tests
+    /// @param collateralSymbol The symbol of the collateral asset
+    /// @return borrowMTokenKey The key for the borrow mToken (e.g., "MOONWELL_DAI")
+    /// @return borrowTokenSymbol The symbol of the borrow token (e.g., "DAI")
+    function _getBorrowTokenForCollateral(
+        string memory collateralSymbol
+    )
+        internal
+        pure
+        returns (string memory borrowMTokenKey, string memory borrowTokenSymbol)
+    {
+        if (
+            keccak256(bytes(collateralSymbol)) == keccak256(bytes("USDC")) ||
+            keccak256(bytes(collateralSymbol)) == keccak256(bytes("EURC"))
+        ) {
+            return ("MOONWELL_DAI", "DAI");
+        } else {
+            return ("MOONWELL_USDC", "USDC");
+        }
+    }
+
     /// @notice Set up synthetic position by depositing collateral and borrowing
     /// @return collateralAmount The amount of collateral deposited
     /// @return borrowAmount The amount borrowed
@@ -626,7 +651,8 @@ contract ChainlinkOEVWrapperIntegrationTest is
         address borrower
     ) internal returns (uint256 collateralAmount, uint256 borrowAmount) {
         (collateralAmount, borrowAmount) = _calculateSyntheticAmounts(
-            mTokenCollateralAddr
+            mTokenCollateralAddr,
+            mTokenBorrowAddr
         );
         _depositCollateral(
             mTokenCollateralAddr,
@@ -634,12 +660,13 @@ contract ChainlinkOEVWrapperIntegrationTest is
             borrower,
             collateralAmount
         );
-        _borrowUSDC(mTokenBorrowAddr, borrower, borrowAmount);
+        _borrow(mTokenBorrowAddr, borrower, borrowAmount);
     }
 
     /// @notice Calculate collateral and borrow amounts for synthetic position
     function _calculateSyntheticAmounts(
-        address mTokenCollateralAddr
+        address mTokenCollateralAddr,
+        address mTokenBorrowAddr
     ) internal view returns (uint256 collateralAmount, uint256 borrowAmount) {
         // Use oracle's getUnderlyingPrice which normalizes all prices to USD
         ChainlinkOracle oracle = ChainlinkOracle(address(comptroller.oracle()));
@@ -654,10 +681,13 @@ contract ChainlinkOEVWrapperIntegrationTest is
         require(isListed, "market not listed");
         uint256 collateralFactorBps = (collateralFactorMantissa * 10000) / 1e18;
 
+        uint256 borrowDecimals = IERC20(MErc20(mTokenBorrowAddr).underlying())
+            .decimals();
+
         collateralAmount = (10_000 * 1e18 * 1e18) / priceInUSD;
         borrowAmount =
             ((10_000 * collateralFactorBps * 70) / (10000 * 100)) *
-            1e6;
+            (10 ** borrowDecimals);
     }
 
     /// @notice Deposit collateral and enter markets
@@ -706,8 +736,8 @@ contract ChainlinkOEVWrapperIntegrationTest is
         }
     }
 
-    /// @notice Borrow USDC
-    function _borrowUSDC(
+    /// @notice Borrow USDC or DAI
+    function _borrow(
         address mTokenBorrowAddr,
         address borrower,
         uint256 borrowAmount
@@ -1160,12 +1190,14 @@ contract ChainlinkOEVWrapperIntegrationTest is
             mTokenBorrowAddr
         );
 
-        _verifyLiquidationResults(
-            liquidation,
-            state,
-            mTokenCollateralAddr,
-            mTokenBorrowAddr
-        );
+        _assertLiquidationResults(state);
+
+        // _verifyLiquidationResults(
+        //     liquidation,
+        //     state,
+        //     mTokenCollateralAddr,
+        //     mTokenBorrowAddr
+        // );
     }
 
     /// @notice Setup liquidation by getting addresses and finding wrapper
@@ -1308,13 +1340,10 @@ contract ChainlinkOEVWrapperIntegrationTest is
         uint256 repayAmount = liquidation.repayAmount;
 
         address borrowUnderlying = MErc20(mTokenBorrowAddr).underlying();
-        address collateralUnderlying = MErc20(mTokenCollateralAddr)
-            .underlying();
-
         deal(borrowUnderlying, liquidator, repayAmount * 2);
         vm.warp(liquidation.timestamp);
 
-        // WIP
+        // WIP; mocking onchain state for historical liquidations
         // // For historical liquidations, set up the necessary state
         // // At block N-1, they may not have had the position yet or been underwater
         // if (liquidation.blockNumber != block.number) {
@@ -1453,13 +1482,13 @@ contract ChainlinkOEVWrapperIntegrationTest is
     }
 
     /// @notice Verify liquidation results and log
+    /// @dev only needed to verify USD values on real liquidations
     function _verifyLiquidationResults(
         LiquidationData memory liquidation,
         LiquidationState memory state,
         address mTokenCollateralAddr,
         address mTokenBorrowAddr
     ) internal view {
-        // NOTE: only needed to verify USD values on real liquidations
         PriceInfo memory priceInfo = _getPriceInfo(
             mTokenCollateralAddr,
             mTokenBorrowAddr

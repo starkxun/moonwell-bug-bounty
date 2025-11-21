@@ -141,7 +141,6 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
 
     function _wireCoreFeeds(Addresses addresses, uint256 chainId) internal {
         OracleConfig[] memory oracleConfigs = getOracleConfigurations(chainId);
-        console.log("=== Wiring %d core feeds ===", oracleConfigs.length);
 
         for (uint256 i = 0; i < oracleConfigs.length; i++) {
             OracleConfig memory config = oracleConfigs[i];
@@ -153,10 +152,6 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 .symbol();
 
             address wrapperAddress = addresses.getAddress(wrapperName);
-            console.log("Feed %d - Symbol: %s", i, symbol);
-            console.log("  Wrapper name: %s", wrapperName);
-            console.log("  Wrapper address: %s", wrapperAddress);
-            console.log("  Pushed setFeed action to ChainlinkOracle");
 
             _pushAction(
                 chainlinkOracle,
@@ -168,7 +163,6 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 string.concat("Set feed to OEV wrapper for ", symbol)
             );
         }
-        console.log("=== Finished wiring core feeds ===");
     }
 
     function _deployOEVProtocolFeeRedeemer(Addresses addresses) internal {
@@ -186,13 +180,9 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
             block.chainid
         );
         for (uint256 i = 0; i < oracleConfigs.length; i++) {
-            OracleConfig memory config = oracleConfigs[i];
-
-            // Only skip if mTokenKey is explicitly set to empty string
-            if (bytes(config.mTokenKey).length == 0) {
-                continue;
-            }
-            feeRedeemer.whitelistMarket(addresses.getAddress(config.mTokenKey));
+            feeRedeemer.whitelistMarket(
+                addresses.getAddress(oracleConfigs[i].mTokenKey)
+            );
         }
 
         feeRedeemer.transferOwnership(
@@ -214,11 +204,6 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
             return;
         }
 
-        console.log(
-            "Deploying %d core wrappers for chain %d",
-            oracleConfigs.length,
-            block.chainid
-        );
         vm.startBroadcast();
 
         for (uint256 i = 0; i < oracleConfigs.length; i++) {
@@ -227,8 +212,6 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
             string memory wrapperName = string(
                 abi.encodePacked(config.oracleName, "_OEV_WRAPPER")
             );
-
-            console.log("--- Wrapper %d: %s ---", i, wrapperName);
 
             ChainlinkOEVWrapper wrapper = new ChainlinkOEVWrapper(
                 addresses.getAddress(config.oracleName),
@@ -239,29 +222,28 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 MAX_ROUND_DELAY,
                 MAX_DECREMENTS
             );
-            console.log("1. Deployed new wrapper at: %s", address(wrapper));
 
             // Set existing wrapper to deprecated and add new wrapper
             if (addresses.isAddressSet(wrapperName)) {
                 address oldWrapper = addresses.getAddress(wrapperName);
-                console.log("2. Old wrapper found at: %s", oldWrapper);
 
                 string memory deprecatedName = string(
                     abi.encodePacked(wrapperName, "_DEPRECATED")
                 );
-                addresses.addAddress(deprecatedName, oldWrapper);
-                console.log("3. Set old wrapper as: %s", deprecatedName);
+
+                if (addresses.isAddressSet(deprecatedName)) {
+                    addresses.changeAddress(deprecatedName, oldWrapper, true);
+                } else {
+                    addresses.addAddress(deprecatedName, oldWrapper);
+                }
 
                 addresses.changeAddress(wrapperName, address(wrapper), true);
-                console.log("4. Changed %s to new wrapper", wrapperName);
             } else {
                 addresses.addAddress(wrapperName, address(wrapper));
-                console.log("2. Added new wrapper (no previous wrapper)");
             }
         }
 
         vm.stopBroadcast();
-        console.log("Finished deploying core wrappers");
     }
 
     function _deployMorphoWrappers(Addresses addresses) internal {

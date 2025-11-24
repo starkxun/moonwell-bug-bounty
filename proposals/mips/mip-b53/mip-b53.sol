@@ -118,10 +118,5 @@ contract mipb53 is HybridProposal {
             address(0),
             "MOONWELL_WETH pendingAdmin should be zero after accepting"
         );
-
-        console.log("✓ MWethOwnerWrapper successfully deployed and configured");
-        console.log("✓ MOONWELL_WETH admin transferred to wrapper");
-        console.log("✓ Wrapper owned by TEMPORAL_GOVERNOR");
-        console.log("✓ Future WETH reserve reductions now enabled");
     }
 }

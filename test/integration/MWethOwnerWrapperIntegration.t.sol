@@ -225,7 +225,7 @@ contract MWethOwnerWrapperIntegrationTest is PostProposalCheck {
         uint256 wrapperBalance = IERC20(weth).balanceOf(address(wrapper));
         assertEq(wrapperBalance, reduceAmount, "WETH not in wrapper");
 
-        // Step 3: Withdraw WETH to recipient
+        // Step 2: Withdraw WETH to recipient
         uint256 recipientBefore = IERC20(weth).balanceOf(RECIPIENT);
 
         vm.prank(temporalGovernor);
@@ -238,7 +238,7 @@ contract MWethOwnerWrapperIntegrationTest is PostProposalCheck {
             "Recipient didn't receive WETH"
         );
 
-        // Step 4: Verify wrapper is empty
+        // Step 3: Verify wrapper is empty
         assertEq(
             IERC20(weth).balanceOf(address(wrapper)),
             0,
@@ -413,23 +413,6 @@ contract MWethOwnerWrapperIntegrationTest is PostProposalCheck {
             wrapper.getTokenBalance(weth),
             amount,
             "getTokenBalance incorrect"
-        );
-    }
-
-    function testGetEthBalance() public {
-        uint256 amount = 3 ether;
-
-        // Send ETH to wrapper (it will auto-wrap)
-        vm.deal(address(this), amount);
-        (bool success, ) = address(wrapper).call{value: amount}("");
-        assertTrue(success);
-
-        // ETH balance should be 0 (all auto-wrapped to WETH)
-        assertEq(wrapper.getEthBalance(), 0, "ETH should be auto-wrapped");
-        assertEq(
-            wrapper.getTokenBalance(weth),
-            amount,
-            "WETH balance should equal sent amount"
         );
     }
 

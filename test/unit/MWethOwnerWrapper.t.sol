@@ -408,13 +408,6 @@ contract MWethOwnerWrapperUnitTest is Test {
         assertEq(wrapper.getTokenBalance(address(weth)), amount);
     }
 
-    function testGetEthBalance() public {
-        uint256 amount = 3 ether;
-        vm.deal(address(wrapper), amount);
-
-        assertEq(wrapper.getEthBalance(), amount);
-    }
-
     // ============================================
     // Integration Test: Full Reserve Reduction Flow
     // ============================================

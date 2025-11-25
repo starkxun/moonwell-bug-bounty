@@ -221,12 +221,4 @@ contract MWethOwnerWrapper is Initializable, OwnableUpgradeable {
     function getTokenBalance(address token) external view returns (uint256) {
         return WETH9(token).balanceOf(address(this));
     }
-
-    /**
-     * @notice Get the ETH balance held by this wrapper
-     * @return The ETH balance
-     */
-    function getEthBalance() external view returns (uint256) {
-        return address(this).balance;
-    }
 }

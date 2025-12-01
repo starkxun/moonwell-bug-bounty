@@ -968,22 +968,6 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             }
         }
 
-        bytes memory multiRewarderBytes = vm.parseJson(
-            data,
-            string.concat(prefix, ".multiRewarder")
-        );
-        if (multiRewarderBytes.length > 0) {
-            MultiRewarder[] memory multiRewarder = abi.decode(
-                multiRewarderBytes,
-                (MultiRewarder[])
-            );
-            for (uint256 i = 0; i < multiRewarder.length; i++) {
-                MultiRewarder memory multiReward = multiRewarder[i];
-
-                externalChainActions[_chainId].multiRewarder.push(multiReward);
-            }
-        }
-
         {
             bytes memory initSaleBytes = vm.parseJson(
                 data,
@@ -1074,6 +1058,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             data,
             string.concat(prefix, ".multiRewarder")
         );
+        if (multiRewarderBytes.length == 0) {
+            return;
+        }
         MultiRewarder[] memory multiRewarders = abi.decode(
             multiRewarderBytes,
             (MultiRewarder[])

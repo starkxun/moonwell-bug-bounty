@@ -420,6 +420,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
                 collateralAnswer,
                 collateralSeized,
                 mTokenLoan,
+                mTokenCollateral,
                 underlyingCollateral
             );
 
@@ -514,16 +515,18 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
 
     /// @notice Calculate the split of seized collateral between liquidator and fee recipient
     /// @param repayAmount The amount of loan tokens being repaid
-    /// @param collateralSeized The amount of collateral tokens seized
+    /// @param collateralSeized The amount of collateral tokens seized (in mToken units)
     /// @param mTokenLoan The mToken for the loan being repaid
+    /// @param mTokenCollateral The mToken for the collateral
     /// @param underlyingCollateral The underlying collateral token interface
-    /// @return liquidatorFee The amount of collateral to send to the liquidator (repayment + bonus)
-    /// @return protocolFee The amount of collateral to send to the fee recipient (remainder)
+    /// @return liquidatorFee The amount of collateral to send to the liquidator (repayment + bonus) in mToken units
+    /// @return protocolFee The amount of collateral to send to the fee recipient (remainder) in mToken units
     function _calculateCollateralSplit(
         uint256 repayAmount,
         int256 collateralAnswer,
         uint256 collateralSeized,
         address mTokenLoan,
+        address mTokenCollateral,
         EIP20Interface underlyingCollateral
     ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
         uint256 loanPrice = chainlinkOracle.getUnderlyingPrice(
@@ -534,9 +537,14 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             underlyingCollateral
         );
 
+        // Convert seized mTokens to underlying amount
+        uint256 exchangeRate = MTokenInterface(mTokenCollateral)
+            .exchangeRateStored();
+        uint256 underlyingAmount = (collateralSeized * exchangeRate) / 1e18;
+
         uint256 usdNormalizer = 10 ** PRICE_MANTISSA_DECIMALS; // 1e18
         uint256 repayUSD = (repayAmount * loanPrice) / usdNormalizer;
-        uint256 collateralUSD = (collateralSeized * collateralPrice) /
+        uint256 collateralUSD = (underlyingAmount * collateralPrice) /
             usdNormalizer;
 
         // If collateral is worth less than repayment, liquidator gets all collateral
@@ -551,8 +559,10 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             ((collateralUSD - repayUSD) * uint256(feeMultiplier)) /
             MAX_BPS;
 
-        // Convert back to collateral token amount
-        liquidatorFee = (liquidatorUSD * usdNormalizer) / collateralPrice;
+        // Convert liquidator USD to underlying, then to mToken units
+        uint256 liquidatorUnderlyingAmount = (liquidatorUSD * usdNormalizer) /
+            collateralPrice;
+        liquidatorFee = (liquidatorUnderlyingAmount * 1e18) / exchangeRate;
 
         protocolFee = collateralSeized - liquidatorFee;
     }

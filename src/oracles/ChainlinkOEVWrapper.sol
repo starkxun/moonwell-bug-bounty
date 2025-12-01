@@ -411,6 +411,11 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             underlyingLoan
         );
 
+        require(
+            collateralSeized > 0,
+            "ChainlinkOEVWrapper: collateral seized cannot be zero"
+        );
+
         // Calculate the split of collateral between liquidator and protocol
         (
             uint256 liquidatorFee,

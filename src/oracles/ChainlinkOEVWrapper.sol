@@ -394,6 +394,11 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
                 uint80 answeredInRound
             ) = priceFeed.latestRoundData();
 
+            require(
+                roundId > cachedRoundId,
+                "ChainlinkOEVWrapper: round must be greater than cached round"
+            );
+
             // validate the round data
             _validateRoundData(roundId, answer, updatedAt, answeredInRound);
 

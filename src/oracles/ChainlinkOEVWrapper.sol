@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {AggregatorV3Interface} from "./AggregatorV3Interface.sol";
 import {MErc20Storage, MTokenInterface, MErc20Interface} from "../MTokenInterfaces.sol";
 import {MToken} from "../MToken.sol";
@@ -13,7 +14,11 @@ import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
  * @notice A wrapper for Chainlink price feeds that allows early updates for liquidation
  * @dev This contract implements the AggregatorV3Interface and adds OEV (Oracle Extractable Value) functionality
  */
-contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
+contract ChainlinkOEVWrapper is
+    Ownable,
+    AggregatorV3Interface,
+    ReentrancyGuard
+{
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
 
@@ -331,7 +336,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         uint256 repayAmount,
         address mTokenCollateral,
         address mTokenLoan
-    ) external {
+    ) external nonReentrant {
         // ensure the repay amount is greater than zero
         require(
             repayAmount > 0,

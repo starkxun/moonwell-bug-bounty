@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./AggregatorV3Interface.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IMorphoBlue} from "../morpho/IMorphoBlue.sol";
@@ -18,7 +19,8 @@ import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
 contract ChainlinkOEVMorphoWrapper is
     Initializable,
     OwnableUpgradeable,
-    AggregatorV3Interface
+    AggregatorV3Interface,
+    ReentrancyGuardUpgradeable
 {
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
@@ -135,6 +137,7 @@ contract ChainlinkOEVMorphoWrapper is
             "ChainlinkOEVMorphoWrapper: max decrements cannot be zero"
         );
         __Ownable_init();
+        __ReentrancyGuard_init();
 
         priceFeed = AggregatorV3Interface(_priceFeed);
         morphoBlue = IMorphoBlue(_morphoBlue);

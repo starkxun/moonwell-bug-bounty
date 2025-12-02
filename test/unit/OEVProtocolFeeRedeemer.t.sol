@@ -38,6 +38,7 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
 
     // Events
     event ReservesAddedFromOEV(address indexed mToken, uint256 amount);
+    event MarketWhitelisted(address indexed market, bool whitelisted);
 
     function setUp() public {
         // Deploy mock tokens
@@ -126,6 +127,8 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
         );
 
         vm.prank(owner);
+        vm.expectEmit(true, false, false, true);
+        emit MarketWhitelisted(address(mUSDC), true);
         redeemer.whitelistMarket(address(mUSDC), true);
 
         assertTrue(
@@ -136,11 +139,17 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
 
     function testUnwhitelistMarket() public {
         vm.startPrank(owner);
+
+        vm.expectEmit(true, false, false, true);
+        emit MarketWhitelisted(address(mUSDC), true);
         redeemer.whitelistMarket(address(mUSDC), true);
         assertTrue(redeemer.whitelistedMarkets(address(mUSDC)));
 
+        vm.expectEmit(true, false, false, true);
+        emit MarketWhitelisted(address(mUSDC), false);
         redeemer.whitelistMarket(address(mUSDC), false);
         assertFalse(redeemer.whitelistedMarkets(address(mUSDC)));
+
         vm.stopPrank();
     }
 

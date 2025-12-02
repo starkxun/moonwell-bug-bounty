@@ -14,6 +14,7 @@ import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
  */
 contract OEVProtocolFeeRedeemer is Ownable {
     event ReservesAddedFromOEV(address indexed mToken, uint256 amount);
+    event MarketWhitelisted(address indexed market, bool whitelisted);
 
     modifier onlyWhitelistedMarkets(address _market) {
         require(
@@ -53,6 +54,7 @@ contract OEVProtocolFeeRedeemer is Ownable {
         bool _whitelisted
     ) external onlyOwner {
         whitelistedMarkets[_market] = _whitelisted;
+        emit MarketWhitelisted(_market, _whitelisted);
     }
 
     /**

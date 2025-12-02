@@ -39,10 +39,15 @@ contract OEVProtocolFeeRedeemer is Ownable {
     }
 
     /**
-     * @notice Allows the contract
+     * @notice Allows the contract owner to whitelist or unwhitelist a market
+     * @param _market Address of the mToken to whitelist or unwhitelist
+     * @param _whitelisted Whether to whitelist the market
      */
-    function whitelistMarket(address _market) external onlyOwner {
-        whitelistedMarkets[_market] = true;
+    function whitelistMarket(
+        address _market,
+        bool _whitelisted
+    ) external onlyOwner {
+        whitelistedMarkets[_market] = _whitelisted;
     }
 
     /**
@@ -160,7 +165,10 @@ contract OEVProtocolFeeRedeemer is Ownable {
         uint256 amount
     ) internal {
         underlyingToken.approve(address(mToken), amount);
-        mToken._addReserves(amount);
+        require(
+            mToken._addReserves(amount) == 0,
+            "OEVProtocolFeeRedeemer: add reserves failed"
+        );
         emit ReservesAddedFromOEV(address(mToken), amount);
     }
 

@@ -181,7 +181,8 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         );
         for (uint256 i = 0; i < oracleConfigs.length; i++) {
             feeRedeemer.whitelistMarket(
-                addresses.getAddress(oracleConfigs[i].mTokenKey)
+                addresses.getAddress(oracleConfigs[i].mTokenKey),
+                true
             );
         }
 

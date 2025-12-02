@@ -81,7 +81,7 @@ contract ChainlinkOEVWrapper is
      * @notice Contract constructor
      * @param _priceFeed Address of the Chainlink price feed to forward calls to
      * @param _owner Address that will own this contract
-     * @param _feeMultiplier The fee multiplier for the OEV fees
+     * @param _liquidatorFeeBps The liquidator fee BPS for the OEV fees
      * @param _maxRoundDelay The max round delay
      * @param _maxDecrements The max decrements
      */
@@ -90,7 +90,7 @@ contract ChainlinkOEVWrapper is
         address _owner,
         address _chainlinkOracle,
         address _feeRecipient,
-        uint16 _feeMultiplier,
+        uint16 _liquidatorFeeBps,
         uint256 _maxRoundDelay,
         uint256 _maxDecrements
     ) {
@@ -103,8 +103,8 @@ contract ChainlinkOEVWrapper is
             "ChainlinkOEVWrapper: owner cannot be zero address"
         );
         require(
-            _feeMultiplier <= MAX_BPS,
-            "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
+            _liquidatorFeeBps <= MAX_BPS,
+            "ChainlinkOEVWrapper: liquidator fee cannot be greater than MAX_BPS"
         );
         require(
             _maxRoundDelay > 0,
@@ -124,7 +124,7 @@ contract ChainlinkOEVWrapper is
         );
 
         priceFeed = AggregatorV3Interface(_priceFeed);
-        liquidatorFeeBps = _feeMultiplier;
+        liquidatorFeeBps = _liquidatorFeeBps;
         cachedRoundId = priceFeed.latestRound();
         maxRoundDelay = _maxRoundDelay;
         maxDecrements = _maxDecrements;

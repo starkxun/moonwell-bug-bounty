@@ -32,6 +32,11 @@ contract OEVProtocolFeeRedeemer is Ownable {
      * @param _moonwellWETH Address for WETH mToken
      */
     constructor(address _moonwellWETH) {
+        require(
+            _moonwellWETH != address(0),
+            "OEVProtocolFeeRedeemer: MOONWELL_WETH cannot be zero address"
+        );
+
         MOONWELL_WETH = _moonwellWETH;
         whitelistedMarkets[_moonwellWETH] = true;
 

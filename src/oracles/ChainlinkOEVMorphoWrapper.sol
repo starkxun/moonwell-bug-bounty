@@ -117,6 +117,10 @@ contract ChainlinkOEVMorphoWrapper is
             "ChainlinkOEVMorphoWrapper: owner cannot be zero address"
         );
         require(
+            _morphoBlue != address(0),
+            "ChainlinkOEVMorphoWrapper: morpho blue cannot be zero address"
+        );
+        require(
             _chainlinkOracle != address(0),
             "ChainlinkOEVMorphoWrapper: chainlink oracle cannot be zero address"
         );

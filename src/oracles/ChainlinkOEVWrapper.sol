@@ -469,19 +469,27 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     function _getCollateralTokenPrice(
         int256 collateralAnswer,
         EIP20Interface underlyingCollateral
-    ) private view returns (uint256) {
-        uint256 decimalDelta = uint256(18) - uint256(priceFeed.decimals());
+    ) internal view returns (uint256) {
+        uint8 feedDecimals = priceFeed.decimals();
         uint256 collateralPricePerUnit = uint256(collateralAnswer);
-        if (decimalDelta > 0) {
+
+        // Scale price feed decimals to 18
+        if (feedDecimals < 18) {
             collateralPricePerUnit =
                 collateralPricePerUnit *
-                (10 ** decimalDelta);
+                (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            collateralPricePerUnit =
+                collateralPricePerUnit /
+                (10 ** (feedDecimals - 18));
         }
 
-        uint256 collateralDecimalDelta = uint256(18) -
-            uint256(underlyingCollateral.decimals());
-        if (collateralDecimalDelta > 0) {
-            return collateralPricePerUnit * (10 ** collateralDecimalDelta);
+        // Adjust for token decimals
+        uint8 tokenDecimals = underlyingCollateral.decimals();
+        if (tokenDecimals < 18) {
+            return collateralPricePerUnit * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            return collateralPricePerUnit / (10 ** (tokenDecimals - 18));
         }
         return collateralPricePerUnit;
     }

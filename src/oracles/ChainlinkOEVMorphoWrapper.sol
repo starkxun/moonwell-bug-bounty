@@ -38,9 +38,8 @@ contract ChainlinkOEVMorphoWrapper is
     /// @notice The address that will receive the OEV fees
     address public feeRecipient;
 
-    /// @notice The fee multiplier for the OEV fees
-    /// @dev Represented as a percentage
-    uint16 public feeMultiplier;
+    /// @notice The fee multiplier (in bps) for the OEV fees, to be paid to the liquidator
+    uint16 public liquidatorFeeBps;
 
     /// @notice The last cached round id
     uint256 public cachedRoundId;
@@ -54,10 +53,10 @@ contract ChainlinkOEVMorphoWrapper is
     /// @notice Emitted when the fee recipient is changed
     event FeeRecipientChanged(address oldFeeRecipient, address newFeeRecipient);
 
-    /// @notice Emitted when the fee multiplier is changed
-    event FeeMultiplierChanged(
-        uint16 oldFeeMultiplier,
-        uint16 newFeeMultiplier
+    /// @notice Emitted when the liquidator fee bps is changed
+    event LiquidatorFeeBpsChanged(
+        uint16 oldLiquidatorFeeBps,
+        uint16 newLiquidatorFeeBps
     );
 
     /// @notice Emitted when the max round delay is changed
@@ -93,7 +92,7 @@ contract ChainlinkOEVMorphoWrapper is
      * @param _morphoBlue Address of the Morpho Blue contract
      * @param _chainlinkOracle Address of the Chainlink oracle contract
      * @param _feeRecipient Address that will receive the OEV fees
-     * @param _feeMultiplier The fee multiplier for the OEV fees
+     * @param _liquidatorFeeBps The liquidator fee in basis points
      * @param _maxRoundDelay The max round delay
      * @param _maxDecrements The max decrements
      */
@@ -103,7 +102,7 @@ contract ChainlinkOEVMorphoWrapper is
         address _morphoBlue,
         address _chainlinkOracle,
         address _feeRecipient,
-        uint16 _feeMultiplier,
+        uint16 _liquidatorFeeBps,
         uint256 _maxRoundDelay,
         uint256 _maxDecrements
     ) public reinitializer(2) {
@@ -124,8 +123,8 @@ contract ChainlinkOEVMorphoWrapper is
             "ChainlinkOEVMorphoWrapper: fee recipient cannot be zero address"
         );
         require(
-            _feeMultiplier <= MAX_BPS,
-            "ChainlinkOEVMorphoWrapper: fee multiplier cannot be greater than MAX_BPS"
+            _liquidatorFeeBps <= MAX_BPS,
+            "ChainlinkOEVMorphoWrapper: liquidatorFeeBps cannot be greater than MAX_BPS"
         );
         require(
             _maxRoundDelay > 0,
@@ -141,7 +140,7 @@ contract ChainlinkOEVMorphoWrapper is
         morphoBlue = IMorphoBlue(_morphoBlue);
         chainlinkOracle = IChainlinkOracle(_chainlinkOracle);
         feeRecipient = _feeRecipient;
-        feeMultiplier = _feeMultiplier;
+        liquidatorFeeBps = _liquidatorFeeBps;
         cachedRoundId = priceFeed.latestRound();
         maxRoundDelay = _maxRoundDelay;
         maxDecrements = _maxDecrements;
@@ -292,17 +291,17 @@ contract ChainlinkOEVMorphoWrapper is
     }
 
     /**
-     * @notice Sets the fee multiplier for OEV fees
-     * @param _feeMultiplier The new fee multiplier in basis points (must be <= MAX_BPS)
+     * @notice Sets the liquidator fee in basis points
+     * @param _liquidatorFeeBps The new liquidator fee in basis points (must be <= MAX_BPS)
      */
-    function setFeeMultiplier(uint16 _feeMultiplier) external onlyOwner {
+    function setLiquidatorFeeBps(uint16 _liquidatorFeeBps) external onlyOwner {
         require(
-            _feeMultiplier <= MAX_BPS,
-            "ChainlinkOEVMorphoWrapper: fee multiplier cannot be greater than MAX_BPS"
+            _liquidatorFeeBps <= MAX_BPS,
+            "ChainlinkOEVMorphoWrapper: liquidatorFeeBps cannot be greater than MAX_BPS"
         );
-        uint16 oldFeeMultiplier = feeMultiplier;
-        feeMultiplier = _feeMultiplier;
-        emit FeeMultiplierChanged(oldFeeMultiplier, _feeMultiplier);
+        uint16 oldLiquidatorFeeBps = liquidatorFeeBps;
+        liquidatorFeeBps = _liquidatorFeeBps;
+        emit LiquidatorFeeBpsChanged(oldLiquidatorFeeBps, _liquidatorFeeBps);
     }
 
     /**
@@ -490,16 +489,20 @@ contract ChainlinkOEVMorphoWrapper is
         );
 
         // Scale feed decimals to 18
-        uint256 decimalDelta = uint256(18) - uint256(loanFeed.decimals());
+        uint8 feedDecimals = loanFeed.decimals();
         uint256 loanPricePerUnit = uint256(loanAnswer);
-        if (decimalDelta > 0) {
-            loanPricePerUnit = loanPricePerUnit * (10 ** decimalDelta);
+        if (feedDecimals < 18) {
+            loanPricePerUnit = loanPricePerUnit * (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            loanPricePerUnit = loanPricePerUnit / (10 ** (feedDecimals - 18));
         }
 
         // Adjust for token decimals (same logic as ChainlinkOracle)
-        uint256 loanDecimalDelta = uint256(18) - uint256(loanToken.decimals());
-        if (loanDecimalDelta > 0) {
-            return loanPricePerUnit * (10 ** loanDecimalDelta);
+        uint8 tokenDecimals = loanToken.decimals();
+        if (tokenDecimals < 18) {
+            return loanPricePerUnit * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            return loanPricePerUnit / (10 ** (tokenDecimals - 18));
         }
         return loanPricePerUnit;
     }
@@ -513,19 +516,26 @@ contract ChainlinkOEVMorphoWrapper is
         int256 collateralAnswer,
         EIP20Interface underlyingCollateral
     ) private view returns (uint256) {
-        uint256 decimalDelta = uint256(18) - uint256(priceFeed.decimals());
+        uint8 feedDecimals = priceFeed.decimals();
         uint256 collateralPricePerUnit = uint256(collateralAnswer);
-        if (decimalDelta > 0) {
+
+        // Scale price feed decimals to 18
+        if (feedDecimals < 18) {
             collateralPricePerUnit =
                 collateralPricePerUnit *
-                (10 ** decimalDelta);
+                (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            collateralPricePerUnit =
+                collateralPricePerUnit /
+                (10 ** (feedDecimals - 18));
         }
 
-        // Adjust for token decimals (same logic as ChainlinkOracle)
-        uint256 collateralDecimalDelta = uint256(18) -
-            uint256(underlyingCollateral.decimals());
-        if (collateralDecimalDelta > 0) {
-            return collateralPricePerUnit * (10 ** collateralDecimalDelta);
+        // Adjust for token decimals
+        uint8 tokenDecimals = underlyingCollateral.decimals();
+        if (tokenDecimals < 18) {
+            return collateralPricePerUnit * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            return collateralPricePerUnit / (10 ** (tokenDecimals - 18));
         }
         return collateralPricePerUnit;
     }
@@ -563,9 +573,9 @@ contract ChainlinkOEVMorphoWrapper is
             return (liquidatorFee, protocolFee);
         }
 
-        // Liquidator gets the repayment amount + bonus (remainder * feeMultiplier)
+        // Liquidator gets the repayment amount + bonus (remainder * liquidatorFeeBps)
         uint256 liquidatorUSD = repayUSD +
-            ((collateralUSD - repayUSD) * uint256(feeMultiplier)) /
+            ((collateralUSD - repayUSD) * uint256(liquidatorFeeBps)) /
             MAX_BPS;
 
         // Convert back to collateral token amount

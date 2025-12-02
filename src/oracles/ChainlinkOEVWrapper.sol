@@ -17,9 +17,6 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
 
-    /// @notice Chainlink feed decimals (USD feeds use 8 decimals)
-    uint8 private constant CHAINLINK_FEED_DECIMALS = 8;
-
     /// @notice Price mantissa decimals (used by ChainlinkOracle)
     uint8 private constant PRICE_MANTISSA_DECIMALS = 18;
 
@@ -32,9 +29,8 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     /// @notice The address that will receive the OEV fees
     address public feeRecipient;
 
-    /// @notice The fee multiplier for the OEV fees, to be paid to the liquidator
-    /// @dev Represented as a percentage
-    uint16 public feeMultiplier;
+    /// @notice The fee multiplier (in bps) for the OEV fees, to be paid to the liquidator
+    uint16 public liquidatorFeeBps;
 
     /// @notice The last cached round id
     uint256 public cachedRoundId;
@@ -49,9 +45,9 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     event FeeRecipientChanged(address oldFeeRecipient, address newFeeRecipient);
 
     /// @notice Emitted when the fee multiplier is changed
-    event FeeMultiplierChanged(
-        uint16 oldFeeMultiplier,
-        uint16 newFeeMultiplier
+    event LiquidatorFeeBpsChanged(
+        uint16 oldLiquidatorFeeBps,
+        uint16 newLiquidatorFeeBps
     );
 
     /// @notice Emitted when the max round delay is changed
@@ -123,7 +119,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         );
 
         priceFeed = AggregatorV3Interface(_priceFeed);
-        feeMultiplier = _feeMultiplier;
+        liquidatorFeeBps = _feeMultiplier;
         cachedRoundId = priceFeed.latestRound();
         maxRoundDelay = _maxRoundDelay;
         maxDecrements = _maxDecrements;
@@ -260,17 +256,17 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     }
 
     /**
-     * @notice Sets the fee multiplier for OEV fees
-     * @param _feeMultiplier The new fee multiplier in basis points (must be <= MAX_BPS)
+     * @notice Sets the liquidator fee BPS for OEV fees
+     * @param _liquidatorFeeBps The new liquidator fee in basis points (must be <= MAX_BPS)
      */
-    function setFeeMultiplier(uint16 _feeMultiplier) external onlyOwner {
+    function setLiquidatorFeeBps(uint16 _liquidatorFeeBps) external onlyOwner {
         require(
-            _feeMultiplier <= MAX_BPS,
-            "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
+            _liquidatorFeeBps <= MAX_BPS,
+            "ChainlinkOEVWrapper: liquidator fee cannot be greater than MAX_BPS"
         );
-        uint16 oldFeeMultiplier = feeMultiplier;
-        feeMultiplier = _feeMultiplier;
-        emit FeeMultiplierChanged(oldFeeMultiplier, _feeMultiplier);
+        uint16 oldLiquidatorFeeBps = liquidatorFeeBps;
+        liquidatorFeeBps = _liquidatorFeeBps;
+        emit LiquidatorFeeBpsChanged(oldLiquidatorFeeBps, _liquidatorFeeBps);
     }
 
     /**
@@ -393,11 +389,6 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
                 uint256 updatedAt,
                 uint80 answeredInRound
             ) = priceFeed.latestRoundData();
-
-            require(
-                roundId > cachedRoundId,
-                "ChainlinkOEVWrapper: round must be greater than cached round"
-            );
 
             // validate the round data
             _validateRoundData(roundId, answer, updatedAt, answeredInRound);
@@ -572,9 +563,9 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             return (liquidatorFee, protocolFee);
         }
 
-        // Liquidator gets the repayment amount + bonus (remainder * feeMultiplier)
+        // Liquidator gets the repayment amount + bonus (remainder * liquidatorFeeBps)
         uint256 liquidatorUSD = repayUSD +
-            ((collateralUSD - repayUSD) * uint256(feeMultiplier)) /
+            ((collateralUSD - repayUSD) * uint256(liquidatorFeeBps)) /
             MAX_BPS;
 
         // Convert liquidator USD to underlying, then to mToken units

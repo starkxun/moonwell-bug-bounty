@@ -23,9 +23,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     MockERC20Decimals token24;
 
     // Events mirrored for expectEmit
-    event FeeMultiplierChanged(
-        uint16 oldFeeMultiplier,
-        uint16 newFeeMultiplier
+    event LiquidatorFeeBpsChanged(
+        uint16 oldLiquidatorFeeBps,
+        uint16 newLiquidatorFeeBps
     );
 
     event MaxRoundDelayChanged(
@@ -71,7 +71,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
                 address(1), // owner
                 address(1), // chainlinkOracle (not used in this test)
                 address(1), // feeRecipient
-                5000, // feeMultiplier (50%)
+                5000, // liquidatorFeeBps (50%)
                 3600, // maxRoundDelay
                 10 // maxDecrements
             );
@@ -133,20 +133,24 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         );
     }
 
-    function testSetFeeMultiplierUpdatesAndEmits() public {
+    function testSetLiquidatorFeeBpsUpdatesAndEmits() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
         uint16 newFee = 250; // 2.5%
         vm.prank(owner);
         vm.expectEmit(false, false, false, true, address(wrapper));
-        emit FeeMultiplierChanged(defaultFeeBps, newFee);
-        wrapper.setFeeMultiplier(newFee);
+        emit LiquidatorFeeBpsChanged(defaultFeeBps, newFee);
+        wrapper.setLiquidatorFeeBps(newFee);
 
-        assertEq(wrapper.feeMultiplier(), newFee, "feeMultiplier not updated");
+        assertEq(
+            wrapper.liquidatorFeeBps(),
+            newFee,
+            "liquidatorFeeBps not updated"
+        );
     }
 
-    function testSetFeeMultiplierAboveMaxReverts() public {
+    function testSetLiquidatorFeeBpsAboveMaxReverts() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
@@ -154,19 +158,19 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         vm.prank(owner);
         vm.expectRevert(
             bytes(
-                "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
+                "ChainlinkOEVWrapper: liquidatorFeeBps cannot be greater than MAX_BPS"
             )
         );
-        wrapper.setFeeMultiplier(overMax);
+        wrapper.setLiquidatorFeeBps(overMax);
     }
 
-    function testSetFeeMultiplierOnlyOwner() public {
+    function testSetLiquidatorFeeBpsOnlyOwner() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
         vm.prank(address(0xDEAD));
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        wrapper.setFeeMultiplier(200);
+        wrapper.setLiquidatorFeeBps(200);
     }
 
     function testSetMaxRoundDelayUpdatesAndEmits() public {
@@ -462,7 +466,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             address(1), // owner
             address(1), // chainlinkOracle
             address(1), // feeRecipient
-            5000, // feeMultiplier
+            5000, // liquidatorFeeBps
             3600, // maxRoundDelay
             10 // maxDecrements
         );
@@ -537,7 +541,7 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
         address _owner,
         address _chainlinkOracle,
         address _feeRecipient,
-        uint16 _feeMultiplier,
+        uint16 _liquidatorFeeBps,
         uint256 _maxRoundDelay,
         uint256 _maxDecrements
     )
@@ -546,7 +550,7 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
             _owner,
             _chainlinkOracle,
             _feeRecipient,
-            _feeMultiplier,
+            _liquidatorFeeBps,
             _maxRoundDelay,
             _maxDecrements
         )

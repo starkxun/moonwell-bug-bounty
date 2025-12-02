@@ -23,9 +23,9 @@ contract ChainlinkOEVWrapperIntegrationTest is
     ChainlinkOracleConfigs,
     Liquidations
 {
-    event FeeMultiplierChanged(
-        uint16 oldFeeMultiplier,
-        uint16 newFeeMultiplier
+    event LiquidatorFeeBpsChanged(
+        uint16 oldLiquidatorFeeBps,
+        uint16 newLiquidatorFeeBps
     );
     event PriceUpdatedEarlyAndLiquidated(
         address indexed borrower,
@@ -226,28 +226,28 @@ contract ChainlinkOEVWrapperIntegrationTest is
         }
     }
 
-    function testSetFeeMultiplier() public {
+    function testSetLiquidatorFeeBps() public {
         uint16 newMultiplier = 100; // 1%
         for (uint256 i = 0; i < wrappers.length; i++) {
             ChainlinkOEVWrapper wrapper = wrappers[i];
-            uint16 originalMultiplier = wrapper.feeMultiplier();
+            uint16 originalMultiplier = wrapper.liquidatorFeeBps();
             vm.prank(addresses.getAddress("TEMPORAL_GOVERNOR"));
             vm.expectEmit(address(wrapper));
-            emit FeeMultiplierChanged(originalMultiplier, newMultiplier);
-            wrapper.setFeeMultiplier(newMultiplier);
+            emit LiquidatorFeeBpsChanged(originalMultiplier, newMultiplier);
+            wrapper.setLiquidatorFeeBps(newMultiplier);
             assertEq(
-                wrapper.feeMultiplier(),
+                wrapper.liquidatorFeeBps(),
                 newMultiplier,
-                "Fee multiplier not updated"
+                "Liquidator fee bps not updated"
             );
         }
     }
 
-    function testSetFeeMultiplierRevertNonOwner() public {
+    function testSetLiquidatorFeeBpsRevertNonOwner() public {
         for (uint256 i = 0; i < wrappers.length; i++) {
             ChainlinkOEVWrapper wrapper = wrappers[i];
             vm.expectRevert("Ownable: caller is not the owner");
-            wrapper.setFeeMultiplier(1);
+            wrapper.setLiquidatorFeeBps(1);
         }
     }
 
@@ -910,7 +910,7 @@ contract ChainlinkOEVWrapperIntegrationTest is
             }
             address mTokenAddr = addresses.getAddress(mTokenKeyCandidate);
             vm.prank(addresses.getAddress("TEMPORAL_GOVERNOR"));
-            wrapper.setFeeMultiplier(0);
+            wrapper.setLiquidatorFeeBps(0);
             vm.expectRevert();
             wrapper.updatePriceEarlyAndLiquidate(
                 address(0xBEEF),

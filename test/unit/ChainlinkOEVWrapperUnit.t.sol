@@ -22,6 +22,13 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     MockERC20Decimals token18;
     MockERC20Decimals token24;
 
+    // Tokens for exchange rate testing
+    MockERC20Decimals collateralToken;
+    MockERC20Decimals loanToken;
+    MockMToken mTokenCollateral;
+    MockChainlinkOracle mockChainlinkOracle;
+    ChainlinkOEVWrapperHarness harness;
+
     // Events mirrored for expectEmit
     event LiquidatorFeeBpsChanged(
         uint16 oldLiquidatorFeeBps,
@@ -38,10 +45,25 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     );
 
     function setUp() public {
-        // Create tokens with different decimals for decimal testing
         token6 = new MockERC20Decimals("Token6", "T6", 6);
         token18 = new MockERC20Decimals("Token18", "T18", 18);
         token24 = new MockERC20Decimals("Token24", "T24", 24);
+
+        collateralToken = new MockERC20Decimals("Collateral", "COLL", 18);
+        loanToken = new MockERC20Decimals("Loan", "LOAN", 18);
+
+        mockChainlinkOracle = new MockChainlinkOracle(1e8, 8);
+        mockChainlinkOracle.set(1, 1e8, 1, 1, 1);
+
+        harness = new ChainlinkOEVWrapperHarness(
+            address(mockChainlinkOracle),
+            address(1),
+            address(1),
+            address(1),
+            500,
+            3600,
+            10
+        );
     }
 
     function _deploy(
@@ -158,7 +180,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         vm.prank(owner);
         vm.expectRevert(
             bytes(
-                "ChainlinkOEVWrapper: liquidatorFeeBps cannot be greater than MAX_BPS"
+                "ChainlinkOEVWrapper: liquidator fee cannot be greater than MAX_BPS"
             )
         );
         wrapper.setLiquidatorFeeBps(overMax);
@@ -477,10 +499,189 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             tokenDecimals
         );
 
-        // Should not revert for any decimal combination
         harness.exposed_getCollateralTokenPrice(
             int256(uint256(answer)),
             address(token)
+        );
+    }
+
+    function testCalculateCollateralSplitWithExchangeRate() public {
+        uint256 exchangeRate = 2e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        uint256 collateralSeized = 100e18;
+        uint256 repayAmount = 50e18;
+        int256 collateralAnswer = 1e8;
+
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getUnderlyingPrice(address)"),
+            abi.encode(1e18)
+        );
+
+        (uint256 liquidatorFee, uint256 protocolFee) = harness
+            .exposed_calculateCollateralSplit(
+                repayAmount,
+                collateralAnswer,
+                collateralSeized,
+                address(1),
+                address(mTokenCollateral),
+                address(collateralToken)
+            );
+
+        uint256 expectedUnderlyingValue = (collateralSeized * exchangeRate) /
+            1e18;
+        assertEq(
+            expectedUnderlyingValue,
+            200e18,
+            "Should convert 100 mTokens to 200 underlying"
+        );
+
+        uint256 surplus = expectedUnderlyingValue - repayAmount;
+        uint256 expectedLiquidatorBonus = (surplus * 500) / 10000;
+        uint256 expectedLiquidatorUnderlying = repayAmount +
+            expectedLiquidatorBonus;
+        uint256 expectedLiquidatorMTokens = (expectedLiquidatorUnderlying *
+            1e18) / exchangeRate;
+
+        assertEq(
+            liquidatorFee,
+            expectedLiquidatorMTokens,
+            "Liquidator fee incorrect with 2x exchange rate"
+        );
+        assertEq(
+            protocolFee,
+            collateralSeized - liquidatorFee,
+            "Protocol fee should be remainder"
+        );
+
+        uint256 liquidatorValueUnderlying = (liquidatorFee * exchangeRate) /
+            1e18;
+        uint256 protocolValueUnderlying = (protocolFee * exchangeRate) / 1e18;
+
+        assertEq(
+            liquidatorValueUnderlying + protocolValueUnderlying,
+            expectedUnderlyingValue,
+            "Total value should match seized collateral"
+        );
+    }
+
+    function testCalculateCollateralSplitWithHighExchangeRate() public {
+        uint256 exchangeRate = 5e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        uint256 collateralSeized = 20e18;
+        uint256 repayAmount = 50e18;
+        int256 collateralAnswer = 1e8;
+
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getUnderlyingPrice(address)"),
+            abi.encode(1e18)
+        );
+
+        (uint256 liquidatorFee, uint256 protocolFee) = harness
+            .exposed_calculateCollateralSplit(
+                repayAmount,
+                collateralAnswer,
+                collateralSeized,
+                address(1),
+                address(mTokenCollateral),
+                address(collateralToken)
+            );
+
+        uint256 expectedUnderlyingValue = (collateralSeized * exchangeRate) /
+            1e18;
+        assertEq(
+            expectedUnderlyingValue,
+            100e18,
+            "Should convert 20 mTokens to 100 underlying"
+        );
+
+        uint256 surplus = expectedUnderlyingValue - repayAmount;
+        uint256 expectedLiquidatorBonus = (surplus * 500) / 10000;
+        uint256 expectedLiquidatorUnderlying = repayAmount +
+            expectedLiquidatorBonus;
+        uint256 expectedLiquidatorMTokens = (expectedLiquidatorUnderlying *
+            1e18) / exchangeRate;
+
+        assertApproxEqAbs(
+            liquidatorFee,
+            expectedLiquidatorMTokens,
+            1,
+            "Liquidator fee incorrect with 5x exchange rate"
+        );
+        assertEq(
+            protocolFee,
+            collateralSeized - liquidatorFee,
+            "Protocol fee should be remainder"
+        );
+    }
+
+    function testCalculateCollateralSplitExampleFromDescription() public {
+        uint256 exchangeRate = 2e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        uint256 collateralSeized = 100e18;
+        uint256 repayAmount = 50e18;
+        int256 collateralAnswer = 1e8;
+
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getUnderlyingPrice(address)"),
+            abi.encode(1e18)
+        );
+
+        (uint256 liquidatorFee, uint256 protocolFee) = harness
+            .exposed_calculateCollateralSplit(
+                repayAmount,
+                collateralAnswer,
+                collateralSeized,
+                address(1),
+                address(mTokenCollateral),
+                address(collateralToken)
+            );
+
+        uint256 underlyingValue = (collateralSeized * exchangeRate) / 1e18;
+        assertEq(underlyingValue, 200e18, "100 mTokens * 2 = 200 underlying");
+
+        uint256 surplus = underlyingValue - repayAmount;
+        assertEq(
+            surplus,
+            150e18,
+            "$200 collateral - $50 repayment = $150 surplus"
+        );
+
+        uint256 liquidatorBonus = (surplus * 500) / 10000;
+        assertEq(liquidatorBonus, 7.5e18, "5% of $150 = $7.50");
+
+        uint256 liquidatorValueUnderlying = repayAmount + liquidatorBonus;
+        assertEq(liquidatorValueUnderlying, 57.5e18, "$50 + $7.50 = $57.50");
+
+        uint256 expectedLiquidatorMTokens = (liquidatorValueUnderlying * 1e18) /
+            exchangeRate;
+        assertEq(
+            expectedLiquidatorMTokens,
+            28.75e18,
+            "$57.50 / 2 per mToken = 28.75 mTokens"
+        );
+
+        assertEq(
+            liquidatorFee,
+            expectedLiquidatorMTokens,
+            "Liquidator should receive 28.75 mTokens"
+        );
+        assertEq(
+            protocolFee,
+            71.25e18,
+            "Protocol should receive 100 - 28.75 = 71.25 mTokens"
+        );
+
+        uint256 protocolValueUnderlying = (protocolFee * exchangeRate) / 1e18;
+        assertEq(
+            protocolValueUnderlying,
+            142.5e18,
+            "71.25 mTokens * 2 = $142.50"
         );
     }
 }
@@ -566,5 +767,38 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
                 collateralAnswer,
                 EIP20Interface(underlyingCollateral)
             );
+    }
+
+    /// @notice Expose the internal _calculateCollateralSplit for testing
+    function exposed_calculateCollateralSplit(
+        uint256 repayAmount,
+        int256 collateralAnswer,
+        uint256 collateralSeized,
+        address mTokenLoan,
+        address mTokenCollateral,
+        address underlyingCollateral
+    ) external view returns (uint256 liquidatorFee, uint256 protocolFee) {
+        return
+            _calculateCollateralSplit(
+                repayAmount,
+                collateralAnswer,
+                collateralSeized,
+                mTokenLoan,
+                mTokenCollateral,
+                EIP20Interface(underlyingCollateral)
+            );
+    }
+}
+
+/// @notice Mock MToken for testing exchange rate scenarios
+contract MockMToken {
+    uint256 private _exchangeRate;
+
+    constructor(uint256 exchangeRate_) {
+        _exchangeRate = exchangeRate_;
+    }
+
+    function exchangeRateStored() external view returns (uint256) {
+        return _exchangeRate;
     }
 }

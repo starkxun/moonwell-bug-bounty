@@ -2,7 +2,7 @@
     {
         "envpath": "proposals/mips/mip-b53/b53.sh",
         "governor": "MultichainGovernor",
-        "id": 0,
+        "id": 132,
         "path": "MarketUpdate.sol/MarketUpdateTemplate.json",
         "proposalType": "HybridProposal"
     },

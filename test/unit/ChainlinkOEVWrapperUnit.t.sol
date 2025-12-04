@@ -269,9 +269,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedLt18_TokenLt18() public {
         // Feed: 8 decimals (standard Chainlink), Token: 6 decimals (USDC)
         // Answer: $1.00 in 8 decimals = 1e8
-        ChainlinkOEVWrapperHarness harness = _createHarness(8, 1e8);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(8, 1e8);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e8,
             address(token6)
         );
@@ -288,9 +288,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedLt18_TokenEq18() public {
         // Feed: 8 decimals, Token: 18 decimals
         // Answer: $1.00 in 8 decimals = 1e8
-        ChainlinkOEVWrapperHarness harness = _createHarness(8, 1e8);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(8, 1e8);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e8,
             address(token18)
         );
@@ -307,9 +307,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedLt18_TokenGt18() public {
         // Feed: 8 decimals, Token: 24 decimals
         // Answer: $1.00 in 8 decimals = 1e8
-        ChainlinkOEVWrapperHarness harness = _createHarness(8, 1e8);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(8, 1e8);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e8,
             address(token24)
         );
@@ -326,9 +326,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedEq18_TokenLt18() public {
         // Feed: 18 decimals, Token: 6 decimals
         // Answer: $1.00 in 18 decimals = 1e18
-        ChainlinkOEVWrapperHarness harness = _createHarness(18, 1e18);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(18, 1e18);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e18,
             address(token6)
         );
@@ -345,9 +345,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedEq18_TokenEq18() public {
         // Feed: 18 decimals, Token: 18 decimals
         // Answer: $1.00 in 18 decimals = 1e18
-        ChainlinkOEVWrapperHarness harness = _createHarness(18, 1e18);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(18, 1e18);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e18,
             address(token18)
         );
@@ -364,9 +364,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedEq18_TokenGt18() public {
         // Feed: 18 decimals, Token: 24 decimals
         // Answer: $1.00 in 18 decimals = 1e18
-        ChainlinkOEVWrapperHarness harness = _createHarness(18, 1e18);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(18, 1e18);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e18,
             address(token24)
         );
@@ -383,9 +383,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedGt18_TokenLt18() public {
         // Feed: 24 decimals, Token: 6 decimals
         // Answer: $1.00 in 24 decimals = 1e24
-        ChainlinkOEVWrapperHarness harness = _createHarness(24, 1e24);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(24, 1e24);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e24,
             address(token6)
         );
@@ -402,9 +402,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedGt18_TokenEq18() public {
         // Feed: 24 decimals, Token: 18 decimals
         // Answer: $1.00 in 24 decimals = 1e24
-        ChainlinkOEVWrapperHarness harness = _createHarness(24, 1e24);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(24, 1e24);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e24,
             address(token18)
         );
@@ -421,9 +421,9 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     function testGetCollateralTokenPrice_FeedGt18_TokenGt18() public {
         // Feed: 24 decimals, Token: 24 decimals
         // Answer: $1.00 in 24 decimals = 1e24
-        ChainlinkOEVWrapperHarness harness = _createHarness(24, 1e24);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(24, 1e24);
 
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e24,
             address(token24)
         );
@@ -439,10 +439,10 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     /// @notice Verify that feed decimals > 18 does NOT revert (regression test for underflow fix)
     function testGetCollateralTokenPrice_NoUnderflowFeedDecimals() public {
         // This test would have reverted before the fix due to underflow
-        ChainlinkOEVWrapperHarness harness = _createHarness(20, 1e20);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(20, 1e20);
 
         // Should not revert
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e20,
             address(token18)
         );
@@ -454,10 +454,10 @@ contract ChainlinkOEVWrapperUnitTest is Test {
     /// @notice Verify that token decimals > 18 does NOT revert (regression test for underflow fix)
     function testGetCollateralTokenPrice_NoUnderflowTokenDecimals() public {
         // This test would have reverted before the fix due to underflow
-        ChainlinkOEVWrapperHarness harness = _createHarness(8, 1e8);
+        ChainlinkOEVWrapperHarness _harness = _createHarness(8, 1e8);
 
         // Should not revert
-        uint256 price = harness.exposed_getCollateralTokenPrice(
+        uint256 price = _harness.exposed_getCollateralTokenPrice(
             1e8,
             address(token24)
         );
@@ -483,7 +483,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             feedDecimals,
             int256(uint256(answer))
         );
-        ChainlinkOEVWrapperHarness harness = new ChainlinkOEVWrapperHarness(
+        ChainlinkOEVWrapperHarness _harness = new ChainlinkOEVWrapperHarness(
             address(mockFeed),
             address(1), // owner
             address(1), // chainlinkOracle
@@ -499,7 +499,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             tokenDecimals
         );
 
-        harness.exposed_getCollateralTokenPrice(
+        _harness.exposed_getCollateralTokenPrice(
             int256(uint256(answer)),
             address(token)
         );
@@ -513,10 +513,28 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         uint256 repayAmount = 50e18;
         int256 collateralAnswer = 1e8;
 
+        // Mock the loan token price feed
+        address mockLoanFeed = address(0x9999);
         vm.mockCall(
             address(1),
-            abi.encodeWithSignature("getUnderlyingPrice(address)"),
-            abi.encode(1e18)
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(1),
+                int256(1e8),
+                uint256(0),
+                uint256(block.timestamp),
+                uint80(1)
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
         );
 
         (uint256 liquidatorFee, uint256 protocolFee) = harness
@@ -524,7 +542,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
                 repayAmount,
                 collateralAnswer,
                 collateralSeized,
-                address(1),
+                address(loanToken),
                 address(mTokenCollateral),
                 address(collateralToken)
             );
@@ -574,10 +592,28 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         uint256 repayAmount = 50e18;
         int256 collateralAnswer = 1e8;
 
+        // Mock the loan token price feed
+        address mockLoanFeed = address(0x9999);
         vm.mockCall(
             address(1),
-            abi.encodeWithSignature("getUnderlyingPrice(address)"),
-            abi.encode(1e18)
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(1),
+                int256(1e8),
+                uint256(0),
+                uint256(block.timestamp),
+                uint80(1)
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
         );
 
         (uint256 liquidatorFee, uint256 protocolFee) = harness
@@ -585,7 +621,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
                 repayAmount,
                 collateralAnswer,
                 collateralSeized,
-                address(1),
+                address(loanToken),
                 address(mTokenCollateral),
                 address(collateralToken)
             );
@@ -626,10 +662,28 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         uint256 repayAmount = 50e18;
         int256 collateralAnswer = 1e8;
 
+        // Mock the loan token price feed
+        address mockLoanFeed = address(0x9999);
         vm.mockCall(
             address(1),
-            abi.encodeWithSignature("getUnderlyingPrice(address)"),
-            abi.encode(1e18)
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(1),
+                int256(1e8),
+                uint256(0),
+                uint256(block.timestamp),
+                uint80(1)
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
         );
 
         (uint256 liquidatorFee, uint256 protocolFee) = harness
@@ -637,7 +691,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
                 repayAmount,
                 collateralAnswer,
                 collateralSeized,
-                address(1),
+                address(loanToken),
                 address(mTokenCollateral),
                 address(collateralToken)
             );
@@ -682,6 +736,91 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             protocolValueUnderlying,
             142.5e18,
             "71.25 mTokens * 2 = $142.50"
+        );
+    }
+
+    /// @notice Test that fresh loan prices prevent stale price exploitation
+    /// @dev This test verifies the fix for the price staleness vulnerability where:
+    ///      - Both collateral and loan assets could have OEV wrappers
+    ///      - Liquidator updates collateral price (fresh) but loan price is stale
+    function testFreshLoanPricePreventsStaleExploit() public {
+        uint256 exchangeRate = 1e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        uint256 repayAmount = 100e18;
+        uint256 collateralSeized = 100e18;
+        int256 collateralAnswer = 85e8;
+
+        // Scenario: Both assets dropped in price from $100 to lower values
+        // - Collateral: $100 -> $85 (fresh, updated by liquidator)
+        // - Loan: $100 -> $80 (should be fetched fresh via our fix)
+
+        address mockLoanFeed = address(0x9999);
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+
+        int256 freshLoanPrice = 80e8;
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(2),
+                freshLoanPrice,
+                uint256(0),
+                uint256(block.timestamp),
+                uint80(2)
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
+        );
+
+        (uint256 liquidatorFee, uint256 protocolFee) = harness
+            .exposed_calculateCollateralSplit(
+                repayAmount,
+                collateralAnswer,
+                collateralSeized,
+                address(loanToken),
+                address(mTokenCollateral),
+                address(collateralToken)
+            );
+
+        uint256 repayUSD = (100e18 * 80e18) / 1e18;
+        uint256 collateralUSD = (100e18 * 85e18) / 1e18;
+        uint256 surplus = collateralUSD - repayUSD;
+        assertEq(surplus, 500e18, "Surplus should be $500");
+
+        uint256 liquidatorBonus = (surplus * 500) / 10000;
+        uint256 expectedLiquidatorUSD = repayUSD + liquidatorBonus;
+        uint256 expectedLiquidatorTokens = (expectedLiquidatorUSD * 1e18) /
+            85e18;
+        uint256 expectedProtocolTokens = collateralSeized -
+            expectedLiquidatorTokens;
+        assertApproxEqAbs(
+            liquidatorFee,
+            expectedLiquidatorTokens,
+            1e15,
+            "Liquidator should receive ~94.41 tokens (repayment + 5% bonus)"
+        );
+
+        assertApproxEqAbs(
+            protocolFee,
+            expectedProtocolTokens,
+            1e15,
+            "Protocol should receive ~5.58 tokens (95% of surplus)"
+        );
+
+        assertGt(protocolFee, 0, "Protocol fee must be > 0");
+
+        assertLt(
+            liquidatorFee,
+            collateralSeized,
+            "Liquidator should not receive 100% of collateral"
         );
     }
 }
@@ -774,7 +913,7 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
         uint256 repayAmount,
         int256 collateralAnswer,
         uint256 collateralSeized,
-        address mTokenLoan,
+        address underlyingLoan,
         address mTokenCollateral,
         address underlyingCollateral
     ) external view returns (uint256 liquidatorFee, uint256 protocolFee) {
@@ -783,7 +922,7 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
                 repayAmount,
                 collateralAnswer,
                 collateralSeized,
-                mTokenLoan,
+                EIP20Interface(underlyingLoan),
                 mTokenCollateral,
                 EIP20Interface(underlyingCollateral)
             );

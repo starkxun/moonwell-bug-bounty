@@ -425,7 +425,7 @@ contract ChainlinkOEVWrapper is
                 repayAmount,
                 collateralAnswer,
                 collateralSeized,
-                mTokenLoan,
+                underlyingLoan,
                 mTokenCollateral,
                 underlyingCollateral
             );
@@ -527,10 +527,48 @@ contract ChainlinkOEVWrapper is
             mTokenCollateralBalanceBefore;
     }
 
+    /// @notice Get the loan token price directly from the underlying Chainlink feed
+    /// @dev Bypasses any OEV wrapper to get fresh price data, preventing price staleness exploits
+    /// @param underlyingLoan The underlying loan token interface
+    /// @return The price scaled to 1e18 and adjusted for token decimals
+    function _getLoanTokenPrice(
+        EIP20Interface underlyingLoan
+    ) internal view returns (uint256) {
+        // Get the price feed for the loan token directly from the oracle
+        AggregatorV3Interface loanFeed = chainlinkOracle.getFeed(
+            underlyingLoan.symbol()
+        );
+
+        // Get the latest price from the feed
+        (, int256 loanAnswer, , , ) = loanFeed.latestRoundData();
+        require(
+            loanAnswer > 0,
+            "ChainlinkOEVWrapper: invalid loan token price"
+        );
+
+        // Scale feed decimals to 18
+        uint8 feedDecimals = loanFeed.decimals();
+        uint256 loanPricePerUnit = uint256(loanAnswer);
+        if (feedDecimals < 18) {
+            loanPricePerUnit = loanPricePerUnit * (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            loanPricePerUnit = loanPricePerUnit / (10 ** (feedDecimals - 18));
+        }
+
+        // Adjust for token decimals (same logic as ChainlinkOracle)
+        uint8 tokenDecimals = underlyingLoan.decimals();
+        if (tokenDecimals < 18) {
+            return loanPricePerUnit * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            return loanPricePerUnit / (10 ** (tokenDecimals - 18));
+        }
+        return loanPricePerUnit;
+    }
+
     /// @notice Calculate the split of seized collateral between liquidator and fee recipient
     /// @param repayAmount The amount of loan tokens being repaid
     /// @param collateralSeized The amount of collateral tokens seized (in mToken units)
-    /// @param mTokenLoan The mToken for the loan being repaid
+    /// @param underlyingLoan The underlying loan token interface
     /// @param mTokenCollateral The mToken for the collateral
     /// @param underlyingCollateral The underlying collateral token interface
     /// @return liquidatorFee The amount of collateral to send to the liquidator (repayment + bonus) in mToken units
@@ -539,13 +577,11 @@ contract ChainlinkOEVWrapper is
         uint256 repayAmount,
         int256 collateralAnswer,
         uint256 collateralSeized,
-        address mTokenLoan,
+        EIP20Interface underlyingLoan,
         address mTokenCollateral,
         EIP20Interface underlyingCollateral
     ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
-        uint256 loanPrice = chainlinkOracle.getUnderlyingPrice(
-            MToken(mTokenLoan)
-        );
+        uint256 loanPrice = _getLoanTokenPrice(underlyingLoan);
         uint256 collateralPrice = _getCollateralTokenPrice(
             collateralAnswer,
             underlyingCollateral

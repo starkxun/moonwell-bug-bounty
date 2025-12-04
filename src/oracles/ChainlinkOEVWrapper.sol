@@ -5,7 +5,6 @@ import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {AggregatorV3Interface} from "./AggregatorV3Interface.sol";
 import {MErc20Storage, MTokenInterface, MErc20Interface} from "../MTokenInterfaces.sol";
-import {MToken} from "../MToken.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
 

@@ -23,8 +23,8 @@ import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 // 2. deploy new non-upgradeable ChainlinkOEVWrapper contracts for core markets
 // 3. upgrade existing ChainlinkOEVMorphoWrapper proxy contracts for Morpho markets => test that storage can still be accessed
 // 4. call setFeed on the ChainlinkOracle for all core markets, to point to the new ChainlinkOEVWrapper contracts
-contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
-    string public constant override name = "MIP-X37";
+contract mipx38 is HybridProposal, ChainlinkOracleConfigs, Networks {
+    string public constant override name = "MIP-X38";
 
     string public constant MORPHO_IMPLEMENTATION_NAME =
         "CHAINLINK_OEV_MORPHO_WRAPPER_IMPL";
@@ -36,7 +36,7 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
     /// @dev description setup
     constructor() {
         _setProposalDescription(
-            bytes(vm.readFile("./proposals/mips/mip-x37/x37.md"))
+            bytes(vm.readFile("./proposals/mips/mip-x38/x38.md"))
         );
     }
 

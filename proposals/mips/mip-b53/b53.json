@@ -1,0 +1,39 @@
+{
+    "8453": {
+        "markets": [
+            {
+                "collateralFactor": -1,
+                "irm": "",
+                "market": "MOONWELL_AERO",
+                "reserveFactor": 0.35e18
+            },
+            {
+                "collateralFactor": -1,
+                "irm": "JUMP_RATE_IRM_MOONWELL_VIRTUAL_MIP_B53",
+                "market": "MOONWELL_VIRTUAL",
+                "reserveFactor": 0.35e18
+            },
+            {
+                "collateralFactor": -1,
+                "irm": "",
+                "market": "MOONWELL_cbXRP",
+                "reserveFactor": 0.35e18
+            },
+            {
+                "collateralFactor": 0.82e18,
+                "irm": "",
+                "market": "MOONWELL_TBTC",
+                "reserveFactor": -1
+            }
+        ],
+        "irModels": [
+            {
+                "baseRatePerYear": 0,
+                "jumpMultiplierPerYear": 5e18,
+                "kink": 0.7e18,
+                "multiplierPerYear": 0.23e18,
+                "name": "JUMP_RATE_IRM_MOONWELL_VIRTUAL_MIP_B53"
+            }
+        ]
+    }
+}

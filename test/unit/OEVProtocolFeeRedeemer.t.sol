@@ -38,6 +38,7 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
 
     // Events
     event ReservesAddedFromOEV(address indexed mToken, uint256 amount);
+    event MarketWhitelisted(address indexed market, bool whitelisted);
 
     function setUp() public {
         // Deploy mock tokens
@@ -126,7 +127,9 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
         );
 
         vm.prank(owner);
-        redeemer.whitelistMarket(address(mUSDC));
+        vm.expectEmit(true, false, false, true);
+        emit MarketWhitelisted(address(mUSDC), true);
+        redeemer.whitelistMarket(address(mUSDC), true);
 
         assertTrue(
             redeemer.whitelistedMarkets(address(mUSDC)),
@@ -134,10 +137,40 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
         );
     }
 
+    function testUnwhitelistMarket() public {
+        vm.startPrank(owner);
+
+        vm.expectEmit(true, false, false, true);
+        emit MarketWhitelisted(address(mUSDC), true);
+        redeemer.whitelistMarket(address(mUSDC), true);
+        assertTrue(redeemer.whitelistedMarkets(address(mUSDC)));
+
+        vm.expectEmit(true, false, false, true);
+        emit MarketWhitelisted(address(mUSDC), false);
+        redeemer.whitelistMarket(address(mUSDC), false);
+        assertFalse(redeemer.whitelistedMarkets(address(mUSDC)));
+
+        vm.stopPrank();
+    }
+
+    function testCannotUseUnwhitelistedMarket() public {
+        vm.startPrank(owner);
+        redeemer.whitelistMarket(address(mUSDC), true);
+        vm.stopPrank();
+
+        usdc.mint(address(redeemer), 1000e18);
+
+        vm.prank(owner);
+        redeemer.whitelistMarket(address(mUSDC), false);
+
+        vm.expectRevert("OEVProtocolFeeRedeemer: not whitelisted market");
+        redeemer.addReserves(address(mUSDC));
+    }
+
     function testWhitelistMarketOnlyOwner() public {
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        redeemer.whitelistMarket(address(mUSDC));
+        redeemer.whitelistMarket(address(mUSDC), true);
     }
 
     function testCannotCallRedeemAndAddReservesWithNonWhitelistedMarket()
@@ -235,19 +268,47 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
     }
 
     function testRedeemAndAddReservesRevertsOnInvalidMToken() public {
-        // First whitelist the weth address (even though it's not an mToken)
         vm.prank(owner);
-        redeemer.whitelistMarket(address(weth));
+        redeemer.whitelistMarket(address(weth), true);
 
         // When calling isMToken() on a contract that doesn't implement it, we get a revert
         vm.expectRevert();
         redeemer.redeemAndAddReserves(address(weth));
     }
 
-    function testAddReserves() public {
-        // Whitelist mUSDC first
+    function testRedeemAndAddReservesRevertsWhenAddReservesFails() public {
+        // Setup: Give mWETH enough cash
+        weth.mint(owner, MINT_AMOUNT * 10);
+        vm.startPrank(owner);
+        weth.approve(address(mWETH), MINT_AMOUNT * 10);
+        mWETH.mint(MINT_AMOUNT * 10);
+        vm.stopPrank();
+
+        // Give redeemer some mWETH
+        uint256 mTokenAmount = 50e8; // 50 mWETH tokens (8 decimals)
         vm.prank(owner);
-        redeemer.whitelistMarket(address(mUSDC));
+        mWETH.transfer(address(redeemer), mTokenAmount);
+
+        uint256 underlyingAmount = (mTokenAmount * mWETH.exchangeRateStored()) /
+            1e18;
+
+        vm.mockCall(
+            address(mWETH),
+            abi.encodeWithSelector(
+                mWETH._addReserves.selector,
+                underlyingAmount
+            ),
+            abi.encode(1)
+        );
+
+        vm.expectRevert("OEVProtocolFeeRedeemer: add reserves failed");
+        redeemer.redeemAndAddReserves(address(mWETH));
+        vm.clearMockedCalls();
+    }
+
+    function testAddReserves() public {
+        vm.prank(owner);
+        redeemer.whitelistMarket(address(mUSDC), true);
 
         // Give redeemer some USDC
         uint256 usdcAmount = 1000e18;
@@ -279,15 +340,34 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
 
     function testAddReservesRevertsWithZeroBalance() public {
         vm.prank(owner);
-        redeemer.whitelistMarket(address(mUSDC));
+        redeemer.whitelistMarket(address(mUSDC), true);
 
         vm.expectRevert("OEVProtocolFeeRedeemer: no underlying balance");
         redeemer.addReserves(address(mUSDC));
     }
 
+    function testAddReservesRevertsWhenAddReservesFails() public {
+        vm.prank(owner);
+        redeemer.whitelistMarket(address(mUSDC), true);
+
+        // Give redeemer some USDC
+        uint256 amount = 1000e18;
+        usdc.mint(address(redeemer), amount);
+
+        vm.mockCall(
+            address(mUSDC),
+            abi.encodeWithSelector(mUSDC._addReserves.selector, amount),
+            abi.encode(1)
+        );
+
+        vm.expectRevert("OEVProtocolFeeRedeemer: add reserves failed");
+        redeemer.addReserves(address(mUSDC));
+        vm.clearMockedCalls();
+    }
+
     function testAddReservesRevertsOnInvalidMToken() public {
         vm.prank(owner);
-        redeemer.whitelistMarket(address(usdc));
+        redeemer.whitelistMarket(address(usdc), true);
 
         // Give the redeemer some USDC so it doesn't fail on the balance check first
         usdc.mint(address(redeemer), 1000e18);
@@ -337,6 +417,21 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
         redeemer.addReservesNative();
     }
 
+    function testAddReservesNativeRevertsWhenAddReservesFails() public {
+        uint256 nativeAmount = 5 ether;
+        vm.deal(address(redeemer), nativeAmount);
+
+        vm.mockCall(
+            address(mWETH),
+            abi.encodeWithSelector(mWETH._addReserves.selector, nativeAmount),
+            abi.encode(1)
+        );
+
+        vm.expectRevert("OEVProtocolFeeRedeemer: add reserves failed");
+        redeemer.addReservesNative();
+        vm.clearMockedCalls();
+    }
+
     function testAddReservesNativeWrapsETHToWETH() public {
         uint256 nativeAmount = 3 ether;
         vm.deal(address(redeemer), nativeAmount);
@@ -355,9 +450,8 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
     }
 
     function testMultipleOperationsInSequence() public {
-        // Whitelist mUSDC
         vm.prank(owner);
-        redeemer.whitelistMarket(address(mUSDC));
+        redeemer.whitelistMarket(address(mUSDC), true);
 
         // 1. Add reserves from native
         uint256 nativeAmount = 2 ether;
@@ -439,7 +533,7 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
 
         vm.startPrank(owner);
         for (uint256 i = 0; i < markets.length; i++) {
-            redeemer.whitelistMarket(markets[i]);
+            redeemer.whitelistMarket(markets[i], true);
             assertTrue(
                 redeemer.whitelistedMarkets(markets[i]),
                 "Market should be whitelisted"
@@ -476,15 +570,13 @@ contract OEVProtocolFeeRedeemerUnitTest is Test {
     }
 
     function testAddReservesAfterWhitelistingLater() public {
-        // Try to add reserves before whitelisting - should fail
         usdc.mint(address(redeemer), 1000e18);
 
         vm.expectRevert("OEVProtocolFeeRedeemer: not whitelisted market");
         redeemer.addReserves(address(mUSDC));
 
-        // Whitelist the market
         vm.prank(owner);
-        redeemer.whitelistMarket(address(mUSDC));
+        redeemer.whitelistMarket(address(mUSDC), true);
 
         // Now it should work
         redeemer.addReserves(address(mUSDC));

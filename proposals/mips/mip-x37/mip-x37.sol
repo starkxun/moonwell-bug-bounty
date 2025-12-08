@@ -181,7 +181,8 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
         );
         for (uint256 i = 0; i < oracleConfigs.length; i++) {
             feeRedeemer.whitelistMarket(
-                addresses.getAddress(oracleConfigs[i].mTokenKey)
+                addresses.getAddress(oracleConfigs[i].mTokenKey),
+                true
             );
         }
 
@@ -327,12 +328,12 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 )
             );
 
-            // Validate feeMultiplier
+            // Validate liquidatorFeeBps
             assertEq(
-                wrapper.feeMultiplier(),
+                wrapper.liquidatorFeeBps(),
                 FEE_MULTIPLIER,
                 string.concat(
-                    "Core wrapper feeMultiplier mismatch for ",
+                    "Core wrapper liquidatorFeeBps mismatch for ",
                     wrapperName
                 )
             );
@@ -481,12 +482,12 @@ contract mipx37 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 )
             );
 
-            // Validate feeMultiplier
+            // Validate liquidatorFeeBps
             assertEq(
-                wrapper.feeMultiplier(),
+                wrapper.liquidatorFeeBps(),
                 FEE_MULTIPLIER,
                 string.concat(
-                    "Morpho wrapper feeMultiplier mismatch for ",
+                    "Morpho wrapper liquidatorFeeBps mismatch for ",
                     wrapperName
                 )
             );

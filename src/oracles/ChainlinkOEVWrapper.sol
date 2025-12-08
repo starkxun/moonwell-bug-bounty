@@ -2,9 +2,9 @@
 pragma solidity 0.8.19;
 
 import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {AggregatorV3Interface} from "./AggregatorV3Interface.sol";
 import {MErc20Storage, MTokenInterface, MErc20Interface} from "../MTokenInterfaces.sol";
-import {MToken} from "../MToken.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
 
@@ -13,12 +13,13 @@ import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
  * @notice A wrapper for Chainlink price feeds that allows early updates for liquidation
  * @dev This contract implements the AggregatorV3Interface and adds OEV (Oracle Extractable Value) functionality
  */
-contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
+contract ChainlinkOEVWrapper is
+    Ownable,
+    AggregatorV3Interface,
+    ReentrancyGuard
+{
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
-
-    /// @notice Chainlink feed decimals (USD feeds use 8 decimals)
-    uint8 private constant CHAINLINK_FEED_DECIMALS = 8;
 
     /// @notice Price mantissa decimals (used by ChainlinkOracle)
     uint8 private constant PRICE_MANTISSA_DECIMALS = 18;
@@ -32,9 +33,8 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     /// @notice The address that will receive the OEV fees
     address public feeRecipient;
 
-    /// @notice The fee multiplier for the OEV fees, to be paid to the liquidator
-    /// @dev Represented as a percentage
-    uint16 public feeMultiplier;
+    /// @notice The fee multiplier (in bps) for the OEV fees, to be paid to the liquidator
+    uint16 public liquidatorFeeBps;
 
     /// @notice The last cached round id
     uint256 public cachedRoundId;
@@ -49,9 +49,9 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     event FeeRecipientChanged(address oldFeeRecipient, address newFeeRecipient);
 
     /// @notice Emitted when the fee multiplier is changed
-    event FeeMultiplierChanged(
-        uint16 oldFeeMultiplier,
-        uint16 newFeeMultiplier
+    event LiquidatorFeeBpsChanged(
+        uint16 oldLiquidatorFeeBps,
+        uint16 newLiquidatorFeeBps
     );
 
     /// @notice Emitted when the max round delay is changed
@@ -80,7 +80,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
      * @notice Contract constructor
      * @param _priceFeed Address of the Chainlink price feed to forward calls to
      * @param _owner Address that will own this contract
-     * @param _feeMultiplier The fee multiplier for the OEV fees
+     * @param _liquidatorFeeBps The liquidator fee BPS for the OEV fees
      * @param _maxRoundDelay The max round delay
      * @param _maxDecrements The max decrements
      */
@@ -89,7 +89,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         address _owner,
         address _chainlinkOracle,
         address _feeRecipient,
-        uint16 _feeMultiplier,
+        uint16 _liquidatorFeeBps,
         uint256 _maxRoundDelay,
         uint256 _maxDecrements
     ) {
@@ -102,8 +102,8 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             "ChainlinkOEVWrapper: owner cannot be zero address"
         );
         require(
-            _feeMultiplier <= MAX_BPS,
-            "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
+            _liquidatorFeeBps <= MAX_BPS,
+            "ChainlinkOEVWrapper: liquidator fee cannot be greater than MAX_BPS"
         );
         require(
             _maxRoundDelay > 0,
@@ -123,7 +123,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         );
 
         priceFeed = AggregatorV3Interface(_priceFeed);
-        feeMultiplier = _feeMultiplier;
+        liquidatorFeeBps = _liquidatorFeeBps;
         cachedRoundId = priceFeed.latestRound();
         maxRoundDelay = _maxRoundDelay;
         maxDecrements = _maxDecrements;
@@ -260,17 +260,17 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     }
 
     /**
-     * @notice Sets the fee multiplier for OEV fees
-     * @param _feeMultiplier The new fee multiplier in basis points (must be <= MAX_BPS)
+     * @notice Sets the liquidator fee BPS for OEV fees
+     * @param _liquidatorFeeBps The new liquidator fee in basis points (must be <= MAX_BPS)
      */
-    function setFeeMultiplier(uint16 _feeMultiplier) external onlyOwner {
+    function setLiquidatorFeeBps(uint16 _liquidatorFeeBps) external onlyOwner {
         require(
-            _feeMultiplier <= MAX_BPS,
-            "ChainlinkOEVWrapper: fee multiplier cannot be greater than MAX_BPS"
+            _liquidatorFeeBps <= MAX_BPS,
+            "ChainlinkOEVWrapper: liquidator fee cannot be greater than MAX_BPS"
         );
-        uint16 oldFeeMultiplier = feeMultiplier;
-        feeMultiplier = _feeMultiplier;
-        emit FeeMultiplierChanged(oldFeeMultiplier, _feeMultiplier);
+        uint16 oldLiquidatorFeeBps = liquidatorFeeBps;
+        liquidatorFeeBps = _liquidatorFeeBps;
+        emit LiquidatorFeeBpsChanged(oldLiquidatorFeeBps, _liquidatorFeeBps);
     }
 
     /**
@@ -335,7 +335,7 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
         uint256 repayAmount,
         address mTokenCollateral,
         address mTokenLoan
-    ) external {
+    ) external nonReentrant {
         // ensure the repay amount is greater than zero
         require(
             repayAmount > 0,
@@ -411,6 +411,11 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             underlyingLoan
         );
 
+        require(
+            collateralSeized > 0,
+            "ChainlinkOEVWrapper: collateral seized cannot be zero"
+        );
+
         // Calculate the split of collateral between liquidator and protocol
         (
             uint256 liquidatorFee,
@@ -419,7 +424,8 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
                 repayAmount,
                 collateralAnswer,
                 collateralSeized,
-                mTokenLoan,
+                underlyingLoan,
+                mTokenCollateral,
                 underlyingCollateral
             );
 
@@ -463,19 +469,27 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
     function _getCollateralTokenPrice(
         int256 collateralAnswer,
         EIP20Interface underlyingCollateral
-    ) private view returns (uint256) {
-        uint256 decimalDelta = uint256(18) - uint256(priceFeed.decimals());
+    ) internal view returns (uint256) {
+        uint8 feedDecimals = priceFeed.decimals();
         uint256 collateralPricePerUnit = uint256(collateralAnswer);
-        if (decimalDelta > 0) {
+
+        // Scale price feed decimals to 18
+        if (feedDecimals < 18) {
             collateralPricePerUnit =
                 collateralPricePerUnit *
-                (10 ** decimalDelta);
+                (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            collateralPricePerUnit =
+                collateralPricePerUnit /
+                (10 ** (feedDecimals - 18));
         }
 
-        uint256 collateralDecimalDelta = uint256(18) -
-            uint256(underlyingCollateral.decimals());
-        if (collateralDecimalDelta > 0) {
-            return collateralPricePerUnit * (10 ** collateralDecimalDelta);
+        // Adjust for token decimals
+        uint8 tokenDecimals = underlyingCollateral.decimals();
+        if (tokenDecimals < 18) {
+            return collateralPricePerUnit * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            return collateralPricePerUnit / (10 ** (tokenDecimals - 18));
         }
         return collateralPricePerUnit;
     }
@@ -512,31 +526,74 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             mTokenCollateralBalanceBefore;
     }
 
+    /// @notice Get the loan token price directly from the underlying Chainlink feed
+    /// @dev Bypasses any OEV wrapper to get fresh price data, preventing price staleness exploits
+    /// @param underlyingLoan The underlying loan token interface
+    /// @return The price scaled to 1e18 and adjusted for token decimals
+    function _getLoanTokenPrice(
+        EIP20Interface underlyingLoan
+    ) internal view returns (uint256) {
+        // Get the price feed for the loan token directly from the oracle
+        AggregatorV3Interface loanFeed = chainlinkOracle.getFeed(
+            underlyingLoan.symbol()
+        );
+
+        // Get the latest price from the feed
+        (, int256 loanAnswer, , , ) = loanFeed.latestRoundData();
+        require(
+            loanAnswer > 0,
+            "ChainlinkOEVWrapper: invalid loan token price"
+        );
+
+        // Scale feed decimals to 18
+        uint8 feedDecimals = loanFeed.decimals();
+        uint256 loanPricePerUnit = uint256(loanAnswer);
+        if (feedDecimals < 18) {
+            loanPricePerUnit = loanPricePerUnit * (10 ** (18 - feedDecimals));
+        } else if (feedDecimals > 18) {
+            loanPricePerUnit = loanPricePerUnit / (10 ** (feedDecimals - 18));
+        }
+
+        // Adjust for token decimals (same logic as ChainlinkOracle)
+        uint8 tokenDecimals = underlyingLoan.decimals();
+        if (tokenDecimals < 18) {
+            return loanPricePerUnit * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            return loanPricePerUnit / (10 ** (tokenDecimals - 18));
+        }
+        return loanPricePerUnit;
+    }
+
     /// @notice Calculate the split of seized collateral between liquidator and fee recipient
     /// @param repayAmount The amount of loan tokens being repaid
-    /// @param collateralSeized The amount of collateral tokens seized
-    /// @param mTokenLoan The mToken for the loan being repaid
+    /// @param collateralSeized The amount of collateral tokens seized (in mToken units)
+    /// @param underlyingLoan The underlying loan token interface
+    /// @param mTokenCollateral The mToken for the collateral
     /// @param underlyingCollateral The underlying collateral token interface
-    /// @return liquidatorFee The amount of collateral to send to the liquidator (repayment + bonus)
-    /// @return protocolFee The amount of collateral to send to the fee recipient (remainder)
+    /// @return liquidatorFee The amount of collateral to send to the liquidator (repayment + bonus) in mToken units
+    /// @return protocolFee The amount of collateral to send to the fee recipient (remainder) in mToken units
     function _calculateCollateralSplit(
         uint256 repayAmount,
         int256 collateralAnswer,
         uint256 collateralSeized,
-        address mTokenLoan,
+        EIP20Interface underlyingLoan,
+        address mTokenCollateral,
         EIP20Interface underlyingCollateral
     ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
-        uint256 loanPrice = chainlinkOracle.getUnderlyingPrice(
-            MToken(mTokenLoan)
-        );
+        uint256 loanPrice = _getLoanTokenPrice(underlyingLoan);
         uint256 collateralPrice = _getCollateralTokenPrice(
             collateralAnswer,
             underlyingCollateral
         );
 
+        // Convert seized mTokens to underlying amount
+        uint256 exchangeRate = MTokenInterface(mTokenCollateral)
+            .exchangeRateStored();
+        uint256 underlyingAmount = (collateralSeized * exchangeRate) / 1e18;
+
         uint256 usdNormalizer = 10 ** PRICE_MANTISSA_DECIMALS; // 1e18
         uint256 repayUSD = (repayAmount * loanPrice) / usdNormalizer;
-        uint256 collateralUSD = (collateralSeized * collateralPrice) /
+        uint256 collateralUSD = (underlyingAmount * collateralPrice) /
             usdNormalizer;
 
         // If collateral is worth less than repayment, liquidator gets all collateral
@@ -546,13 +603,15 @@ contract ChainlinkOEVWrapper is Ownable, AggregatorV3Interface {
             return (liquidatorFee, protocolFee);
         }
 
-        // Liquidator gets the repayment amount + bonus (remainder * feeMultiplier)
+        // Liquidator gets the repayment amount + bonus (remainder * liquidatorFeeBps)
         uint256 liquidatorUSD = repayUSD +
-            ((collateralUSD - repayUSD) * uint256(feeMultiplier)) /
+            ((collateralUSD - repayUSD) * uint256(liquidatorFeeBps)) /
             MAX_BPS;
 
-        // Convert back to collateral token amount
-        liquidatorFee = (liquidatorUSD * usdNormalizer) / collateralPrice;
+        // Convert liquidator USD to underlying, then to mToken units
+        uint256 liquidatorUnderlyingAmount = (liquidatorUSD * usdNormalizer) /
+            collateralPrice;
+        liquidatorFee = (liquidatorUnderlyingAmount * 1e18) / exchangeRate;
 
         protocolFee = collateralSeized - liquidatorFee;
     }

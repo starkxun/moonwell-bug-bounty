@@ -4,7 +4,7 @@ pragma solidity 0.8.19;
 import {console} from "forge-std/console.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {ChainlinkOracleConfigs} from "@proposals/ChainlinkOracleConfigs.sol";
-import {BASE_FORK_ID, OPTIMISM_FORK_ID, MOONBEAM_FORK_ID, BASE_CHAIN_ID, OPTIMISM_CHAIN_ID} from "@utils/ChainIds.sol";
+import {BASE_FORK_ID, OPTIMISM_FORK_ID, BASE_CHAIN_ID, OPTIMISM_CHAIN_ID, ChainIds} from "@utils/ChainIds.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {Networks} from "@proposals/utils/Networks.sol";
@@ -24,6 +24,7 @@ import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 // 3. upgrade existing ChainlinkOEVMorphoWrapper proxy contracts for Morpho markets => test that storage can still be accessed
 // 4. call setFeed on the ChainlinkOracle for all core markets, to point to the new ChainlinkOEVWrapper contracts
 contract mipx38 is HybridProposal, ChainlinkOracleConfigs, Networks {
+    using ChainIds for uint256;
     string public constant override name = "MIP-X38";
 
     string public constant MORPHO_IMPLEMENTATION_NAME =
@@ -42,6 +43,36 @@ contract mipx38 is HybridProposal, ChainlinkOracleConfigs, Networks {
 
     function primaryForkId() public pure override returns (uint256) {
         return BASE_FORK_ID;
+    }
+
+    function run() public override {
+        primaryForkId().createForksAndSelect();
+
+        Addresses addresses = new Addresses();
+        vm.makePersistent(address(addresses));
+
+        initProposal(addresses);
+
+        (, address deployerAddress, ) = vm.readCallers();
+
+        if (DO_DEPLOY) deploy(addresses, deployerAddress);
+        if (DO_AFTER_DEPLOY) afterDeploy(addresses, deployerAddress);
+
+        if (DO_BUILD) build(addresses);
+        if (DO_RUN) run(addresses, deployerAddress);
+        if (DO_TEARDOWN) teardown(addresses, deployerAddress);
+        if (DO_VALIDATE) {
+            validate(addresses, deployerAddress);
+            console.log("Validation completed for proposal ", this.name());
+        }
+        if (DO_PRINT) {
+            printProposalActionSteps();
+
+            addresses.removeAllRestrictions();
+            printCalldata(addresses);
+
+            _printAddressesChanges(addresses);
+        }
     }
 
     // Deploy new instances of ChainlinkOEVWrapper (core markets) and ensure ChainlinkOEVMorphoWrapper implementation

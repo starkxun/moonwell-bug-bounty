@@ -245,6 +245,10 @@ contract mipx38 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 abi.encodePacked(config.oracleName, "_OEV_WRAPPER")
             );
 
+            if (addresses.isAddressSet(wrapperName)) {
+                continue;
+            }
+
             ChainlinkOEVWrapper wrapper = new ChainlinkOEVWrapper(
                 addresses.getAddress(config.oracleName),
                 addresses.getAddress("TEMPORAL_GOVERNOR"),
@@ -255,24 +259,7 @@ contract mipx38 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 MAX_DECREMENTS
             );
 
-            // Set existing wrapper to deprecated and add new wrapper
-            if (addresses.isAddressSet(wrapperName)) {
-                address oldWrapper = addresses.getAddress(wrapperName);
-
-                string memory deprecatedName = string(
-                    abi.encodePacked(wrapperName, "_DEPRECATED")
-                );
-
-                if (addresses.isAddressSet(deprecatedName)) {
-                    addresses.changeAddress(deprecatedName, oldWrapper, true);
-                } else {
-                    addresses.addAddress(deprecatedName, oldWrapper);
-                }
-
-                addresses.changeAddress(wrapperName, address(wrapper), true);
-            } else {
-                addresses.addAddress(wrapperName, address(wrapper));
-            }
+            addresses.addAddress(wrapperName, address(wrapper));
         }
 
         vm.stopBroadcast();

@@ -640,6 +640,36 @@
         "name": "RESERVE_AUTOMATION_WBTC"
     },
     {
+        "addr": "0x6F0cC02e5a7640B28F538fcc06bCA3BdFA57d1BB",
+        "isContract": true,
+        "name": "CHAINLINK_USDC_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0x48F86A23aDE243F7a1028108aA65274FC84f382F",
+        "isContract": true,
+        "name": "CHAINLINK_DAI_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0x1E0E8bcFb5FFa86749B8b89fb6e055337Ba74A39",
+        "isContract": true,
+        "name": "CHAINLINK_USDT_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0xAeC8E8E3696fc5fcd954eb3ebC26B72FC2FE8E8e",
+        "isContract": true,
+        "name": "CHAINLINK_WBTC_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0x94423903EaAf8638bDE262c417fEEf5E2Ec507E5",
+        "isContract": true,
+        "name": "CHAINLINK_OP_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0x6aa41dF8FB0deC976B59bf0824FC5fFB88ccA958",
+        "isContract": true,
+        "name": "CHAINLINK_VELO_USD_OEV_WRAPPER"
+    },
+    {
         "addr": "0xfeA5a5927645C0DC5C1E740Ec1B24AD320c7e58f",
         "isContract": true,
         "name": "CHAINLINK_WELL_USD_OEV_WRAPPER"
@@ -688,80 +718,5 @@
         "addr": "0x5fddda4866db63685018faa1bfc9bfce7072014c",
         "isContract": true,
         "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE"
-    },
-    {
-        "addr": "0xcB95579c706144f3150f7C3b1BD3F24A48d3463e",
-        "isContract": true,
-        "name": "OEV_PROTOCOL_FEE_REDEEMER"
-    },
-    {
-        "addr": "0x6F0cC02e5a7640B28F538fcc06bCA3BdFA57d1BB",
-        "isContract": true,
-        "name": "CHAINLINK_USDC_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0x165783Bb828F838844EBC923Aa8ce79dEdB6440D",
-        "isContract": true,
-        "name": "CHAINLINK_USDT_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0x48F86A23aDE243F7a1028108aA65274FC84f382F",
-        "isContract": true,
-        "name": "CHAINLINK_DAI_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0x502510FA35Da0db798452a7A33138F14343FebAc",
-        "isContract": true,
-        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0xAeC8E8E3696fc5fcd954eb3ebC26B72FC2FE8E8e",
-        "isContract": true,
-        "name": "CHAINLINK_WBTC_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0x94423903EaAf8638bDE262c417fEEf5E2Ec507E5",
-        "isContract": true,
-        "name": "CHAINLINK_OP_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0x6aa41dF8FB0deC976B59bf0824FC5fFB88ccA958",
-        "isContract": true,
-        "name": "CHAINLINK_VELO_USD_OEV_WRAPPER_DEPRECATED"
-    },
-    {
-        "addr": "0x86aD38946d4614b96DFDAbC818585C4F12025e26",
-        "isContract": true,
-        "name": "CHAINLINK_USDC_USD_OEV_WRAPPER"
-    },
-    {
-        "addr": "0xC8cE975353BC920Cd8ffE361343E123755f2612B",
-        "isContract": true,
-        "name": "CHAINLINK_USDT_USD_OEV_WRAPPER"
-    },
-    {
-        "addr": "0x920Ae9cB01a01b19f3795af86280dedF44384A10",
-        "isContract": true,
-        "name": "CHAINLINK_DAI_USD_OEV_WRAPPER"
-    },
-    {
-        "addr": "0x621478e81a1eBdC29DbD92D788d0CDe37288fd07",
-        "isContract": true,
-        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
-    },
-    {
-        "addr": "0xc78fe13CAc157BD9dAddc1BF11C47FeA51113854",
-        "isContract": true,
-        "name": "CHAINLINK_WBTC_USD_OEV_WRAPPER"
-    },
-    {
-        "addr": "0x24a51Aede97f2b9f82aD41B372361164389eae79",
-        "isContract": true,
-        "name": "CHAINLINK_OP_USD_OEV_WRAPPER"
-    },
-    {
-        "addr": "0xa799Ff0AD130ae58E4BFEdAE696533a59Acc3438",
-        "isContract": true,
-        "name": "CHAINLINK_VELO_USD_OEV_WRAPPER"
     }
 ]

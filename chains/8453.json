@@ -1368,5 +1368,15 @@
         "addr": "0x22C7269DF71799b5655B34Fff17bBE1215795668",
         "isContract": true,
         "name": "CHAINLINK_VIRTUAL_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0x1796720C9441F8f18a3AA570aB7c10597a57C08e",
+        "isContract": true,
+        "name": "MWETH_OWNER_WRAPPER_IMPL"
+    },
+    {
+        "addr": "0x82e5e038A1D93f371f02768b09B2C6C4b98f6250",
+        "isContract": true,
+        "name": "MWETH_OWNER_WRAPPER"
     }
 ]

@@ -38,6 +38,7 @@ contract ChainlinkOracleProxyIntegrationTest is PostProposalCheck {
             ChainlinkOracleProxy implementation
         ) = deployer.deploy(addresses);
         proxy = ChainlinkOracleProxy(address(proxyContract));
+        vm.makePersistent(address(proxy));
 
         // Validate deployment
         deployer.validate(addresses, proxyContract, implementation);

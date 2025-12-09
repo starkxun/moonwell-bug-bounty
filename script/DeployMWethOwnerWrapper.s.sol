@@ -23,8 +23,11 @@ contract DeployMWethOwnerWrapper is Script {
     function deploy(
         Addresses addresses
     ) public returns (TransparentUpgradeableProxy, MWethOwnerWrapper) {
-        // Skip deployment if already deployed
-        if (addresses.isAddressSet("MWETH_OWNER_WRAPPER")) {
+        // Skip deployment if already deployed (check both addresses)
+        if (
+            addresses.isAddressSet("MWETH_OWNER_WRAPPER_IMPL") ||
+            addresses.isAddressSet("MWETH_OWNER_WRAPPER")
+        ) {
             return (
                 TransparentUpgradeableProxy(
                     payable(addresses.getAddress("MWETH_OWNER_WRAPPER"))

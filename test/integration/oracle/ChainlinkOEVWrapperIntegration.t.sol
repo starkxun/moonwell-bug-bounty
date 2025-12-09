@@ -1138,6 +1138,9 @@ contract ChainlinkOEVWrapperIntegrationTest is
 
     /// @notice Simulate some real liquidations from 10/10
     function testRealLiquidations() public {
+        // NOTE: skipping real liquidations given protocol fee oev redeemer not deployed yet
+        vm.skip(true);
+
         LiquidationData[] memory liquidations = getLiquidations();
 
         // Skip test if no liquidation data for this chain

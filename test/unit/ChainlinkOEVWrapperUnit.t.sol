@@ -823,6 +823,313 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             "Liquidator should not receive 100% of collateral"
         );
     }
+
+    function testWithdrawETHSucceeds() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
+
+        // Fund the wrapper with some ETH
+        uint256 ethAmount = 1 ether;
+        vm.deal(address(wrapper), ethAmount);
+        assertEq(
+            address(wrapper).balance,
+            ethAmount,
+            "Wrapper should have ETH"
+        );
+
+        // Create recipient and record initial balance
+        address payable recipient = payable(address(0xBEEF));
+        uint256 recipientBalanceBefore = recipient.balance;
+
+        // Withdraw ETH as owner
+        vm.prank(owner);
+        wrapper.withdrawETH(recipient);
+
+        // Verify ETH was transferred
+        assertEq(
+            address(wrapper).balance,
+            0,
+            "Wrapper should have 0 ETH after withdrawal"
+        );
+        assertEq(
+            recipient.balance,
+            recipientBalanceBefore + ethAmount,
+            "Recipient should have received ETH"
+        );
+    }
+
+    function testWithdrawETHOnlyOwner() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
+
+        // Fund the wrapper with some ETH
+        vm.deal(address(wrapper), 1 ether);
+
+        address payable recipient = payable(address(0xBEEF));
+
+        // Try to withdraw as non-owner
+        vm.prank(address(0xDEAD));
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        wrapper.withdrawETH(recipient);
+    }
+
+    function testWithdrawERC20Succeeds() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
+
+        // Mint some tokens to the wrapper
+        uint256 tokenAmount = 1000e18;
+        token18.mint(address(wrapper), tokenAmount);
+        assertEq(
+            token18.balanceOf(address(wrapper)),
+            tokenAmount,
+            "Wrapper should have tokens"
+        );
+
+        // Create recipient
+        address recipient = address(0xBEEF);
+        uint256 recipientBalanceBefore = token18.balanceOf(recipient);
+
+        // Withdraw tokens as owner
+        vm.prank(owner);
+        wrapper.withdrawERC20(address(token18), recipient);
+
+        // Verify tokens were transferred
+        assertEq(
+            token18.balanceOf(address(wrapper)),
+            0,
+            "Wrapper should have 0 tokens after withdrawal"
+        );
+        assertEq(
+            token18.balanceOf(recipient),
+            recipientBalanceBefore + tokenAmount,
+            "Recipient should have received tokens"
+        );
+    }
+
+    function testWithdrawERC20OnlyOwner() public {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
+
+        // Mint some tokens to the wrapper
+        token18.mint(address(wrapper), 1000e18);
+
+        address recipient = address(0xBEEF);
+
+        // Try to withdraw as non-owner
+        vm.prank(address(0xDEAD));
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        wrapper.withdrawERC20(address(token18), recipient);
+    }
+
+    function testLoanPriceValidationRevertsOnZeroAnswer() public {
+        uint256 exchangeRate = 1e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        address mockLoanFeed = address(0x9999);
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+
+        // Mock loan feed with zero answer
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(1), // roundId
+                int256(0), // answer = 0 (invalid)
+                uint256(0), // startedAt
+                uint256(block.timestamp), // updatedAt
+                uint80(1) // answeredInRound
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
+        );
+
+        vm.expectRevert(bytes("Chainlink price cannot be lower or equal to 0"));
+        harness.exposed_calculateCollateralSplit(
+            100e18, // repayAmount
+            1e8, // collateralAnswer
+            100e18, // collateralSeized
+            address(loanToken),
+            address(mTokenCollateral),
+            address(collateralToken)
+        );
+    }
+
+    function testLoanPriceValidationRevertsOnNegativeAnswer() public {
+        uint256 exchangeRate = 1e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        address mockLoanFeed = address(0x9999);
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+
+        // Mock loan feed with negative answer
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(1), // roundId
+                int256(-1e8), // answer = -1 (invalid)
+                uint256(0), // startedAt
+                uint256(block.timestamp), // updatedAt
+                uint80(1) // answeredInRound
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
+        );
+
+        vm.expectRevert(bytes("Chainlink price cannot be lower or equal to 0"));
+        harness.exposed_calculateCollateralSplit(
+            100e18,
+            1e8,
+            100e18,
+            address(loanToken),
+            address(mTokenCollateral),
+            address(collateralToken)
+        );
+    }
+
+    function testLoanPriceValidationRevertsOnIncompleteRound() public {
+        uint256 exchangeRate = 1e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        address mockLoanFeed = address(0x9999);
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+
+        // Mock loan feed with updatedAt = 0 (incomplete round)
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(1), // roundId
+                int256(1e8), // answer
+                uint256(0), // startedAt
+                uint256(0), // updatedAt = 0 (invalid - incomplete)
+                uint80(1) // answeredInRound
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
+        );
+
+        vm.expectRevert(bytes("Round is in incompleted state"));
+        harness.exposed_calculateCollateralSplit(
+            100e18,
+            1e8,
+            100e18,
+            address(loanToken),
+            address(mTokenCollateral),
+            address(collateralToken)
+        );
+    }
+
+    function testLoanPriceValidationRevertsOnStalePrice() public {
+        uint256 exchangeRate = 1e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        address mockLoanFeed = address(0x9999);
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+
+        // Mock loan feed with answeredInRound < roundId (stale price)
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(5), // roundId = 5
+                int256(1e8), // answer
+                uint256(0), // startedAt
+                uint256(block.timestamp), // updatedAt
+                uint80(3) // answeredInRound = 3 (< roundId, stale)
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
+        );
+
+        vm.expectRevert(bytes("Stale price"));
+        harness.exposed_calculateCollateralSplit(
+            100e18,
+            1e8,
+            100e18,
+            address(loanToken),
+            address(mTokenCollateral),
+            address(collateralToken)
+        );
+    }
+
+    function testLoanPriceValidationSucceedsWithValidData() public {
+        uint256 exchangeRate = 1e18;
+        mTokenCollateral = new MockMToken(exchangeRate);
+
+        address mockLoanFeed = address(0x9999);
+        vm.mockCall(
+            address(1),
+            abi.encodeWithSignature("getFeed(string)", loanToken.symbol()),
+            abi.encode(mockLoanFeed)
+        );
+
+        // Mock loan feed with valid data
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("latestRoundData()"),
+            abi.encode(
+                uint80(5), // roundId
+                int256(1e8), // answer > 0 (valid)
+                uint256(0), // startedAt
+                uint256(block.timestamp), // updatedAt != 0 (valid)
+                uint80(5) // answeredInRound >= roundId (valid)
+            )
+        );
+        vm.mockCall(
+            mockLoanFeed,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(uint8(8))
+        );
+
+        // Should not revert with valid data
+        (uint256 liquidatorFee, uint256 protocolFee) = harness
+            .exposed_calculateCollateralSplit(
+                50e18, // repayAmount
+                1e8, // collateralAnswer ($1)
+                100e18, // collateralSeized
+                address(loanToken),
+                address(mTokenCollateral),
+                address(collateralToken)
+            );
+
+        // Verify calculation succeeded
+        assertGt(liquidatorFee, 0, "Liquidator fee should be > 0");
+        assertEq(
+            liquidatorFee + protocolFee,
+            100e18,
+            "Total should equal collateralSeized"
+        );
+    }
 }
 
 /// @notice Mock price feed with configurable decimals for testing
@@ -916,7 +1223,7 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
         address underlyingLoan,
         address mTokenCollateral,
         address underlyingCollateral
-    ) external view returns (uint256 liquidatorFee, uint256 protocolFee) {
+    ) external returns (uint256 liquidatorFee, uint256 protocolFee) {
         return
             _calculateCollateralSplit(
                 repayAmount,
@@ -938,6 +1245,10 @@ contract MockMToken {
     }
 
     function exchangeRateStored() external view returns (uint256) {
+        return _exchangeRate;
+    }
+
+    function exchangeRateCurrent() external returns (uint256) {
         return _exchangeRate;
     }
 }

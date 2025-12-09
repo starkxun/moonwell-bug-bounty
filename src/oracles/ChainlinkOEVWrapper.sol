@@ -318,6 +318,29 @@ contract ChainlinkOEVWrapper is
     }
 
     /**
+     * @notice Allows the contract owner to withdraw ETH from the contract to the recipient
+     * @param recipient The address to receive the ETH
+     */
+    function withdrawETH(address payable recipient) external onlyOwner {
+        recipient.transfer(address(this).balance);
+    }
+
+    /**
+     * @notice Allows the contract owner to withdraw ERC20 tokens from the contract to the recipient
+     * @param token The address of the ERC20 token to withdraw
+     * @param recipient The address to receive the ERC20 tokens
+     */
+    function withdrawERC20(
+        address token,
+        address recipient
+    ) external onlyOwner {
+        EIP20Interface(token).transfer(
+            recipient,
+            EIP20Interface(token).balanceOf(address(this))
+        );
+    }
+
+    /**
      * @notice Allows the contract to receive ETH (needed for mWETH redemption which unwraps to ETH)
      */
     receive() external payable {}
@@ -538,12 +561,21 @@ contract ChainlinkOEVWrapper is
             underlyingLoan.symbol()
         );
 
-        // Get the latest price from the feed
-        (, int256 loanAnswer, , , ) = loanFeed.latestRoundData();
-        require(
-            loanAnswer > 0,
-            "ChainlinkOEVWrapper: invalid loan token price"
-        );
+        // Get the latest price from the feed and validate
+        int256 loanAnswer;
+        {
+            (
+                uint80 roundId,
+                int256 answer,
+                ,
+                uint256 updatedAt,
+                uint80 answeredInRound
+            ) = loanFeed.latestRoundData();
+
+            _validateRoundData(roundId, answer, updatedAt, answeredInRound);
+
+            loanAnswer = answer;
+        }
 
         // Scale feed decimals to 18
         uint8 feedDecimals = loanFeed.decimals();
@@ -579,16 +611,16 @@ contract ChainlinkOEVWrapper is
         EIP20Interface underlyingLoan,
         address mTokenCollateral,
         EIP20Interface underlyingCollateral
-    ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
+    ) internal returns (uint256 liquidatorFee, uint256 protocolFee) {
         uint256 loanPrice = _getLoanTokenPrice(underlyingLoan);
         uint256 collateralPrice = _getCollateralTokenPrice(
             collateralAnswer,
             underlyingCollateral
         );
 
-        // Convert seized mTokens to underlying amount
+        // Convert seized mTokens to underlying amount, and accrue interest
         uint256 exchangeRate = MTokenInterface(mTokenCollateral)
-            .exchangeRateStored();
+            .exchangeRateCurrent();
         uint256 underlyingAmount = (collateralSeized * exchangeRate) / 1e18;
 
         uint256 usdNormalizer = 10 ** PRICE_MANTISSA_DECIMALS; // 1e18

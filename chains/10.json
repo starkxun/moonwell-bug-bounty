@@ -572,7 +572,7 @@
     {
         "addr": "0x502510FA35Da0db798452a7A33138F14343FebAc",
         "isContract": true,
-        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
+        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER_DEPRECATED"
     },
     {
         "addr": "0x7F102e5b4C32e0861293E97DE85e6E0dB3530605",
@@ -723,5 +723,15 @@
         "addr": "0x5fddda4866db63685018faa1bfc9bfce7072014c",
         "isContract": true,
         "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE"
+    },
+    {
+        "addr": "0xAd3315F8B0c17f3bF97186B65EF91DA9FbFf170B",
+        "isContract": true,
+        "name": "OEV_PROTOCOL_FEE_REDEEMER"
+    },
+    {
+        "addr": "0x9aD1d7F1E7AA7277b6f5F7aB820dFf2Da36e1822",
+        "isContract": true,
+        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
     }
 ]

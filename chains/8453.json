@@ -1022,7 +1022,7 @@
     {
         "addr": "0xc2dA00D538237822e3c7dcb95114FA1474e4c884",
         "isContract": true,
-        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
+        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER_DEPRECATED"
     },
     {
         "addr": "0x6F0cC02e5a7640B28F538fcc06bCA3BdFA57d1BB",
@@ -1182,7 +1182,7 @@
     {
         "addr": "0xb62f6CcE22d414483c3BC4Dea6f4Fe6B6dF50239",
         "isContract": true,
-        "name": "CHAINLINK_WELL_USD_ORACLE_IMPL"
+        "name": "CHAINLINK_WELL_USD_ORACLE_IMPL_DEPRECATED"
     },
     {
         "addr": "0x3fCA08493283E79cbD1E733Ca3Cb8eC8C6074deC",
@@ -1258,5 +1258,20 @@
         "addr": "0x82e5e038A1D93f371f02768b09B2C6C4b98f6250",
         "isContract": true,
         "name": "MWETH_OWNER_WRAPPER"
+    },
+    {
+        "addr": "0xB25b49c555a458c3c4dE3205040da6A582FF331d",
+        "isContract": true,
+        "name": "OEV_PROTOCOL_FEE_REDEEMER"
+    },
+    {
+        "addr": "0x5C6C11D5e5553e7802Bce6A56156B8F0D8A11833",
+        "isContract": true,
+        "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0xF781D501639cA7e869614476Fc38811D803A8acf",
+        "isContract": true,
+        "name": "CHAINLINK_OEV_MORPHO_WRAPPER_IMPL"
     }
 ]

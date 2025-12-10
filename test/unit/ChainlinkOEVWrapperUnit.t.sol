@@ -1223,7 +1223,7 @@ contract ChainlinkOEVWrapperHarness is ChainlinkOEVWrapper {
         address underlyingLoan,
         address mTokenCollateral,
         address underlyingCollateral
-    ) external returns (uint256 liquidatorFee, uint256 protocolFee) {
+    ) external view returns (uint256 liquidatorFee, uint256 protocolFee) {
         return
             _calculateCollateralSplit(
                 repayAmount,

@@ -611,7 +611,7 @@ contract ChainlinkOEVWrapper is
         EIP20Interface underlyingLoan,
         address mTokenCollateral,
         EIP20Interface underlyingCollateral
-    ) internal returns (uint256 liquidatorFee, uint256 protocolFee) {
+    ) internal view returns (uint256 liquidatorFee, uint256 protocolFee) {
         uint256 loanPrice = _getLoanTokenPrice(underlyingLoan);
         uint256 collateralPrice = _getCollateralTokenPrice(
             collateralAnswer,
@@ -620,7 +620,7 @@ contract ChainlinkOEVWrapper is
 
         // Convert seized mTokens to underlying amount, and accrue interest
         uint256 exchangeRate = MTokenInterface(mTokenCollateral)
-            .exchangeRateCurrent();
+            .exchangeRateStored();
         uint256 underlyingAmount = (collateralSeized * exchangeRate) / 1e18;
 
         uint256 usdNormalizer = 10 ** PRICE_MANTISSA_DECIMALS; // 1e18

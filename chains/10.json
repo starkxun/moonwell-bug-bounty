@@ -725,12 +725,12 @@
         "name": "CHAINLINK_wrsETH_COMPOSITE_ORACLE"
     },
     {
-        "addr": "0xAd3315F8B0c17f3bF97186B65EF91DA9FbFf170B",
+        "addr": "0xEe3F2ca26f6F0526c50a14083113059ABb948CF9",
         "isContract": true,
         "name": "OEV_PROTOCOL_FEE_REDEEMER"
     },
     {
-        "addr": "0x9aD1d7F1E7AA7277b6f5F7aB820dFf2Da36e1822",
+        "addr": "0x531f69127bB04Ebb0Fd321b8092d34a4C2B4E0f1",
         "isContract": true,
         "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
     }

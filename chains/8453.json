@@ -1260,17 +1260,17 @@
         "name": "MWETH_OWNER_WRAPPER"
     },
     {
-        "addr": "0xB25b49c555a458c3c4dE3205040da6A582FF331d",
+        "addr": "0xab05F7216B4ecD0594E703F21fb0dE6183BFeCF3",
         "isContract": true,
         "name": "OEV_PROTOCOL_FEE_REDEEMER"
     },
     {
-        "addr": "0x5C6C11D5e5553e7802Bce6A56156B8F0D8A11833",
+        "addr": "0xeb083d234ec636A10325ea42bCbbE09Aa56d1547",
         "isContract": true,
         "name": "CHAINLINK_ETH_USD_OEV_WRAPPER"
     },
     {
-        "addr": "0xF781D501639cA7e869614476Fc38811D803A8acf",
+        "addr": "0xB5421a112f07C31820f413852E7e39E2d765e4B8",
         "isContract": true,
         "name": "CHAINLINK_OEV_MORPHO_WRAPPER_IMPL"
     }

@@ -482,10 +482,24 @@ contract ChainlinkOEVWrapper is
             );
 
         // transfer the liquidator's payment (repayment + bonus) to the liquidator
-        mTokenCollateralInterface.transfer(msg.sender, liquidatorFee);
+        bool liquidatorSuccess = mTokenCollateralInterface.transfer(
+            msg.sender,
+            liquidatorFee
+        );
+        require(
+            liquidatorSuccess,
+            "ChainlinkOEVWrapper: liquidator fee transfer failed"
+        );
 
         // transfer the remainder to the fee recipient
-        mTokenCollateralInterface.transfer(feeRecipient, protocolFee);
+        bool protocolSuccess = mTokenCollateralInterface.transfer(
+            feeRecipient,
+            protocolFee
+        );
+        require(
+            protocolSuccess,
+            "ChainlinkOEVWrapper: protocol fee transfer failed"
+        );
 
         emit PriceUpdatedEarlyAndLiquidated(
             borrower,

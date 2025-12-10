@@ -445,7 +445,11 @@ contract ChainlinkOEVMorphoWrapper is
             // return any excess loan tokens to the liquidator
             uint256 excessLoanTokens = maxRepayAmount - actualRepaidAssets;
             if (excessLoanTokens > 0) {
-                loanToken.transfer(msg.sender, excessLoanTokens);
+                bool success = loanToken.transfer(msg.sender, excessLoanTokens);
+                require(
+                    success,
+                    "ChainlinkOEVMorphoWrapper: excess loan tokens transfer failed"
+                );
             }
         }
 
@@ -461,15 +465,19 @@ contract ChainlinkOEVMorphoWrapper is
             );
 
         // transfer the liquidator's payment (repayment + bonus) to the liquidator
-        EIP20Interface(marketParams.collateralToken).transfer(
-            msg.sender,
-            liquidatorFee
+        bool liquidatorSuccess = EIP20Interface(marketParams.collateralToken)
+            .transfer(msg.sender, liquidatorFee);
+        require(
+            liquidatorSuccess,
+            "ChainlinkOEVMorphoWrapper: liquidator fee transfer failed"
         );
 
         // transfer the remainder to the fee recipient
-        EIP20Interface(marketParams.collateralToken).transfer(
-            feeRecipient,
-            protocolFee
+        bool protocolSuccess = EIP20Interface(marketParams.collateralToken)
+            .transfer(feeRecipient, protocolFee);
+        require(
+            protocolSuccess,
+            "ChainlinkOEVMorphoWrapper: protocol fee transfer failed"
         );
 
         emit PriceUpdatedEarlyAndLiquidated(

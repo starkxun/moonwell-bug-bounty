@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
-import "@openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./AggregatorV3Interface.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IMorphoBlue} from "../morpho/IMorphoBlue.sol";
@@ -19,8 +18,7 @@ import {IChainlinkOracle} from "../interfaces/IChainlinkOracle.sol";
 contract ChainlinkOEVMorphoWrapper is
     Initializable,
     OwnableUpgradeable,
-    AggregatorV3Interface,
-    ReentrancyGuardUpgradeable
+    AggregatorV3Interface
 {
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
@@ -28,11 +26,11 @@ contract ChainlinkOEVMorphoWrapper is
     /// @notice Price mantissa decimals (used by ChainlinkOracle)
     uint8 private constant PRICE_MANTISSA_DECIMALS = 18;
 
-    /// @notice The ChainlinkOracle contract
-    IChainlinkOracle public chainlinkOracle;
-
     /// @notice The Chainlink price feed this proxy forwards to
     AggregatorV3Interface public priceFeed;
+
+    /// @notice The ChainlinkOracle contract
+    IChainlinkOracle public chainlinkOracle;
 
     /// @notice The Morpho Blue contract address
     IMorphoBlue public morphoBlue;
@@ -141,7 +139,6 @@ contract ChainlinkOEVMorphoWrapper is
             "ChainlinkOEVMorphoWrapper: max decrements cannot be zero"
         );
         __Ownable_init();
-        __ReentrancyGuard_init();
 
         priceFeed = AggregatorV3Interface(_priceFeed);
         morphoBlue = IMorphoBlue(_morphoBlue);
@@ -421,7 +418,15 @@ contract ChainlinkOEVMorphoWrapper is
             EIP20Interface loanToken = EIP20Interface(marketParams.loanToken);
 
             // Morpho will pull the actual amount needed, and we'll return any excess
-            loanToken.transferFrom(msg.sender, address(this), maxRepayAmount);
+            bool success = loanToken.transferFrom(
+                msg.sender,
+                address(this),
+                maxRepayAmount
+            );
+            require(
+                success,
+                "ChainlinkOEVMorphoWrapper: loan token transfer failed"
+            );
 
             loanToken.approve(address(morphoBlue), maxRepayAmount);
             (actualSeizedAssets, actualRepaidAssets) = morphoBlue.liquidate(

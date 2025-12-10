@@ -1132,6 +1132,76 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             "Total should equal collateralSeized"
         );
     }
+
+    function testUpdatePriceEarlyAndLiquidateRevertsOnLoanTokenTransferFailure()
+        public
+    {
+        MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
+        mockFeed.set(1, 100e8, block.timestamp, block.timestamp, 1);
+
+        address mockChainlinkOracleAddr = address(0x1111);
+
+        ChainlinkOEVWrapper wrapper = new ChainlinkOEVWrapper(
+            address(mockFeed),
+            owner,
+            mockChainlinkOracleAddr,
+            feeRecipient,
+            defaultFeeBps,
+            defaultMaxRoundDelay,
+            defaultMaxDecrements
+        );
+
+        address mockMTokenCollateral = address(0x2222);
+        address mockMTokenLoan = address(0x3333);
+
+        address mockUnderlyingCollateral = address(0x4444);
+        address mockUnderlyingLoan = address(0x5555);
+
+        vm.mockCall(
+            mockMTokenCollateral,
+            abi.encodeWithSignature("underlying()"),
+            abi.encode(mockUnderlyingCollateral)
+        );
+
+        vm.mockCall(
+            mockMTokenLoan,
+            abi.encodeWithSignature("underlying()"),
+            abi.encode(mockUnderlyingLoan)
+        );
+
+        vm.mockCall(
+            mockUnderlyingCollateral,
+            abi.encodeWithSignature("symbol()"),
+            abi.encode("COLL")
+        );
+
+        vm.mockCall(
+            mockChainlinkOracleAddr,
+            abi.encodeWithSignature("getFeed(string)", "COLL"),
+            abi.encode(address(wrapper))
+        );
+
+        vm.mockCall(
+            mockUnderlyingLoan,
+            abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)",
+                address(this),
+                address(wrapper),
+                100e18
+            ),
+            abi.encode(false)
+        );
+
+        vm.expectRevert(
+            bytes("ChainlinkOEVWrapper: loan token transfer failed")
+        );
+        wrapper.updatePriceEarlyAndLiquidate(
+            address(0xBEEF), // borrower
+            100e18, // repayAmount
+            mockMTokenCollateral,
+            mockMTokenLoan
+        );
+    }
 }
 
 /// @notice Mock price feed with configurable decimals for testing

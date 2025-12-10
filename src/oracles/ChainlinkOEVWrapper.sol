@@ -425,7 +425,12 @@ contract ChainlinkOEVWrapper is
         );
 
         // transfer the loan token (to repay the borrow) from the liquidator to this contract
-        underlyingLoan.transferFrom(msg.sender, address(this), repayAmount);
+        bool success = underlyingLoan.transferFrom(
+            msg.sender,
+            address(this),
+            repayAmount
+        );
+        require(success, "ChainlinkOEVWrapper: loan token transfer failed");
 
         // get the latest round data and update cached round id
         int256 collateralAnswer;

@@ -542,6 +542,51 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
         }
     }
 
+    function testUpdatePriceEarlyAndLiquidate_RevertLoanTokenTransferFailed()
+        public
+    {
+        MarketParams memory params;
+        address mUSDC = addresses.getAddress("MOONWELL_USDC");
+        address mWETH = addresses.getAddress("MOONWELL_WETH");
+        address loanToken = MErc20(mUSDC).underlying();
+        params.loanToken = loanToken;
+        params.collateralToken = MErc20(mWETH).underlying();
+        params.oracle = addresses.getAddress(
+            "MORPHO_CHAINLINK_WELL_USD_ORACLE"
+        );
+        params.irm = addresses.getAddress("MORPHO_ADAPTIVE_CURVE_IRM");
+        params.lltv = 0.625e18;
+
+        for (uint256 i = 0; i < wrappers.length; i++) {
+            ChainlinkOEVMorphoWrapper wrapper = wrappers[i];
+            _mockValidRound(wrapper, 10, 3_000e8);
+
+            uint256 maxRepayAmount = 100e6;
+
+            // Mock loan token transferFrom to return false
+            vm.mockCall(
+                loanToken,
+                abi.encodeWithSignature(
+                    "transferFrom(address,address,uint256)",
+                    address(this),
+                    address(wrapper),
+                    maxRepayAmount
+                ),
+                abi.encode(false)
+            );
+
+            vm.expectRevert(
+                "ChainlinkOEVMorphoWrapper: loan token transfer failed"
+            );
+            wrapper.updatePriceEarlyAndLiquidate(
+                params,
+                address(0xBEEF),
+                1 ether, // seizedAssets
+                maxRepayAmount
+            );
+        }
+    }
+
     function _mockValidRound(
         ChainlinkOEVMorphoWrapper wrapper,
         uint80 roundId_,

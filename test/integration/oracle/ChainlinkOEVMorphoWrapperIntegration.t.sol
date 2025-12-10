@@ -197,6 +197,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
     }
 
     function testUpdatePriceEarlyAndLiquidate_stkWELL() public {
+        vm.skip(true); // TODO: once we enable stkWELL oev wrapper
         _testLiquidation(
             addresses.getAddress("CHAINLINK_stkWELL_USD_ORACLE_PROXY"),
             addresses.getAddress("STK_GOVTOKEN_PROXY"),
@@ -208,6 +209,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
     }
 
     function testUpdatePriceEarlyAndLiquidate_MAMO() public {
+        vm.skip(true); // TODO: once we enable mamo oev wrapper
         _testLiquidation(
             addresses.getAddress("CHAINLINK_MAMO_USD_ORACLE_PROXY"),
             addresses.getAddress("MAMO"),

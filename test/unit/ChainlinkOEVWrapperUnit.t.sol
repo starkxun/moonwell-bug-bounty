@@ -824,7 +824,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         );
     }
 
-    function testWithdrawETHSucceeds() public {
+    function testRecoverETHSucceeds() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
@@ -843,7 +843,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
 
         // Withdraw ETH as owner
         vm.prank(owner);
-        wrapper.withdrawETH(recipient);
+        wrapper.recoverETH(recipient);
 
         // Verify ETH was transferred
         assertEq(
@@ -858,7 +858,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         );
     }
 
-    function testWithdrawETHOnlyOwner() public {
+    function testRecoverETHOnlyOwner() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
@@ -870,10 +870,10 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         // Try to withdraw as non-owner
         vm.prank(address(0xDEAD));
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        wrapper.withdrawETH(recipient);
+        wrapper.recoverETH(recipient);
     }
 
-    function testWithdrawERC20Succeeds() public {
+    function testRecoverERC20Succeeds() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
@@ -892,7 +892,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
 
         // Withdraw tokens as owner
         vm.prank(owner);
-        wrapper.withdrawERC20(address(token18), recipient);
+        wrapper.recoverERC20(address(token18), recipient, tokenAmount);
 
         // Verify tokens were transferred
         assertEq(
@@ -907,19 +907,21 @@ contract ChainlinkOEVWrapperUnitTest is Test {
         );
     }
 
-    function testWithdrawERC20OnlyOwner() public {
+    function testRecoverERC20OnlyOwner() public {
         MockChainlinkOracle mockFeed = new MockChainlinkOracle(100e8, 8);
         ChainlinkOEVWrapper wrapper = _deploy(address(mockFeed));
 
+        uint256 tokenAmount = 1000e18;
+
         // Mint some tokens to the wrapper
-        token18.mint(address(wrapper), 1000e18);
+        token18.mint(address(wrapper), tokenAmount);
 
         address recipient = address(0xBEEF);
 
         // Try to withdraw as non-owner
         vm.prank(address(0xDEAD));
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        wrapper.withdrawERC20(address(token18), recipient);
+        wrapper.recoverERC20(address(token18), recipient, tokenAmount);
     }
 
     function testLoanPriceValidationRevertsOnZeroAnswer() public {

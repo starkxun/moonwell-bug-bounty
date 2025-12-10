@@ -76,6 +76,13 @@ contract ChainlinkOEVWrapper is
         uint256 liquidatorFee
     );
 
+    /// @notice Emitted when tokens are recovered from the contract
+    event TokenRecovered(
+        address indexed tokenAddress,
+        address indexed to,
+        uint256 amount
+    );
+
     /**
      * @notice Contract constructor
      * @param _priceFeed Address of the Chainlink price feed to forward calls to
@@ -318,26 +325,40 @@ contract ChainlinkOEVWrapper is
     }
 
     /**
-     * @notice Allows the contract owner to withdraw ETH from the contract to the recipient
-     * @param recipient The address to receive the ETH
+     * @notice Recovers ERC20 tokens accidentally sent to this contract
+     * @dev Only callable by the user who owns this strategy
+     * @param tokenAddress The address of the token to recover
+     * @param to The address to send the tokens to
+     * @param amount The amount of tokens to recover
      */
-    function withdrawETH(address payable recipient) external onlyOwner {
-        recipient.transfer(address(this).balance);
+    function recoverERC20(
+        address tokenAddress,
+        address to,
+        uint256 amount
+    ) external onlyOwner {
+        require(to != address(0), "Cannot send to zero address");
+        require(amount > 0, "Amount must be greater than 0");
+
+        EIP20Interface(tokenAddress).transfer(to, amount);
+
+        emit TokenRecovered(tokenAddress, to, amount);
     }
 
     /**
-     * @notice Allows the contract owner to withdraw ERC20 tokens from the contract to the recipient
-     * @param token The address of the ERC20 token to withdraw
-     * @param recipient The address to receive the ERC20 tokens
+     * @notice Recovers ETH accidentally sent to this contract
+     * @dev Only callable by the user who owns this strategy
+     * @param to The address to send the ETH to
      */
-    function withdrawERC20(
-        address token,
-        address recipient
-    ) external onlyOwner {
-        EIP20Interface(token).transfer(
-            recipient,
-            EIP20Interface(token).balanceOf(address(this))
-        );
+    function recoverETH(address payable to) external onlyOwner {
+        require(to != address(0), "Cannot send to zero address");
+
+        uint256 balance = address(this).balance;
+        require(balance > 0, "Empty balance");
+
+        (bool success, ) = to.call{value: balance}("");
+        require(success, "Transfer failed");
+
+        emit TokenRecovered(address(0), to, balance);
     }
 
     /**

@@ -1317,8 +1317,4 @@ contract MockMToken {
     function exchangeRateStored() external view returns (uint256) {
         return _exchangeRate;
     }
-
-    function exchangeRateCurrent() external returns (uint256) {
-        return _exchangeRate;
-    }
 }

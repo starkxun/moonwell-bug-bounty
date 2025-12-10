@@ -343,7 +343,7 @@ contract ChainlinkOEVWrapper is
         require(to != address(0), "Cannot send to zero address");
         require(amount > 0, "Amount must be greater than 0");
 
-        EIP20Interface(tokenAddress).transfer(to, amount);
+        IERC20(tokenAddress).safeTransfer(to, amount);
 
         emit TokenRecovered(tokenAddress, to, amount);
     }

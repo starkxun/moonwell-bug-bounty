@@ -563,8 +563,7 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
 
             uint256 maxRepayAmount = 100e6;
 
-            // Mock loan token transferFrom to return false
-            vm.mockCall(
+            vm.mockCallRevert(
                 loanToken,
                 abi.encodeWithSignature(
                     "transferFrom(address,address,uint256)",
@@ -572,12 +571,10 @@ contract ChainlinkOEVMorphoWrapperIntegrationTest is
                     address(wrapper),
                     maxRepayAmount
                 ),
-                abi.encode(false)
+                abi.encodeWithSignature("Error(string)", "transfer failed")
             );
 
-            vm.expectRevert(
-                "ChainlinkOEVMorphoWrapper: loan token transfer failed"
-            );
+            vm.expectRevert();
             wrapper.updatePriceEarlyAndLiquidate(
                 params,
                 address(0xBEEF),

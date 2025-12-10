@@ -1192,9 +1192,7 @@ contract ChainlinkOEVWrapperUnitTest is Test {
             abi.encode(false)
         );
 
-        vm.expectRevert(
-            bytes("ChainlinkOEVWrapper: loan token transfer failed")
-        );
+        vm.expectRevert(bytes("SafeERC20: ERC20 operation did not succeed"));
         wrapper.updatePriceEarlyAndLiquidate(
             address(0xBEEF), // borrower
             100e18, // repayAmount

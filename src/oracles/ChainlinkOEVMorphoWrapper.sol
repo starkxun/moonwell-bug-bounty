@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 import "@openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {SafeERC20} from "@openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "./AggregatorV3Interface.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
 import {IMorphoBlue} from "../morpho/IMorphoBlue.sol";
@@ -20,6 +22,8 @@ contract ChainlinkOEVMorphoWrapper is
     OwnableUpgradeable,
     AggregatorV3Interface
 {
+    using SafeERC20 for IERC20;
+
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
 
@@ -418,14 +422,10 @@ contract ChainlinkOEVMorphoWrapper is
             EIP20Interface loanToken = EIP20Interface(marketParams.loanToken);
 
             // Morpho will pull the actual amount needed, and we'll return any excess
-            bool success = loanToken.transferFrom(
+            IERC20(address(loanToken)).safeTransferFrom(
                 msg.sender,
                 address(this),
                 maxRepayAmount
-            );
-            require(
-                success,
-                "ChainlinkOEVMorphoWrapper: loan token transfer failed"
             );
 
             loanToken.approve(address(morphoBlue), maxRepayAmount);

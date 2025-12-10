@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 import {Ownable} from "@openzeppelin-contracts/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {SafeERC20} from "@openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "./AggregatorV3Interface.sol";
 import {MErc20Storage, MTokenInterface, MErc20Interface} from "../MTokenInterfaces.sol";
 import {EIP20Interface} from "../EIP20Interface.sol";
@@ -18,6 +20,8 @@ contract ChainlinkOEVWrapper is
     AggregatorV3Interface,
     ReentrancyGuard
 {
+    using SafeERC20 for IERC20;
+
     /// @notice The maximum basis points for the fee multiplier
     uint16 public constant MAX_BPS = 10000;
 
@@ -425,12 +429,11 @@ contract ChainlinkOEVWrapper is
         );
 
         // transfer the loan token (to repay the borrow) from the liquidator to this contract
-        bool success = underlyingLoan.transferFrom(
+        IERC20(address(underlyingLoan)).safeTransferFrom(
             msg.sender,
             address(this),
             repayAmount
         );
-        require(success, "ChainlinkOEVWrapper: loan token transfer failed");
 
         // get the latest round data and update cached round id
         int256 collateralAnswer;

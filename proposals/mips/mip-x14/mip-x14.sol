@@ -10,12 +10,11 @@ import {ERC20} from "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 import {ChainlinkFeedOEVWrapper} from "@protocol/oracles/ChainlinkFeedOEVWrapper.sol";
 import {ChainlinkCompositeOracle} from "@protocol/oracles/ChainlinkCompositeOracle.sol";
-import {DeployChainlinkOEVWrapper} from "@script/DeployChainlinkOEVWrapper.sol";
 import {HybridProposal, ActionType} from "@proposals/proposalTypes/HybridProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {OPTIMISM_FORK_ID, BASE_FORK_ID, OPTIMISM_CHAIN_ID, BASE_CHAIN_ID} from "@utils/ChainIds.sol";
 
-contract mipx14 is HybridProposal, DeployChainlinkOEVWrapper {
+contract mipx14 is HybridProposal {
     using ProposalActions for *;
     using ChainIds for uint256;
 
@@ -151,10 +150,11 @@ contract mipx14 is HybridProposal, DeployChainlinkOEVWrapper {
                 )
             );
             if (!addresses.isAddressSet(wrapperName)) {
-                deployChainlinkOEVWrapper(
-                    addresses,
-                    _oracleConfigs[OPTIMISM_CHAIN_ID][i].oracleName
-                );
+                // new version of deploy script not compatiblw with old wrapper
+                //deployChainlinkOEVWrapper(
+                //   addresses,
+                //  _oracleConfigs[OPTIMISM_CHAIN_ID][i].oracleName
+                //);
             }
         }
         vm.stopBroadcast();
@@ -170,10 +170,11 @@ contract mipx14 is HybridProposal, DeployChainlinkOEVWrapper {
                 )
             );
             if (!addresses.isAddressSet(wrapperName)) {
-                deployChainlinkOEVWrapper(
-                    addresses,
-                    _oracleConfigs[BASE_CHAIN_ID][i].oracleName
-                );
+                // new version of deploy script not compatiblw with old wrapper
+                //deployChainlinkOEVWrapper(
+                //   addresses,
+                //  _oracleConfigs[BASE_CHAIN_ID][i].oracleName
+                //);
             }
         }
 

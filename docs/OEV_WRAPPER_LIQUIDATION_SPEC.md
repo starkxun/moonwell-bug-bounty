@@ -1,8 +1,8 @@
-# OEV Wrapper Liquidation Specification
+# OEV Liquidation Specification
 
 This document explains how to use the `ChainlinkOEVWrapper` and
 `ChainlinkOEVMorphoWrapper` contracts to perform liquidations with early price
-access.
+access in the Moonwell protocol.
 
 ---
 
@@ -184,13 +184,13 @@ Used for liquidations in Morpho Blue isolated lending markets.
 
 ### Key Differences from ChainlinkOEVWrapper
 
-| Aspect                | ChainlinkOEVWrapper       | ChainlinkOEVMorphoWrapper |
-| --------------------- | ------------------------- | ------------------------- |
-| Market Type           | Moonwell (Compound-style) | Morpho Blue               |
-| Collateral Received   | mTokens                   | Underlying tokens         |
-| Market Identification | mToken addresses          | MarketParams struct       |
-| Slippage Protection   | Fixed repay amount        | maxRepayAmount parameter  |
-| Upgradeable           | No                        | Yes (reinitializer)       |
+| Aspect                | ChainlinkOEVWrapper | ChainlinkOEVMorphoWrapper |
+| --------------------- | ------------------- | ------------------------- |
+| Market Type           | Moonwell Core       | Morpho Blue               |
+| Collateral Received   | mTokens             | Underlying tokens         |
+| Market Identification | mToken addresses    | MarketParams struct       |
+| Slippage Protection   | Fixed repay amount  | maxRepayAmount parameter  |
+| Upgradeable           | No                  | Yes (reinitializer)       |
 
 ### Function Signature
 

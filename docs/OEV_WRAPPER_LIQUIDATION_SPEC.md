@@ -16,11 +16,38 @@ access in the Moonwell protocol.
 | ----- | ----------------------------- | -------------------------------------------- |
 | WETH  | CHAINLINK_ETH_USD_OEV_WRAPPER | `0xeb083d234ec636A10325ea42bCbbE09Aa56d1547` |
 
+#### WETH Core Market Addresses
+
+| Contract      | Address                                      | Description         |
+| ------------- | -------------------------------------------- | ------------------- |
+| WETH          | `0x4200000000000000000000000000000000000006` | Underlying token    |
+| MOONWELL_WETH | `0x628ff693426583D9a7FB391E54366292F509D457` | mToken (collateral) |
+
 #### Morpho Market OEV Wrapper (ChainlinkOEVMorphoWrapper)
 
 | Asset | Contract                        | Address                                      |
 | ----- | ------------------------------- | -------------------------------------------- |
 | WELL  | CHAINLINK_WELL_USD_ORACLE_PROXY | `0xAEeE6335f50e1f8aF924DF0742b1879C9761F5f5` |
+
+#### WELL/USDC Morpho Market Parameters
+
+```solidity
+MarketParams memory params = MarketParams({
+    loanToken: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,        // USDC
+    collateralToken: 0xA88594D404727625A9437C3f886C7643872296AE,  // xWELL
+    oracle: 0x71FBaD6c2200C8A5B89380f9B6bb8a35d411c852,           // MORPHO_CHAINLINK_WELL_USD_ORACLE
+    irm: 0x46415998764C29aB2a25CbeA6254146D50D22687,              // MORPHO_ADAPTIVE_CURVE_IRM
+    lltv: 625000000000000000                                      // 0.625e18 (62.5%)
+});
+```
+
+| Parameter         | Value                                        | Description             |
+| ----------------- | -------------------------------------------- | ----------------------- |
+| `loanToken`       | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | USDC on Base            |
+| `collateralToken` | `0xA88594D404727625A9437C3f886C7643872296AE` | xWELL (wrapped WELL)    |
+| `oracle`          | `0x71FBaD6c2200C8A5B89380f9B6bb8a35d411c852` | Morpho Chainlink Oracle |
+| `irm`             | `0x46415998764C29aB2a25CbeA6254146D50D22687` | Adaptive Curve IRM      |
+| `lltv`            | `625000000000000000`                         | 62.5% Liquidation LTV   |
 
 ### Optimism
 
@@ -29,6 +56,13 @@ access in the Moonwell protocol.
 | Asset | Contract                      | Address                                      |
 | ----- | ----------------------------- | -------------------------------------------- |
 | WETH  | CHAINLINK_ETH_USD_OEV_WRAPPER | `0x531f69127bB04Ebb0Fd321b8092d34a4C2B4E0f1` |
+
+#### WETH Core Market Addresses
+
+| Contract      | Address                                      | Description         |
+| ------------- | -------------------------------------------- | ------------------- |
+| WETH          | `0x4200000000000000000000000000000000000006` | Underlying token    |
+| MOONWELL_WETH | `0xb4104C02BBf4E9be85AAa41a62974E4e28D59A33` | mToken (collateral) |
 
 ### Configuration Parameters (MIP-X38)
 

@@ -6,9 +6,9 @@ access.
 
 ---
 
-## Deployed Contract Addresses (MIP-X38)
+## Deployed Contract Addresses
 
-### Base (Chain ID: 8453)
+### Base
 
 #### Core Market OEV Wrapper (ChainlinkOEVWrapper)
 
@@ -22,28 +22,13 @@ access.
 | ----- | ------------------------------- | -------------------------------------------- |
 | WELL  | CHAINLINK_WELL_USD_ORACLE_PROXY | `0xAEeE6335f50e1f8aF924DF0742b1879C9761F5f5` |
 
-#### Infrastructure
-
-| Contract                  | Address                                      |
-| ------------------------- | -------------------------------------------- |
-| OEV_PROTOCOL_FEE_REDEEMER | `0xab05F7216B4ecD0594E703F21fb0dE6183BFeCF3` |
-| CHAINLINK_ORACLE          | `0xEC942bE8A8114bFD0396A5052c36027f2cA6a9d0` |
-| MORPHO_BLUE               | `0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb` |
-
-### Optimism (Chain ID: 10)
+### Optimism
 
 #### Core Market OEV Wrapper (ChainlinkOEVWrapper)
 
 | Asset | Contract                      | Address                                      |
 | ----- | ----------------------------- | -------------------------------------------- |
 | WETH  | CHAINLINK_ETH_USD_OEV_WRAPPER | `0x531f69127bB04Ebb0Fd321b8092d34a4C2B4E0f1` |
-
-#### Infrastructure
-
-| Contract                  | Address                                      |
-| ------------------------- | -------------------------------------------- |
-| OEV_PROTOCOL_FEE_REDEEMER | `0xEe3F2ca26f6F0526c50a14083113059ABb948CF9` |
-| CHAINLINK_ORACLE          | `0x2f1490bD6aD10C9CE42a2829afa13EAc0b746dcf` |
 
 ### Configuration Parameters (MIP-X38)
 
@@ -57,8 +42,7 @@ access.
 
 ## Overview
 
-Both OEV (Oracle Extractable Value) wrapper contracts implement a mechanism
-that:
+Both OEV wrapper contracts implement a mechanism that:
 
 1. **Delays price updates** by default (returns previous round data)
 2. **Allows liquidators to access fresh prices** by calling

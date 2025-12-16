@@ -12,7 +12,7 @@ import {IMorphoBlue} from "@protocol/morpho/IMorphoBlue.sol";
 import {IMorphoChainlinkOracleV2Factory} from "@protocol/morpho/IMorphoChainlinkOracleFactory.sol";
 import {IMorphoChainlinkOracleV2} from "@protocol/morpho/IMorphoChainlinkOracleV2.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
-import {ChainlinkOracleProxy} from "@protocol/oracles/ChainlinkOracleProxy.sol";
+import {ChainlinkOEVMorphoWrapper} from "@protocol/oracles/ChainlinkOEVMorphoWrapper.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -42,9 +42,17 @@ contract CreateMorphoMarket is Script, Test {
         uint8 baseFeedDecimals; // e.g. 18
         string quoteFeedName; // e.g. CHAINLINK_USDC_USD
         uint8 quoteFeedDecimals; // e.g. 6
+        string coreMarketAsFeeRecipient; // e.g. MOONWELL_WELL
     }
 
     uint256 internal constant MARKET_PARAMS_BYTES_LENGTH = 5 * 32;
+
+    uint16 internal constant FEE_MULTIPLIER = 9000; // 90%
+    uint8 internal constant MAX_ROUND_DELAY = 10;
+    uint8 internal constant MAX_DECREMENTS = 10;
+
+    string internal constant MORPHO_IMPLEMENTATION_NAME =
+        "CHAINLINK_OEV_MORPHO_WRAPPER_IMPL";
 
     function run() external {
         // Setup fork for Base chain
@@ -112,6 +120,18 @@ contract CreateMorphoMarket is Script, Test {
         );
         ocfg.addressName = json.readString(".oracle.addressName");
         ocfg.proxyAddressName = json.readString(".oracle.proxyAddressName");
+
+        // coreMarketAsFeeRecipient is required
+        bytes memory feeRecipientRaw = json.parseRaw(
+            ".oracle.coreMarketAsFeeRecipient"
+        );
+        require(
+            feeRecipientRaw.length > 0,
+            "oracle.coreMarketAsFeeRecipient is required"
+        );
+        ocfg.coreMarketAsFeeRecipient = json.readString(
+            ".oracle.coreMarketAsFeeRecipient"
+        );
     }
 
     function _computeMarketId(
@@ -235,23 +255,22 @@ contract CreateMorphoMarket is Script, Test {
         Addresses addresses,
         CreateMorphoMarket.OracleConfig memory ocfg
     ) internal returns (AggregatorV3Interface) {
-        if (addresses.isAddressSet(ocfg.addressName)) {
-            return
-                AggregatorV3Interface(addresses.getAddress(ocfg.addressName));
-        }
-        string memory logicAddressName = string(
-            abi.encodePacked(ocfg.proxyAddressName, "_IMPL")
+        // Reuse the proxy if it already exists for this market's base feed wrapper
+        string memory proxyAddressName = string(
+            abi.encodePacked(ocfg.proxyAddressName, "_PROXY")
         );
+        if (addresses.isAddressSet(proxyAddressName)) {
+            return
+                AggregatorV3Interface(addresses.getAddress(proxyAddressName));
+        }
 
-        ChainlinkOracleProxy logic;
-
-        if (!addresses.isAddressSet(logicAddressName)) {
-            logic = new ChainlinkOracleProxy();
-
-            addresses.addAddress(logicAddressName, address(logic));
+        ChainlinkOEVMorphoWrapper logic;
+        if (!addresses.isAddressSet(MORPHO_IMPLEMENTATION_NAME)) {
+            logic = new ChainlinkOEVMorphoWrapper();
+            addresses.addAddress(MORPHO_IMPLEMENTATION_NAME, address(logic));
         } else {
-            logic = ChainlinkOracleProxy(
-                addresses.getAddress(logicAddressName)
+            logic = ChainlinkOEVMorphoWrapper(
+                addresses.getAddress(MORPHO_IMPLEMENTATION_NAME)
             );
         }
 
@@ -262,32 +281,32 @@ contract CreateMorphoMarket is Script, Test {
                 "CHAINLINK_ORACLE_PROXY_ADMIN",
                 address(proxyAdmin)
             );
+            proxyAdmin.transferOwnership(
+                addresses.getAddress("TEMPORAL_GOVERNOR")
+            );
         } else {
             proxyAdmin = ProxyAdmin(
                 addresses.getAddress("CHAINLINK_ORACLE_PROXY_ADMIN")
             );
         }
 
-        string memory proxyAddressName = string(
-            abi.encodePacked(ocfg.proxyAddressName, "_PROXY")
+        bytes memory initData = abi.encodeWithSelector(
+            ChainlinkOEVMorphoWrapper.initializeV2.selector,
+            addresses.getAddress(ocfg.baseFeedName),
+            addresses.getAddress("TEMPORAL_GOVERNOR"),
+            addresses.getAddress("MORPHO_BLUE"),
+            ocfg.coreMarketAsFeeRecipient,
+            FEE_MULTIPLIER,
+            MAX_ROUND_DELAY,
+            MAX_DECREMENTS
         );
 
-        TransparentUpgradeableProxy proxy;
-        if (!addresses.isAddressSet(proxyAddressName)) {
-            proxy = new TransparentUpgradeableProxy(
-                address(logic),
-                address(proxyAdmin),
-                ""
-            );
-
-            ChainlinkOracleProxy(address(proxy)).initialize(
-                addresses.getAddress(ocfg.baseFeedName),
-                addresses.getAddress("TEMPORAL_GOVERNOR")
-            );
-            addresses.addAddress(proxyAddressName, address(proxy));
-        }
-
-        return AggregatorV3Interface(address(proxy));
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(logic),
+            address(proxyAdmin),
+            initData
+        );
+        addresses.addAddress(proxyAddressName, address(proxy));
     }
 
     function _createOracle(

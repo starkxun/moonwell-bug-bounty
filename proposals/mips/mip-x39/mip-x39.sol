@@ -134,6 +134,18 @@ contract mipx39 is HybridProposal {
             "Reduce 2.6 WETH reserves from MOONWELL_WETH on Optimism (sends ETH to TEMPORAL_GOVERNOR)",
             ActionType.Optimism
         );
+
+        // Transfer ETH from TEMPORAL_GOVERNOR to BAD_DEBT_REPAYER_EOA
+        address badDebtRepayerEoa = addresses.getAddress(
+            "BAD_DEBT_REPAYER_EOA"
+        );
+        _pushAction(
+            badDebtRepayerEoa,
+            WETH_AMOUNT,
+            "",
+            "Transfer 2.6 ETH to BAD_DEBT_REPAYER_EOA for bad debt repayment",
+            ActionType.Optimism
+        );
     }
 
     function teardown(Addresses addresses, address) public pure override {}
@@ -160,15 +172,16 @@ contract mipx39 is HybridProposal {
         // ============ VALIDATE OPTIMISM CHAIN ============
         vm.selectFork(OPTIMISM_FORK_ID);
 
-        address temporalGovernor = addresses.getAddress("TEMPORAL_GOVERNOR");
+        address badDebtRepayerEoa = addresses.getAddress(
+            "BAD_DEBT_REPAYER_EOA"
+        );
 
-        // Validate TEMPORAL_GOVERNOR received native ETH from reserve reduction
-        // The WETH_UNWRAPPER sends native ETH to TEMPORAL_GOVERNOR
-        uint256 ethBalance = temporalGovernor.balance;
+        // Validate BAD_DEBT_REPAYER_EOA received ETH
+        uint256 ethBalance = badDebtRepayerEoa.balance;
         assertGe(
             ethBalance,
             WETH_AMOUNT,
-            "TEMPORAL_GOVERNOR should have received ETH on Optimism"
+            "BAD_DEBT_REPAYER_EOA should have received ETH on Optimism"
         );
     }
 }

@@ -70,15 +70,6 @@ abstract contract ProposalChecker {
             block.chainid.nonMoonbeamChainIds(),
             "cannot run base/optimism checks on non-base/optimism network"
         );
-
-        for (uint256 i = 0; i < targets.length; i++) {
-            address target = targets[i];
-            /// there's 0 reason for any proposal actions to call addresses with 0 bytecode
-            require(
-                target.code.length > 0,
-                "target for base/optimism action not a contract"
-            );
-        }
     }
 
     /// @notice checks actions on both moonbeam and base

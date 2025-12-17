@@ -13,11 +13,13 @@ import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID} from "@utils/ChainIds.
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 import {ChainIds} from "@utils/ChainIds.sol";
 
-/// @title MIP-X39: rETH Market Exchange Rate Feed Update
+/// @title MIP-X39: rETH Market Exchange Rate Feed and Debt Management
 /// @author Moonwell Contributors
 /// @notice Proposal to:
 ///         1. Update rETH oracle on Base to use exchange-rate feed instead of market price
 ///         2. Update rETH oracle on Optimism to use exchange-rate feed instead of market price
+///         3. Withdraw WETH reserves on Optimism and transfer to BAD_DEBT_REPAYER_EOA
+///            for repaying bad debt on rETH and cbETH markets
 contract mipx39 is HybridProposal {
     using ProposalActions for *;
     using ChainIds for uint256;
@@ -27,6 +29,9 @@ contract mipx39 is HybridProposal {
     // Storage for deployed oracles
     ChainlinkCompositeOracle public baseRethOracle;
     ChainlinkCompositeOracle public optimismRethOracle;
+
+    // Debt management constants
+    uint256 public constant WETH_AMOUNT = 2.6 ether;
 
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
@@ -175,6 +180,28 @@ contract mipx39 is HybridProposal {
             "Update rETH oracle to exchange rate feed on Optimism",
             ActionType.Optimism
         );
+
+        address moonwellWeth = addresses.getAddress("MOONWELL_WETH");
+
+        // Reduce WETH reserves - ETH will be sent to TEMPORAL_GOVERNOR via WETH_UNWRAPPER
+        _pushAction(
+            moonwellWeth,
+            abi.encodeWithSignature("_reduceReserves(uint256)", WETH_AMOUNT),
+            "Reduce 2.6 WETH reserves from MOONWELL_WETH on Optimism (sends ETH to TEMPORAL_GOVERNOR)",
+            ActionType.Optimism
+        );
+
+        // Transfer ETH from TEMPORAL_GOVERNOR to BAD_DEBT_REPAYER_EOA
+        address badDebtRepayerEoa = addresses.getAddress(
+            "BAD_DEBT_REPAYER_EOA"
+        );
+        _pushAction(
+            badDebtRepayerEoa,
+            WETH_AMOUNT,
+            "",
+            "Transfer 2.6 ETH to BAD_DEBT_REPAYER_EOA for bad debt repayment",
+            ActionType.Optimism
+        );
     }
 
     function teardown(Addresses addresses, address) public pure override {}
@@ -217,5 +244,17 @@ contract mipx39 is HybridProposal {
         // Validate price can be fetched on Optimism
         (, int256 optimismPrice, , , ) = optimismFeed.latestRoundData();
         assertGt(uint256(optimismPrice), 0, "Optimism rETH price check failed");
+
+        address badDebtRepayerEoa = addresses.getAddress(
+            "BAD_DEBT_REPAYER_EOA"
+        );
+
+        // Validate BAD_DEBT_REPAYER_EOA received ETH
+        uint256 ethBalance = badDebtRepayerEoa.balance;
+        assertGe(
+            ethBalance,
+            WETH_AMOUNT,
+            "BAD_DEBT_REPAYER_EOA should have received ETH on Optimism"
+        );
     }
 }

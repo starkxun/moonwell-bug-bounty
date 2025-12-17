@@ -3,8 +3,6 @@ pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
 
-import {MErc20} from "@protocol/MErc20.sol";
-import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {ChainlinkCompositeOracle} from "@protocol/oracles/ChainlinkCompositeOracle.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
@@ -128,28 +126,12 @@ contract mipx39 is HybridProposal {
         vm.selectFork(OPTIMISM_FORK_ID);
 
         address moonwellWeth = addresses.getAddress("MOONWELL_WETH");
-        address weth = addresses.getAddress("WETH");
-        address badDebtRepayerEoa = addresses.getAddress(
-            "BAD_DEBT_REPAYER_EOA"
-        );
 
-        // Reduce WETH reserves
+        // Reduce WETH reserves - ETH will be sent to TEMPORAL_GOVERNOR via WETH_UNWRAPPER
         _pushAction(
             moonwellWeth,
             abi.encodeWithSignature("_reduceReserves(uint256)", WETH_AMOUNT),
-            "Reduce 2.6 WETH reserves from MOONWELL_WETH on Optimism",
-            ActionType.Optimism
-        );
-
-        // Transfer WETH to BAD_DEBT_REPAYER_EOA
-        _pushAction(
-            weth,
-            abi.encodeWithSignature(
-                "transfer(address,uint256)",
-                badDebtRepayerEoa,
-                WETH_AMOUNT
-            ),
-            "Transfer 2.6 WETH to BAD_DEBT_REPAYER_EOA on Optimism",
+            "Reduce 2.6 WETH reserves from MOONWELL_WETH on Optimism (sends ETH to TEMPORAL_GOVERNOR)",
             ActionType.Optimism
         );
     }
@@ -178,17 +160,15 @@ contract mipx39 is HybridProposal {
         // ============ VALIDATE OPTIMISM CHAIN ============
         vm.selectFork(OPTIMISM_FORK_ID);
 
-        address weth = addresses.getAddress("WETH");
-        address badDebtRepayerEoa = addresses.getAddress(
-            "BAD_DEBT_REPAYER_EOA"
-        );
+        address temporalGovernor = addresses.getAddress("TEMPORAL_GOVERNOR");
 
-        // Validate WETH was transferred to BAD_DEBT_REPAYER_EOA
-        uint256 wethBalance = IERC20(weth).balanceOf(badDebtRepayerEoa);
+        // Validate TEMPORAL_GOVERNOR received native ETH from reserve reduction
+        // The WETH_UNWRAPPER sends native ETH to TEMPORAL_GOVERNOR
+        uint256 ethBalance = temporalGovernor.balance;
         assertGe(
-            wethBalance,
+            ethBalance,
             WETH_AMOUNT,
-            "BAD_DEBT_REPAYER_EOA should have received WETH on Optimism"
+            "TEMPORAL_GOVERNOR should have received ETH on Optimism"
         );
     }
 }

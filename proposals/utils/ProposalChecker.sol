@@ -63,7 +63,6 @@ abstract contract ProposalChecker {
 
     /// @notice should only be run while on Base or Optimism mainnet or testnet fork
     /// @dev checks that the actions all have bytecode
-    /// @param targets the list of targets for Base or Optimism
     function checkBaseOptimismActions(address[] memory) public view {
         /// check that we are on the proper chain id
         require(

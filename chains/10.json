@@ -743,5 +743,10 @@
         "addr": "0x22F3727be377781d1579B7C9222382b21c9d1a8f",
         "isContract": true,
         "name": "CHAINLINK_RETH_ETH_EXCHANGE_RATE"
+    },
+    {
+        "addr": "0x48ce24c1D1Da86158DA2dD8aeE23F906161e3433",
+        "isContract": true,
+        "name": "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE"
     }
 ]

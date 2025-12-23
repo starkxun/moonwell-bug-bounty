@@ -1060,6 +1060,9 @@ contract RewardsDistributionTemplate is HybridProposal, Networks {
             data,
             string.concat(prefix, ".multiRewarder")
         );
+        if (multiRewarderBytes.length == 0) {
+            return;
+        }
         MultiRewarder[] memory multiRewarders = abi.decode(
             multiRewarderBytes,
             (MultiRewarder[])

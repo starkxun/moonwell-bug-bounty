@@ -26,10 +26,6 @@ contract mipx39 is HybridProposal {
 
     string public constant override name = "MIP-X39";
 
-    // Storage for deployed oracles
-    ChainlinkCompositeOracle public baseRethOracle;
-    ChainlinkCompositeOracle public optimismRethOracle;
-
     // Debt management constants
     uint256 public constant WETH_AMOUNT = 2.6 ether;
 
@@ -88,21 +84,19 @@ contract mipx39 is HybridProposal {
                 "CHAINLINK_RETH_ETH_EXCHANGE_RATE"
             );
 
-            baseRethOracle = new ChainlinkCompositeOracle(
-                baseEthUsdFeed,
-                baseRethEthExchangeRateFeed,
-                address(0)
+            address baseRethOracle = address(
+                new ChainlinkCompositeOracle(
+                    baseEthUsdFeed,
+                    baseRethEthExchangeRateFeed,
+                    address(0)
+                )
             );
 
             vm.stopBroadcast();
 
             addresses.addAddress(
                 "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE",
-                address(baseRethOracle)
-            );
-        } else {
-            baseRethOracle = ChainlinkCompositeOracle(
-                addresses.getAddress("CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE")
+                baseRethOracle
             );
         }
 
@@ -124,24 +118,19 @@ contract mipx39 is HybridProposal {
                 "CHAINLINK_RETH_ETH_EXCHANGE_RATE"
             );
 
-            optimismRethOracle = new ChainlinkCompositeOracle(
-                optimismEthUsdFeed,
-                optimismRethEthExchangeRateFeed,
-                address(0)
+            address optimismRethOracle = address(
+                new ChainlinkCompositeOracle(
+                    optimismEthUsdFeed,
+                    optimismRethEthExchangeRateFeed,
+                    address(0)
+                )
             );
 
             vm.stopBroadcast();
 
             addresses.addAddress(
                 "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE",
-                address(optimismRethOracle)
-            );
-        } else {
-            optimismRethOracle = ChainlinkCompositeOracle(
-                addresses.getAddress(
-                    "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE",
-                    block.chainid
-                )
+                optimismRethOracle
             );
         }
     }
@@ -152,12 +141,15 @@ contract mipx39 is HybridProposal {
 
         // Update rETH oracle price feed on Base
         address baseChainlinkOracle = addresses.getAddress("CHAINLINK_ORACLE");
+        address baseRethOracle = addresses.getAddress(
+            "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE"
+        );
         _pushAction(
             baseChainlinkOracle,
             abi.encodeWithSignature(
                 "setFeed(string,address)",
                 "rETH",
-                address(baseRethOracle)
+                baseRethOracle
             ),
             "Update rETH oracle to exchange rate feed on Base",
             ActionType.Base
@@ -170,12 +162,16 @@ contract mipx39 is HybridProposal {
         address optimismChainlinkOracle = addresses.getAddress(
             "CHAINLINK_ORACLE"
         );
+        address optimismRethOracle = addresses.getAddress(
+            "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE",
+            block.chainid
+        );
         _pushAction(
             optimismChainlinkOracle,
             abi.encodeWithSignature(
                 "setFeed(string,address)",
                 "rETH",
-                address(optimismRethOracle)
+                optimismRethOracle
             ),
             "Update rETH oracle to exchange rate feed on Optimism",
             ActionType.Optimism
@@ -215,9 +211,12 @@ contract mipx39 is HybridProposal {
             addresses.getAddress("CHAINLINK_ORACLE")
         );
         AggregatorV3Interface baseFeed = baseChainlinkOracle.getFeed("rETH");
+        address baseRethOracle = addresses.getAddress(
+            "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE"
+        );
         assertEq(
             address(baseFeed),
-            address(baseRethOracle),
+            baseRethOracle,
             "Base rETH oracle not updated"
         );
 
@@ -235,9 +234,15 @@ contract mipx39 is HybridProposal {
         AggregatorV3Interface optimismFeed = optimismChainlinkOracle.getFeed(
             "rETH"
         );
+
+        address optimismRethOracle = addresses.getAddress(
+            "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE",
+            block.chainid
+        );
+
         assertEq(
             address(optimismFeed),
-            address(optimismRethOracle),
+            optimismRethOracle,
             "Optimism rETH oracle not updated"
         );
 

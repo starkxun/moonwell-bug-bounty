@@ -11,7 +11,7 @@ import {SafeERC20} from "./SafeERC20.sol";
 import {DistributionTypes} from "./DistributionTypes.sol";
 import {InitializableV2} from "./InitializableV2.sol";
 import {DistributionManager} from "./DistributionManager.sol";
-import {ReentrancyGuardUpgradeable} from "./ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuardUpgradeableV2} from "./ReentrancyGuardUpgradeableV2.sol";
 
 /**
  * @title StakedTokenV2
@@ -24,7 +24,7 @@ contract StakedTokenV2 is
     ERC20WithSnapshotV2,
     InitializableV2,
     DistributionManager,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeableV2
 {
     using SafeERC20 for IERC20;
 

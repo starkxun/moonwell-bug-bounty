@@ -6,10 +6,6 @@ import {IERC20} from "./IERC20.sol";
 import {DistributionTypes} from "./DistributionTypes.sol";
 
 interface IDistributionManager {
-    function configureAsset(
-        uint128 emissionPerSecond,
-        IERC20 underlyingAsset
-    ) external;
     function configureAssets(
         DistributionTypes.AssetConfigInput[] calldata assetsConfigInput
     ) external;

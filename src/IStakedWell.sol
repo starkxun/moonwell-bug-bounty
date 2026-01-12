@@ -1,6 +1,13 @@
 pragma solidity 0.8.19;
 
 interface IStakedWell {
+    // Note: DistributionTypes struct definition for cross-version compatibility
+    struct AssetConfigInput {
+        uint128 emissionPerSecond;
+        uint256 totalStaked;
+        address underlyingAsset;
+    }
+
     function initialize(
         address _stakedToken,
         address _rewardToken,
@@ -55,15 +62,8 @@ interface IStakedWell {
     function cooldown() external;
 
     // from IDistributionManager
-    function configureAsset(
-        uint128 emissionPerSecond,
-        address underlyingAsset
-    ) external;
-
     function configureAssets(
-        uint128[] memory emissionPerSecond,
-        uint256[] memory totalStaked,
-        address[] memory underlyingAsset
+        AssetConfigInput[] calldata assetsConfigInput
     ) external;
 
     /// @notice update the unstake window

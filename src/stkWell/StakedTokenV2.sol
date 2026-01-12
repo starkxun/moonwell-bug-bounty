@@ -5,7 +5,6 @@ pragma experimental ABIEncoderV2;
 import {IERC20} from "./IERC20.sol";
 import {IStakedToken} from "./IStakedToken.sol";
 import {ITransferHook} from "./ITransferHook.sol";
-import {IEcosystemReserve} from "./IEcosystemReserve.sol";
 import {ERC20WithSnapshotV2} from "./ERC20WithSnapshotV2.sol";
 import {SafeERC20} from "./SafeERC20.sol";
 import {DistributionTypes} from "./DistributionTypes.sol";

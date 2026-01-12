@@ -5,7 +5,6 @@ pragma experimental ABIEncoderV2;
 import {SafeMath} from "./SafeMath.sol";
 import {DistributionTypes} from "./DistributionTypes.sol";
 import {IDistributionManager} from "./IDistributionManager.sol";
-import {IERC20} from "./IERC20.sol";
 
 /**
  * @title DistributionManager

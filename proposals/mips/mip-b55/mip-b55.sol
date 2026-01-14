@@ -106,10 +106,23 @@ contract mipb55 is HybridProposal, Configs {
     function beforeSimulationHook(Addresses addresses) public override {
         vm.selectFork(MOONBEAM_FORK_ID);
 
+        // Query real bridge cost BEFORE setting up mock (for validation hook)
+        address router = addresses.getAddress("xWELL_ROUTER");
+        uint16 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
+        uint256 realBridgeCost = xWELLRouter(router).bridgeCost(
+            wormholeChainId
+        );
+
+        // Configure mock relayer with real bridge cost so validation passes
+        uint16[] memory chainIds = new uint16[](1);
+        uint256[] memory prices = new uint256[](1);
+        chainIds[0] = wormholeChainId;
+        prices[0] = realBridgeCost;
+
         // Mock relayer for cross-chain bridging simulation
         WormholeRelayerAdapter wormholeRelayer = new WormholeRelayerAdapter(
-            new uint16[](0),
-            new uint256[](0)
+            chainIds,
+            prices
         );
         vm.makePersistent(address(wormholeRelayer));
         vm.label(address(wormholeRelayer), "MockWormholeRelayer");
@@ -180,7 +193,8 @@ contract mipb55 is HybridProposal, Configs {
         );
 
         uint16 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
-        uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId);
+        uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId) *
+            5;
 
         // Step 3: Bridge xWELL to Base Temporal Governor
         _pushAction(
@@ -264,7 +278,7 @@ contract mipb55 is HybridProposal, Configs {
         );
     }
 
-    function validate(Addresses addresses, address) public override {
+    function validate(Addresses addresses, address) public view override {
         string[4] memory assetNames = ["USDC", "WETH", "EURC", "cbBTC"];
 
         uint256[4] memory vaultAmounts = [

@@ -2544,7 +2544,14 @@ contract MultichainProposalTest is PostProposalCheck {
 
         vm.startPrank(stkwell.EMISSION_MANAGER());
         /// distribute 1e18 xWELL per second
-        stkwell.configureAsset(1e18, address(stkwell));
+        IStakedWellUplift.AssetConfigInput[]
+            memory configs = new IStakedWellUplift.AssetConfigInput[](1);
+        configs[0] = IStakedWellUplift.AssetConfigInput({
+            emissionPerSecond: uint128(1e18),
+            totalStaked: stkwell.totalSupply(),
+            underlyingAsset: address(stkwell)
+        });
+        stkwell.configureAssets(configs);
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1);
@@ -2667,7 +2674,14 @@ contract MultichainProposalTest is PostProposalCheck {
 
         vm.startPrank(stkwell.EMISSION_MANAGER());
         /// distribute 1e18 xWELL per second
-        stkwell.configureAsset(1e18, address(stkwell));
+        IStakedWellUplift.AssetConfigInput[]
+            memory configs = new IStakedWellUplift.AssetConfigInput[](1);
+        configs[0] = IStakedWellUplift.AssetConfigInput({
+            emissionPerSecond: uint128(1e18),
+            totalStaked: stkwell.totalSupply(),
+            underlyingAsset: address(stkwell)
+        });
+        stkwell.configureAssets(configs);
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1);

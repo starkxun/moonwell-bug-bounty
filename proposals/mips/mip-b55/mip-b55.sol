@@ -6,7 +6,6 @@ import "@forge-std/Test.sol";
 import {Configs} from "@proposals/Configs.sol";
 import "@protocol/utils/ChainIds.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {HybridProposal, ActionType} from "@proposals/proposalTypes/HybridProposal.sol";
 import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
 import {WormholeRelayerAdapter} from "@test/mock/WormholeRelayerAdapter.sol";
@@ -147,14 +146,6 @@ contract mipb55 is HybridProposal, Configs {
             encodedData
         );
 
-        // Approve governor to spend WELL tokens for bridging
-        vm.startPrank(addresses.getAddress("F-GLMR-DEVGRANT"));
-        IERC20(addresses.getAddress("GOVTOKEN")).approve(
-            addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
-            BRIDGE_AMOUNT
-        );
-        vm.stopPrank();
-
         vm.selectFork(primaryForkId());
 
         vm.store(
@@ -170,16 +161,16 @@ contract mipb55 is HybridProposal, Configs {
         address router = addresses.getAddress("xWELL_ROUTER");
         address well = addresses.getAddress("GOVTOKEN");
 
-        // Step 1: Transfer WELL from dev grant to governor
+        // Step 1: Transfer WELL from MGLIMMER_MULTISIG to governor
         _pushAction(
             well,
             abi.encodeWithSignature(
                 "transferFrom(address,address,uint256)",
-                addresses.getAddress("F-GLMR-DEVGRANT"),
+                addresses.getAddress("MGLIMMER_MULTISIG"),
                 addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"),
                 BRIDGE_AMOUNT
             ),
-            "Transfer WELL from F-GLMR-DEVGRANT to MULTICHAIN_GOVERNOR_PROXY"
+            "Transfer WELL from MGLIMMER_MULTISIG to MULTICHAIN_GOVERNOR_PROXY"
         );
 
         // Step 2: Approve xWELL Router to spend WELL for bridging

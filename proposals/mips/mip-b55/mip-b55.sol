@@ -57,29 +57,17 @@ contract mipb55 is HybridProposal, Configs {
     uint32 public constant CAMPAIGN_DURATION =
         CAMPAIGN_END_TIMESTAMP - CAMPAIGN_START_TIMESTAMP; // ~16.44 days (1,420,182 sec)
 
-    // ============ APY Maintenance Calculation ============
-    // X40 vault campaigns used 14-day duration (1,209,600 seconds)
-    // To maintain same APY (reward per second), we scale amounts proportionally:
-    // new_amount = x40_amount * (new_duration / x40_duration)
+    // ============ Campaign Amounts ============
+    // Amounts calculated to maintain same APY (reward per second) as X40:
+    // new_amount = x40_amount * (CAMPAIGN_DURATION / X40_DURATION)
+    // where X40_DURATION = 1,209,600 seconds (14 days)
+    uint256 public constant USDC_AMOUNT = 1356324839586493957812500;
+    uint256 public constant WETH_AMOUNT = 454278618648986368437500;
+    uint256 public constant EURC_AMOUNT = 271049853266076003062500;
+    uint256 public constant cbBTC_AMOUNT = 110946008618949463437500;
 
-    uint256 public constant X40_VAULT_DURATION = 1209600; // 14 days in seconds
-
-    // X40 original amounts (14 days):
-    // USDC: 1.1551917839192369e24, WETH: 3.869502356298615e23
-    // EURC: 2.3087682693661858e23, cbBTC: 9.44995881527945e22
-    // Scaled amounts for new duration (maintaining same APY)
-    uint256 public constant USDC_AMOUNT =
-        (1155191783919236900000000 * CAMPAIGN_DURATION) / X40_VAULT_DURATION;
-    uint256 public constant WETH_AMOUNT =
-        (386950235629861500000000 * CAMPAIGN_DURATION) / X40_VAULT_DURATION;
-    uint256 public constant EURC_AMOUNT =
-        (230876826936618580000000 * CAMPAIGN_DURATION) / X40_VAULT_DURATION;
-    uint256 public constant cbBTC_AMOUNT =
-        (94499588152794500000000 * CAMPAIGN_DURATION) / X40_VAULT_DURATION;
-
-    // Total tokens needed for all vault campaigns
-    uint256 public constant TOTAL_CAMPAIGN_AMOUNT =
-        USDC_AMOUNT + WETH_AMOUNT + EURC_AMOUNT + cbBTC_AMOUNT;
+    // Total tokens needed for all vault campaigns (~2,192,599.32 WELL)
+    uint256 public constant TOTAL_CAMPAIGN_AMOUNT = 2192599320120505792750000;
 
     // Amount to bridge from Moonbeam (same as total campaign amount)
     uint256 public constant BRIDGE_AMOUNT = TOTAL_CAMPAIGN_AMOUNT;

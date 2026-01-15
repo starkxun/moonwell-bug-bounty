@@ -326,7 +326,7 @@ contract StakedTokenV2 is
         uint256 amountToReceive,
         address toAddress,
         uint256 toBalance
-    ) public returns (uint256) {
+    ) internal returns (uint256) {
         uint256 toCooldownTimestamp = stakersCooldowns[toAddress];
         if (toCooldownTimestamp == 0) {
             return 0;

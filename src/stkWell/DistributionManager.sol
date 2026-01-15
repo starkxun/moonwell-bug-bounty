@@ -48,18 +48,24 @@ contract DistributionManager is IDistributionManager {
 
     /**
      * @dev Configures the distribution of rewards for a list of assets
-     * @param assetsConfigInput The list of configurations to apply
      **/
     function configureAssets(
-        DistributionTypes.AssetConfigInput[] calldata assetsConfigInput
+        uint128[] memory emissionPerSecond,
+        uint256[] memory totalStaked,
+        address[] memory underlyingAsset
     ) external override {
         require(msg.sender == EMISSION_MANAGER, "ONLY_EMISSION_MANAGER");
+        require(
+            emissionPerSecond.length == totalStaked.length &&
+                totalStaked.length == underlyingAsset.length,
+            "PARAM_LENGTHS"
+        );
 
-        for (uint256 i = 0; i < assetsConfigInput.length; ++i) {
+        for (uint256 i = 0; i < emissionPerSecond.length; ++i) {
             _configureAssetInternal(
-                assetsConfigInput[i].emissionPerSecond,
-                assetsConfigInput[i].totalStaked,
-                assetsConfigInput[i].underlyingAsset
+                emissionPerSecond[i],
+                totalStaked[i],
+                underlyingAsset[i]
             );
         }
     }

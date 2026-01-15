@@ -1,12 +1,6 @@
 pragma solidity 0.8.19;
 
 interface IStakedWellUplift {
-    struct AssetConfigInput {
-        uint128 emissionPerSecond;
-        uint256 totalStaked;
-        address underlyingAsset;
-    }
-
     function EMISSION_MANAGER() external view returns (address);
 
     function STAKED_TOKEN() external view returns (address);
@@ -44,6 +38,8 @@ interface IStakedWellUplift {
     function assets(address) external view returns (uint128, uint128, uint256);
 
     function configureAssets(
-        AssetConfigInput[] calldata assetsConfigInput
+        uint128[] calldata emissionPerSecond,
+        uint256[] calldata totalStaked,
+        address[] calldata underlyingAsset
     ) external;
 }

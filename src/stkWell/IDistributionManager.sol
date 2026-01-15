@@ -2,10 +2,10 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import {DistributionTypes} from "./DistributionTypes.sol";
-
 interface IDistributionManager {
     function configureAssets(
-        DistributionTypes.AssetConfigInput[] calldata assetsConfigInput
+        uint128[] calldata emissionPerSecond,
+        uint256[] calldata totalStaked,
+        address[] calldata underlyingAsset
     ) external;
 }

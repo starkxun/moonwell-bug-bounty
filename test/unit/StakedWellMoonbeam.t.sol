@@ -50,27 +50,23 @@ contract StakedWellMoonbeamUnitTest is BaseTest, MultichainGovernorDeploy {
         );
         require(success, "initializeV2 failed");
 
-        // configure asset using configureAssets (V2 upgrade removed configureAsset)
-        // We need to manually build the calldata for the struct array
-        bytes memory assetConfigArray = abi.encode(
-            uint128(1e18), // emissionPerSecond
-            uint256(0), // totalStaked
-            stkWellProxy // underlyingAsset
-        );
+        stakedWell = IStakedWell(stkWellProxy);
 
-        // Build the full calldata: function selector + offset + length + data
-        bytes4 selector = bytes4(
-            keccak256("configureAssets((uint128,uint256,address)[])")
-        );
-        bytes memory callData = abi.encodePacked(
-            selector,
-            uint256(32), // offset to array start
-            uint256(1), // array length
-            assetConfigArray
-        );
+        // configure asset using configureAssets with separate arrays
+        uint128[] memory emissionPerSecond = new uint128[](1);
+        emissionPerSecond[0] = 1e18;
 
-        (bool configSuccess, ) = stkWellProxy.call(callData);
-        require(configSuccess, "configureAssets failed");
+        uint256[] memory totalStaked = new uint256[](1);
+        totalStaked[0] = 0;
+
+        address[] memory underlyingAsset = new address[](1);
+        underlyingAsset[0] = stkWellProxy;
+
+        stakedWell.configureAssets(
+            emissionPerSecond,
+            totalStaked,
+            underlyingAsset
+        );
 
         amount = 1_000_000_000 * 1e18;
 
@@ -127,17 +123,22 @@ contract StakedWellMoonbeamUnitTest is BaseTest, MultichainGovernorDeploy {
     }
 
     function testConfigureAssetsNonManagerFails() public {
-        IStakedWell.AssetConfigInput[]
-            memory configs = new IStakedWell.AssetConfigInput[](1);
-        configs[0] = IStakedWell.AssetConfigInput({
-            emissionPerSecond: 1e18,
-            totalStaked: 0,
-            underlyingAsset: address(stakedWell)
-        });
+        uint128[] memory emissionPerSecond = new uint128[](1);
+        emissionPerSecond[0] = 1e18;
+
+        uint256[] memory totalStaked = new uint256[](1);
+        totalStaked[0] = 0;
+
+        address[] memory underlyingAsset = new address[](1);
+        underlyingAsset[0] = address(stakedWell);
 
         vm.prank(address(1));
         vm.expectRevert("ONLY_EMISSION_MANAGER");
-        stakedWell.configureAssets(configs);
+        stakedWell.configureAssets(
+            emissionPerSecond,
+            totalStaked,
+            underlyingAsset
+        );
     }
 
     function testGetPriorVotes() public {

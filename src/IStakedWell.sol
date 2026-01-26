@@ -24,6 +24,7 @@ interface IStakedWell {
 
     function EMISSION_MANAGER() external view returns (address);
 
+    function REWARD_TOKEN() external view returns (address);
     function STAKED_TOKEN() external view returns (address);
     function REWARDS_VAULT() external view returns (address);
 

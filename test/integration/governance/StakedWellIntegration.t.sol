@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
-import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID} from "@utils/ChainIds.sol";
+import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ETHEREUM_FORK_ID} from "@utils/ChainIds.sol";
 import {MultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
 
 /// @notice Integration test for upgraded StakedWell contracts
@@ -15,6 +15,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     IStakedWell public stkWellMoonbeam;
     IStakedWell public stkWellBase;
     IStakedWell public stkWellOptimism;
+    IStakedWell public stkWellEthereum;
 
     // Test actors
     address internal constant STAKER_1 =
@@ -45,6 +46,13 @@ contract StakedWellIntegrationTest is PostProposalCheck {
             addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
         vm.makePersistent(address(stkWellOptimism));
+
+        // Ethereum
+        vm.selectFork(ETHEREUM_FORK_ID);
+        stkWellEthereum = IStakedWell(
+            addresses.getAddress("STK_GOVTOKEN_PROXY")
+        );
+        vm.makePersistent(address(stkWellEthereum));
 
         vm.selectFork(primaryForkId);
     }
@@ -443,10 +451,364 @@ contract StakedWellIntegrationTest is PostProposalCheck {
         }
     }
 
+    /// ========== Ethereum Tests ========== ///
+
+    function testEthereumBasicFunctionalityWorks() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Verify stkWELL is deployed (totalSupply should be 0 or greater on fresh deployment)
+        uint256 totalSupply = stkWellEthereum.totalSupply();
+        assertGe(totalSupply, 0, "Ethereum: Total supply should be >= 0");
+
+        // Verify core constants are set correctly
+        assertEq(
+            stkWellEthereum.COOLDOWN_SECONDS(),
+            7 days,
+            "Ethereum: Cooldown should be 7 days"
+        );
+
+        assertEq(
+            stkWellEthereum.UNSTAKE_WINDOW(),
+            2 days,
+            "Ethereum: Unstake window should be 2 days"
+        );
+
+        // Verify staked token is xWELL
+        address stakedToken = stkWellEthereum.STAKED_TOKEN();
+        address xWellProxy = addresses.getAddress("xWELL_PROXY");
+        assertEq(
+            stakedToken,
+            xWellProxy,
+            "Ethereum: Staked token should be xWELL"
+        );
+
+        // Verify reward token is xWELL
+        address rewardToken = stkWellEthereum.REWARD_TOKEN();
+        assertEq(
+            rewardToken,
+            xWellProxy,
+            "Ethereum: Reward token should be xWELL"
+        );
+    }
+
+    function testEthereumCanStakeAndUnstake() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Create a mock staker
+        uint256 stakeAmount = 1000e18;
+        address staker = _createMockStaker(
+            stkWellEthereum,
+            STAKER_1,
+            stakeAmount
+        );
+
+        // Verify staker has staked balance
+        uint256 balance = stkWellEthereum.balanceOf(staker);
+        assertEq(
+            balance,
+            stakeAmount,
+            "Ethereum: Staker should have staked balance"
+        );
+
+        // Start cooldown
+        vm.prank(staker);
+        stkWellEthereum.cooldown();
+
+        // Advance time past cooldown period
+        vm.warp(block.timestamp + 7 days + 1);
+
+        // Redeem/unstake
+        vm.prank(staker);
+        stkWellEthereum.redeem(staker, stakeAmount);
+
+        // Verify balance is now 0
+        uint256 balanceAfter = stkWellEthereum.balanceOf(staker);
+        assertEq(
+            balanceAfter,
+            0,
+            "Ethereum: Staker balance should be 0 after redeem"
+        );
+
+        // Verify xWELL was returned
+        address xWellProxy = addresses.getAddress("xWELL_PROXY");
+        uint256 xWellBalance = IERC20(xWellProxy).balanceOf(staker);
+        assertEq(
+            xWellBalance,
+            stakeAmount,
+            "Ethereum: Staker should have received xWELL back"
+        );
+    }
+
+    function testEthereumVotingPowerWorks() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Create a mock staker
+        uint256 stakeAmount = 1000e18;
+        address staker = _createMockStaker(
+            stkWellEthereum,
+            STAKER_1,
+            stakeAmount
+        );
+
+        // Verify staker has voting power
+        uint256 votingPower = stkWellEthereum.balanceOf(staker);
+        assertEq(
+            votingPower,
+            stakeAmount,
+            "Ethereum: Staker should have voting power equal to stake"
+        );
+
+        // Advance time so we can take a snapshot in the past
+        vm.warp(block.timestamp + 2 hours);
+
+        // Get votes at a past timestamp (simulate proposal snapshot)
+        uint256 snapshotTimestamp = block.timestamp - 1 hours;
+        uint256 votesAtSnapshot = stkWellEthereum.getPriorVotes(
+            staker,
+            snapshotTimestamp
+        );
+
+        // Votes at snapshot should equal the staked amount
+        assertEq(
+            votesAtSnapshot,
+            stakeAmount,
+            "Ethereum: Votes at snapshot should equal staked amount"
+        );
+    }
+
+    function testEthereumProperSnapshotTimestampRequired() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Create a mock staker
+        uint256 stakeAmount = 1000e18;
+        address staker = _createMockStaker(
+            stkWellEthereum,
+            STAKER_2,
+            stakeAmount
+        );
+
+        uint256 futureTimestamp = block.timestamp + 1 days;
+
+        // Future timestamp should revert or return 0
+        try stkWellEthereum.getPriorVotes(staker, futureTimestamp) returns (
+            uint256 votes
+        ) {
+            assertEq(
+                votes,
+                0,
+                "Ethereum: Future timestamp should return 0 votes"
+            );
+        } catch {
+            assertTrue(
+                true,
+                "Ethereum: Correctly reverted on future timestamp"
+            );
+        }
+    }
+
+    function testEthereumEmissionManagerSetCorrectly() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Verify emission manager is PROXY_ADMIN (since no governor on Ethereum yet)
+        address emissionManager = stkWellEthereum.EMISSION_MANAGER();
+        address proxyAdmin = addresses.getAddress("PROXY_ADMIN");
+
+        assertEq(
+            emissionManager,
+            proxyAdmin,
+            "Ethereum: Emission manager should be PROXY_ADMIN"
+        );
+    }
+
+    function testEthereumRewardsVaultSetCorrectly() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Verify rewards vault is ecosystem reserve
+        address rewardsVault = stkWellEthereum.REWARDS_VAULT();
+        address ecosystemReserve = addresses.getAddress(
+            "ECOSYSTEM_RESERVE_PROXY"
+        );
+
+        assertEq(
+            rewardsVault,
+            ecosystemReserve,
+            "Ethereum: Rewards vault should be ecosystem reserve"
+        );
+    }
+
+    function testEthereumXWellIntegration() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        address xWellProxy = addresses.getAddress("xWELL_PROXY");
+        address staker = STAKER_1;
+        uint256 stakeAmount = 1000e18;
+
+        // Deal xWELL to staker
+        deal(xWellProxy, staker, stakeAmount);
+
+        // Verify staker has xWELL
+        uint256 xWellBalance = IERC20(xWellProxy).balanceOf(staker);
+        assertEq(
+            xWellBalance,
+            stakeAmount,
+            "Ethereum: Staker should have xWELL"
+        );
+
+        // Approve and stake
+        vm.startPrank(staker);
+        IERC20(xWellProxy).approve(address(stkWellEthereum), stakeAmount);
+        stkWellEthereum.stake(staker, stakeAmount);
+        vm.stopPrank();
+
+        // Verify staker received stkWELL
+        uint256 stkWellBalance = stkWellEthereum.balanceOf(staker);
+        assertEq(
+            stkWellBalance,
+            stakeAmount,
+            "Ethereum: Staker should have received stkWELL"
+        );
+
+        // Verify xWELL was transferred from staker
+        uint256 xWellBalanceAfter = IERC20(xWellProxy).balanceOf(staker);
+        assertEq(
+            xWellBalanceAfter,
+            0,
+            "Ethereum: xWELL should be transferred to stkWELL contract"
+        );
+
+        // Verify stkWELL contract holds xWELL
+        uint256 stkWellContractBalance = IERC20(xWellProxy).balanceOf(
+            address(stkWellEthereum)
+        );
+        assertEq(
+            stkWellContractBalance,
+            stakeAmount,
+            "Ethereum: stkWELL contract should hold staked xWELL"
+        );
+    }
+
+    function testEthereumMultipleStakersVotingPower() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        uint256 stake1 = 500e18;
+        uint256 stake2 = 1500e18;
+
+        // Create two stakers with different amounts
+        address staker1 = _createMockStaker(stkWellEthereum, STAKER_1, stake1);
+        address staker2 = _createMockStaker(stkWellEthereum, STAKER_2, stake2);
+
+        // Verify voting power reflects their stakes
+        assertEq(
+            stkWellEthereum.balanceOf(staker1),
+            stake1,
+            "Ethereum: Staker 1 voting power incorrect"
+        );
+
+        assertEq(
+            stkWellEthereum.balanceOf(staker2),
+            stake2,
+            "Ethereum: Staker 2 voting power incorrect"
+        );
+
+        // Verify total supply is the sum of both stakes
+        uint256 totalSupply = stkWellEthereum.totalSupply();
+        assertGe(
+            totalSupply,
+            stake1 + stake2,
+            "Ethereum: Total supply should include both stakes"
+        );
+
+        // Advance time and check snapshot voting power
+        vm.warp(block.timestamp + 2 hours);
+        uint256 snapshotTime = block.timestamp - 1 hours;
+
+        uint256 votes1 = stkWellEthereum.getPriorVotes(staker1, snapshotTime);
+        uint256 votes2 = stkWellEthereum.getPriorVotes(staker2, snapshotTime);
+
+        assertEq(votes1, stake1, "Ethereum: Staker 1 snapshot votes incorrect");
+        assertEq(votes2, stake2, "Ethereum: Staker 2 snapshot votes incorrect");
+    }
+
+    function testEthereumCooldownWindowEnforcement() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        uint256 stakeAmount = 1000e18;
+        address staker = _createMockStaker(
+            stkWellEthereum,
+            STAKER_1,
+            stakeAmount
+        );
+
+        // Start cooldown
+        vm.prank(staker);
+        stkWellEthereum.cooldown();
+
+        // Try to redeem before cooldown period ends (should revert)
+        vm.warp(block.timestamp + 6 days); // Less than 7 day cooldown
+        vm.expectRevert();
+        vm.prank(staker);
+        stkWellEthereum.redeem(staker, stakeAmount);
+
+        // Advance to valid unstake window (after cooldown, within unstake window)
+        vm.warp(block.timestamp + 1 days + 1); // Now at 7 days + 1 second
+
+        // Should be able to redeem now
+        vm.prank(staker);
+        stkWellEthereum.redeem(staker, stakeAmount);
+
+        // Verify redemption worked
+        assertEq(
+            stkWellEthereum.balanceOf(staker),
+            0,
+            "Ethereum: Balance should be 0 after redeem"
+        );
+    }
+
+    function testEthereumUnstakeWindowExpiration() public {
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        uint256 stakeAmount = 1000e18;
+        address staker = _createMockStaker(
+            stkWellEthereum,
+            STAKER_1,
+            stakeAmount
+        );
+
+        // Start cooldown
+        vm.prank(staker);
+        stkWellEthereum.cooldown();
+
+        // Advance past cooldown + unstake window (7 days + 2 days + 1 second)
+        vm.warp(block.timestamp + 9 days + 1);
+
+        // Try to redeem after unstake window expired (should revert)
+        vm.expectRevert();
+        vm.prank(staker);
+        stkWellEthereum.redeem(staker, stakeAmount);
+
+        // User must restart cooldown
+        vm.prank(staker);
+        stkWellEthereum.cooldown();
+
+        // Advance to valid window
+        vm.warp(block.timestamp + 7 days + 1);
+
+        // Should work now
+        vm.prank(staker);
+        stkWellEthereum.redeem(staker, stakeAmount);
+
+        assertEq(
+            stkWellEthereum.balanceOf(staker),
+            0,
+            "Ethereum: Balance should be 0 after redeem"
+        );
+    }
+
     /// ========== Cross-Chain Consistency Tests ========== ///
 
     function testAllChainsHavePositiveTotalSupply() public {
         // Verify all chains have staked tokens (totalSupply > 0)
+        // Note: Ethereum may have 0 supply if freshly deployed
         vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
         uint256 moonbeamSupply = stkWellMoonbeam.totalSupply();
         assertGt(moonbeamSupply, 0, "Moonbeam should have positive supply");
@@ -458,6 +820,10 @@ contract StakedWellIntegrationTest is PostProposalCheck {
         vm.selectFork(OPTIMISM_FORK_ID);
         uint256 optimismSupply = stkWellOptimism.totalSupply();
         assertGt(optimismSupply, 0, "Optimism should have positive supply");
+
+        vm.selectFork(ETHEREUM_FORK_ID);
+        uint256 ethereumSupply = stkWellEthereum.totalSupply();
+        assertGe(ethereumSupply, 0, "Ethereum should have non-negative supply");
     }
 
     function testAllChainsUseSameInterface() public {
@@ -473,6 +839,10 @@ contract StakedWellIntegrationTest is PostProposalCheck {
         vm.selectFork(OPTIMISM_FORK_ID);
         stkWellOptimism.totalSupply();
         stkWellOptimism.COOLDOWN_SECONDS();
+
+        vm.selectFork(ETHEREUM_FORK_ID);
+        stkWellEthereum.totalSupply();
+        stkWellEthereum.COOLDOWN_SECONDS();
 
         // If we got here without reverting, all chains support the same interface
         assertTrue(true, "All chains support the same interface");

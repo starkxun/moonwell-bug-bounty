@@ -15,6 +15,7 @@ import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
 import {MOONBEAM_CHAIN_ID, BASE_CHAIN_ID, OPTIMISM_CHAIN_ID, ETHEREUM_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID, BASE_WORMHOLE_CHAIN_ID, OPTIMISM_WORMHOLE_CHAIN_ID} from "@utils/ChainIds.sol";
+import {IStakedWell} from "@protocol/IStakedWell.sol";
 
 /*
 
@@ -43,9 +44,9 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
     uint128 public constant ETH_XWELL_PAUSE_DURATION = 10 days;
 
     /// @notice Constants for Ethereum stkWELL deployment
-    uint256 public constant ETH_STKWELL_COOLDOWN_SECONDS = 7 days;
-    uint256 public constant ETH_STKWELL_UNSTAKE_WINDOW = 2 days;
-    uint128 public constant ETH_STKWELL_DISTRIBUTION_DURATION = 1 days;
+    uint256 public constant ETH_STKWELL_COOLDOWN_SECONDS = 604800; // onchain value on base
+    uint256 public constant ETH_STKWELL_UNSTAKE_WINDOW = 172800; // onchain value on base
+    uint128 public constant ETH_STKWELL_DISTRIBUTION_END = 4864764777; // onchain value on base
 
     function run() public {
         Addresses addresses = new Addresses();
@@ -75,7 +76,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
         // 2. Deploy xWELL system if not exists
         if (!addresses.isAddressSet("xWELL_PROXY")) {
             // NOTE: this is the moonwell deployer 1 address for now
-            // TODO: use grantPauseGuardian in the proposal script to
+            // TODO: use grantPauseGuardian in the proposal script to set new PAUSE_GUARDIAN
             address pauseGuardian = addresses.getAddress("PAUSE_GUARDIAN");
 
             (
@@ -99,7 +100,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
                 xwellProxy,
                 "WELL",
                 "WELL",
-                proxyAdmin, // Use PROXY_ADMIN as owner
+                proxyAdmin, // Use PROXY_ADMIN as owner; TODO: transfer ownership to governance in the proposal script
                 limits,
                 ETH_XWELL_PAUSE_DURATION,
                 pauseGuardian
@@ -163,12 +164,12 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
 
         // 3. Deploy Ecosystem Reserve if not exists
         if (!addresses.isAddressSet("ECOSYSTEM_RESERVE_PROXY")) {
-            address ecosystemReserveImplementation = address(
-                new EcosystemReserve()
+            address ecosystemReserveImplementation = deployCode(
+                "EcosystemReserve.sol:EcosystemReserve"
             );
 
-            address ecosystemReserveController = address(
-                new EcosystemReserveController()
+            address ecosystemReserveController = deployCode(
+                "EcosystemReserveController.sol:EcosystemReserveController"
             );
 
             ecosystemReserveProxy = address(
@@ -211,7 +212,9 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
 
         // 4. Deploy StakedWell (stkWELL) if not exists
         if (!addresses.isAddressSet("STK_GOVTOKEN_PROXY")) {
-            address stkWellImplementation = address(new StakedWell());
+            address stkWellImplementation = deployCode(
+                "StakedWell.sol:StakedWell"
+            );
 
             // Generate init calldata for stkWELL
             bytes memory stkWellInitData = abi.encodeWithSignature(
@@ -221,8 +224,8 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
                 ETH_STKWELL_COOLDOWN_SECONDS,
                 ETH_STKWELL_UNSTAKE_WINDOW,
                 ecosystemReserveProxy, // rewardsVault
-                proxyAdmin, // emissionManager (Use PROXY_ADMIN since no governor)
-                ETH_STKWELL_DISTRIBUTION_DURATION,
+                proxyAdmin, // emissionManager (TODO: use setEmissionsManager in the proposal script to set the emission manager)
+                ETH_STKWELL_DISTRIBUTION_END - block.timestamp, // dynamically calculate duration to match onchain value on base
                 address(0) // governance (no transfer hook needed)
             );
 
@@ -431,9 +434,3 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
         console.log("=== Validation Passed ===\n");
     }
 }
-
-// Import the necessary contracts for deployment
-import {EcosystemReserve} from "@protocol/stkWell/EcosystemReserve.sol";
-import {EcosystemReserveController} from "@protocol/stkWell/EcosystemReserveController.sol";
-import {StakedWell} from "@protocol/stkWell/StakedWell.sol";
-import {IStakedWell} from "@protocol/IStakedWell.sol";

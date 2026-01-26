@@ -15,6 +15,12 @@ block_gas_limit = "18446744073709551615"
 revert_strings = "debug"
 sparse_mode = true # compiles files that match filter criteria
 
+# Library linking for zelt libraries used by xWELL
+# These addresses must have the library code deployed at runtime (see PostProposalCheck)
+libraries = [
+    "lib/zelt/src/lib/RateLimitMidpointCommonLibrary.sol:RateLimitMidpointCommonLibrary:0x000000000000000000000000000000000000cafE",
+    "lib/zelt/src/util/Math.sol:Math:0x000000000000000000000000000000000000baBe"
+]
 
 # We can have quite some control over the optimiser when using the new IR one.
 [profile.default.optimizer_details]

@@ -3,22 +3,47 @@ pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
 
+import {ITransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
+
+import {xWELL} from "@protocol/xWELL/xWELL.sol";
+import {MintLimits} from "@protocol/xWELL/MintLimits.sol";
+import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
+import {WormholeTrustedSender} from "@protocol/governance/WormholeTrustedSender.sol";
+import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
-import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ChainIds} from "@utils/ChainIds.sol";
+import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ETHEREUM_FORK_ID, MOONBEAM_WORMHOLE_CHAIN_ID, BASE_WORMHOLE_CHAIN_ID, OPTIMISM_WORMHOLE_CHAIN_ID, ETHEREUM_WORMHOLE_CHAIN_ID, ChainIds} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
-/// @title MIP-X41: Upgrade StakedWell contracts on Base, OP, and Moonbeam
+/// @title MIP-X41: Upgrade StakedWell contracts on Base, OP, and Moonbeam; Deploy to Ethereum
 /// @author Moonwell Contributors
 /// @notice Proposal to:
 ///         1. Upgrade stkWELL on Moonbeam to switch snapshot logic to use timestamps instead of block numbers
 ///         2. Upgrade stkWELL on Base/OP to remove faulty configureAssets function
 ///         3. Call setNewStakedWell on the MultichainGovernor on moonbeam with the same stkwell contract and toUseTimestamps=true
+///         4. Validate xWELL and stkWELL deployment on Ethereum
+///
+/// @dev IMPORTANT: Ethereum deployment is handled separately via script/DeployXWellEthereum.s.sol
+///      This is because multichain proposals cannot handle library linking for xWELL's Zelt libraries.
+///      Before running this proposal, deploy to Ethereum using:
+///        forge script script/DeployXWellEthereum.s.sol:DeployXWellEthereum --rpc-url ethereum --broadcast
 contract mipx41 is HybridProposal {
     using ProposalActions for *;
     using ChainIds for uint256;
 
     string public constant override name = "MIP-X41";
+
+    /// @notice Constants for Ethereum xWELL deployment
+    uint112 public constant ETH_XWELL_BUFFER_CAP = 100_000_000 * 1e18;
+    uint128 public constant ETH_XWELL_RATE_LIMIT_PER_SECOND = 1158 * 1e18; // ~19m per day
+    uint128 public constant ETH_XWELL_PAUSE_DURATION = 10 days;
+
+    /// @notice Constants for Ethereum stkWELL deployment
+    uint256 public constant ETH_STKWELL_COOLDOWN_SECONDS = 7 days;
+    uint256 public constant ETH_STKWELL_UNSTAKE_WINDOW = 2 days;
+    uint128 public constant ETH_STKWELL_DISTRIBUTION_DURATION = 1 days;
 
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
@@ -61,10 +86,7 @@ contract mipx41 is HybridProposal {
         }
     }
 
-    function deploy(
-        Addresses addresses,
-        address deployerAddress
-    ) public override {
+    function deploy(Addresses addresses, address) public override {
         // Moonbeam
         if (!addresses.isAddressSet("STK_GOVTOKEN_IMPL_V2")) {
             vm.startBroadcast();
@@ -118,6 +140,25 @@ contract mipx41 is HybridProposal {
             vm.stopBroadcast();
         }
 
+        // Ethereum - Verify xWELL and stkWELL are deployed
+        // NOTE: Ethereum deployment is handled separately via script/DeployXWellEthereum.s.sol
+        // This is because multichain proposals cannot handle library linking for xWELL's Zelt libraries.
+        // Run the deployment script before executing this proposal:
+        //   forge script script/DeployXWellEthereum.s.sol:DeployXWellEthereum --rpc-url ethereum --broadcast
+        vm.selectFork(ETHEREUM_FORK_ID);
+        require(
+            addresses.isAddressSet("xWELL_PROXY"),
+            "Ethereum xWELL must be deployed before running this proposal. Run script/DeployXWellEthereum.s.sol first."
+        );
+        require(
+            addresses.isAddressSet("STK_GOVTOKEN_PROXY"),
+            "Ethereum stkWELL must be deployed before running this proposal. Run script/DeployXWellEthereum.s.sol first."
+        );
+        require(
+            addresses.isAddressSet("PROXY_ADMIN"),
+            "Ethereum PROXY_ADMIN must be deployed before running this proposal. Run script/DeployXWellEthereum.s.sol first."
+        );
+
         // Switch back to Moonbeam
         vm.selectFork(primaryForkId());
     }
@@ -170,6 +211,55 @@ contract mipx41 is HybridProposal {
             "Upgrade stkWELL on Optimism"
         );
 
+        // Get Ethereum wormhole adapter address for trusting on other chains
+        vm.selectFork(ETHEREUM_FORK_ID);
+        address ethereumWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        // Prepare trusted sender struct for Ethereum
+        WormholeTrustedSender.TrustedSender[]
+            memory trustedSenders = new WormholeTrustedSender.TrustedSender[](
+                1
+            );
+        trustedSenders[0] = WormholeTrustedSender.TrustedSender({
+            chainId: ETHEREUM_WORMHOLE_CHAIN_ID,
+            addr: ethereumWormholeAdapter
+        });
+
+        // Moonbeam: Add Ethereum wormhole adapter as trusted sender
+        vm.selectFork(primaryForkId());
+        _pushAction(
+            addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY"),
+            abi.encodeWithSignature(
+                "addTrustedSenders((uint16,address)[])",
+                trustedSenders
+            ),
+            "Add Ethereum wormhole adapter as trusted sender on Moonbeam"
+        );
+
+        // Base: Add Ethereum wormhole adapter as trusted sender
+        vm.selectFork(BASE_FORK_ID);
+        _pushAction(
+            addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY"),
+            abi.encodeWithSignature(
+                "addTrustedSenders((uint16,address)[])",
+                trustedSenders
+            ),
+            "Add Ethereum wormhole adapter as trusted sender on Base"
+        );
+
+        // Optimism: Add Ethereum wormhole adapter as trusted sender
+        vm.selectFork(OPTIMISM_FORK_ID);
+        _pushAction(
+            addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY"),
+            abi.encodeWithSignature(
+                "addTrustedSenders((uint16,address)[])",
+                trustedSenders
+            ),
+            "Add Ethereum wormhole adapter as trusted sender on Optimism"
+        );
+
         // Switch back to Moonbeam
         vm.selectFork(primaryForkId());
     }
@@ -189,11 +279,15 @@ contract mipx41 is HybridProposal {
         vm.selectFork(OPTIMISM_FORK_ID);
         _validateOptimismUpgrade(addresses);
 
+        // Validate Ethereum deployment
+        vm.selectFork(ETHEREUM_FORK_ID);
+        _validateEthereumDeployment(addresses);
+
         // Switch back to Moonbeam
         vm.selectFork(primaryForkId());
     }
 
-    function _validateMoonbeamUpgrade(Addresses addresses) internal view {
+    function _validateMoonbeamUpgrade(Addresses addresses) internal {
         address proxyAdmin = addresses.getAddress("MOONBEAM_PROXY_ADMIN");
         address proxy = addresses.getAddress("STK_GOVTOKEN_PROXY");
         address expectedImpl = addresses.getAddress("STK_GOVTOKEN_IMPL_V2");
@@ -229,10 +323,29 @@ contract mipx41 is HybridProposal {
             "MultichainGovernor useTimestamps not enabled"
         );
 
+        // Validate Ethereum wormhole adapter is trusted
+        vm.selectFork(ETHEREUM_FORK_ID);
+        address ethereumWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        vm.selectFork(primaryForkId());
+        address moonbeamWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        assertTrue(
+            WormholeBridgeAdapter(moonbeamWormholeAdapter).isTrustedSender(
+                ETHEREUM_WORMHOLE_CHAIN_ID,
+                ethereumWormholeAdapter
+            ),
+            "Moonbeam: Ethereum wormhole adapter not trusted"
+        );
+
         // TODO: validate an address that had voting power thru stkwell, and voting power remained the same after the upgrade
     }
 
-    function _validateBaseUpgrade(Addresses addresses) internal view {
+    function _validateBaseUpgrade(Addresses addresses) internal {
         address proxyAdmin = addresses.getAddress("MRD_PROXY_ADMIN");
         address proxy = addresses.getAddress("STK_GOVTOKEN_PROXY");
         address expectedImpl = addresses.getAddress("STK_GOVTOKEN_IMPL_V2");
@@ -244,9 +357,28 @@ contract mipx41 is HybridProposal {
             expectedImpl,
             "Base stkWELL implementation not upgraded"
         );
+
+        // Validate Ethereum wormhole adapter is trusted
+        vm.selectFork(ETHEREUM_FORK_ID);
+        address ethereumWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        vm.selectFork(BASE_FORK_ID);
+        address baseWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        assertTrue(
+            WormholeBridgeAdapter(baseWormholeAdapter).isTrustedSender(
+                ETHEREUM_WORMHOLE_CHAIN_ID,
+                ethereumWormholeAdapter
+            ),
+            "Base: Ethereum wormhole adapter not trusted"
+        );
     }
 
-    function _validateOptimismUpgrade(Addresses addresses) internal view {
+    function _validateOptimismUpgrade(Addresses addresses) internal {
         address proxyAdmin = addresses.getAddress("MRD_PROXY_ADMIN");
         address proxy = addresses.getAddress("STK_GOVTOKEN_PROXY");
         address expectedImpl = addresses.getAddress("STK_GOVTOKEN_IMPL_V2");
@@ -257,6 +389,25 @@ contract mipx41 is HybridProposal {
             actualImpl,
             expectedImpl,
             "Optimism stkWELL implementation not upgraded"
+        );
+
+        // Validate Ethereum wormhole adapter is trusted
+        vm.selectFork(ETHEREUM_FORK_ID);
+        address ethereumWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        vm.selectFork(OPTIMISM_FORK_ID);
+        address optimismWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        assertTrue(
+            WormholeBridgeAdapter(optimismWormholeAdapter).isTrustedSender(
+                ETHEREUM_WORMHOLE_CHAIN_ID,
+                ethereumWormholeAdapter
+            ),
+            "Optimism: Ethereum wormhole adapter not trusted"
         );
     }
 
@@ -269,5 +420,198 @@ contract mipx41 is HybridProposal {
         );
         require(success, "Failed to get proxy implementation");
         return abi.decode(data, (address));
+    }
+
+    /// @notice Validate Ethereum xWELL and stkWELL deployment
+    /// @dev Adapted from xwellDeployBase validation logic
+    /// @param addresses The addresses contract
+    function _validateEthereumDeployment(Addresses addresses) private {
+        // Get addresses from Ethereum fork (current fork)
+        address xwellProxy = addresses.getAddress("xWELL_PROXY");
+        address wormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+        address proxyAdmin = addresses.getAddress("PROXY_ADMIN");
+        address stkWellProxy = addresses.getAddress("STK_GOVTOKEN_PROXY");
+        address ecosystemReserveProxy = addresses.getAddress(
+            "ECOSYSTEM_RESERVE_PROXY"
+        );
+
+        // Get trusted sender addresses from other chains
+        vm.selectFork(MOONBEAM_FORK_ID);
+        address moonbeamWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        vm.selectFork(BASE_FORK_ID);
+        address baseWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        vm.selectFork(OPTIMISM_FORK_ID);
+        address optimismWormholeAdapter = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_PROXY"
+        );
+
+        // Switch back to Ethereum fork for validation
+        vm.selectFork(ETHEREUM_FORK_ID);
+
+        // Validate xWELL and Wormhole Adapter ownership
+        // On Ethereum, PROXY_ADMIN is the owner (not temporal governor)
+        assertEq(
+            WormholeBridgeAdapter(wormholeAdapter).owner(),
+            proxyAdmin,
+            "Ethereum: wormhole bridge adapter owner is incorrect"
+        );
+
+        assertEq(
+            address(WormholeBridgeAdapter(wormholeAdapter).wormholeRelayer()),
+            addresses.getAddress("WORMHOLE_BRIDGE_RELAYER_PROXY"),
+            "Ethereum: wormhole bridge adapter relayer is incorrect"
+        );
+
+        assertEq(
+            WormholeBridgeAdapter(wormholeAdapter).gasLimit(),
+            300_000,
+            "Ethereum: wormhole bridge adapter gas limit is incorrect"
+        );
+
+        assertEq(
+            xWELL(xwellProxy).owner(),
+            proxyAdmin,
+            "Ethereum: xWELL owner is incorrect (should be PROXY_ADMIN)"
+        );
+
+        assertEq(
+            xWELL(xwellProxy).pendingOwner(),
+            address(0),
+            "Ethereum: xWELL pending owner should be address(0)"
+        );
+
+        // Validate pause guardian (PROXY_ADMIN on Ethereum)
+        assertEq(
+            xWELL(xwellProxy).pauseGuardian(),
+            addresses.getAddress("PAUSE_GUARDIAN"),
+            "Ethereum: pause guardian is incorrect (should be PAUSE_GUARDIAN)"
+        );
+
+        // Validate pause duration
+        assertEq(
+            xWELL(xwellProxy).pauseDuration(),
+            ETH_XWELL_PAUSE_DURATION,
+            "Ethereum: pause duration is incorrect"
+        );
+
+        // Validate rate limits
+        assertEq(
+            xWELL(xwellProxy).rateLimitPerSecond(wormholeAdapter),
+            ETH_XWELL_RATE_LIMIT_PER_SECOND,
+            "Ethereum: rateLimitPerSecond is incorrect"
+        );
+
+        // Validate buffer cap
+        assertEq(
+            xWELL(xwellProxy).bufferCap(wormholeAdapter),
+            ETH_XWELL_BUFFER_CAP,
+            "Ethereum: bufferCap is incorrect"
+        );
+
+        // Validate trusted senders (should trust Moonbeam, Base, and Optimism wormhole adapters)
+        assertTrue(
+            WormholeBridgeAdapter(wormholeAdapter).isTrustedSender(
+                MOONBEAM_WORMHOLE_CHAIN_ID,
+                moonbeamWormholeAdapter
+            ),
+            "Ethereum: Moonbeam wormhole adapter not trusted"
+        );
+
+        assertTrue(
+            WormholeBridgeAdapter(wormholeAdapter).isTrustedSender(
+                BASE_WORMHOLE_CHAIN_ID,
+                baseWormholeAdapter
+            ),
+            "Ethereum: Base wormhole adapter not trusted"
+        );
+
+        assertTrue(
+            WormholeBridgeAdapter(wormholeAdapter).isTrustedSender(
+                OPTIMISM_WORMHOLE_CHAIN_ID,
+                optimismWormholeAdapter
+            ),
+            "Ethereum: Optimism wormhole adapter not trusted"
+        );
+
+        // Validate proxy admin is admin of xWELL proxy
+        assertEq(
+            ProxyAdmin(proxyAdmin).getProxyAdmin(
+                ITransparentUpgradeableProxy(xwellProxy)
+            ),
+            proxyAdmin,
+            "Ethereum: ProxyAdmin is not admin of xWELL proxy"
+        );
+
+        // Validate proxy admin is admin of wormhole adapter proxy
+        assertEq(
+            ProxyAdmin(proxyAdmin).getProxyAdmin(
+                ITransparentUpgradeableProxy(wormholeAdapter)
+            ),
+            proxyAdmin,
+            "Ethereum: ProxyAdmin is not admin of wormhole adapter proxy"
+        );
+
+        // Validate stkWELL deployment
+        assertEq(
+            address(IStakedWell(stkWellProxy).STAKED_TOKEN()),
+            xwellProxy,
+            "Ethereum: stkWELL staked token should be xWELL"
+        );
+
+        assertEq(
+            address(IStakedWell(stkWellProxy).REWARD_TOKEN()),
+            xwellProxy,
+            "Ethereum: stkWELL reward token should be xWELL"
+        );
+
+        assertEq(
+            IStakedWell(stkWellProxy).COOLDOWN_SECONDS(),
+            ETH_STKWELL_COOLDOWN_SECONDS,
+            "Ethereum: stkWELL cooldown seconds is incorrect"
+        );
+
+        assertEq(
+            IStakedWell(stkWellProxy).UNSTAKE_WINDOW(),
+            ETH_STKWELL_UNSTAKE_WINDOW,
+            "Ethereum: stkWELL unstake window is incorrect"
+        );
+
+        assertEq(
+            address(IStakedWell(stkWellProxy).REWARDS_VAULT()),
+            ecosystemReserveProxy,
+            "Ethereum: stkWELL rewards vault should be ecosystem reserve"
+        );
+
+        assertEq(
+            IStakedWell(stkWellProxy).EMISSION_MANAGER(),
+            proxyAdmin,
+            "Ethereum: stkWELL emission manager should be PROXY_ADMIN"
+        );
+
+        // Validate proxy admin is admin of stkWELL proxy
+        assertEq(
+            ProxyAdmin(proxyAdmin).getProxyAdmin(
+                ITransparentUpgradeableProxy(stkWellProxy)
+            ),
+            proxyAdmin,
+            "Ethereum: ProxyAdmin is not admin of stkWELL proxy"
+        );
+
+        // Validate proxy admin is admin of ecosystem reserve proxy
+        assertEq(
+            ProxyAdmin(proxyAdmin).getProxyAdmin(
+                ITransparentUpgradeableProxy(ecosystemReserveProxy)
+            ),
+            proxyAdmin,
+            "Ethereum: ProxyAdmin is not admin of ecosystem reserve proxy"
+        );
     }
 }

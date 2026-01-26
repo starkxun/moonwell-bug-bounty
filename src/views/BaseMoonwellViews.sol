@@ -10,8 +10,6 @@ import {Well} from "@protocol/governance/Well.sol";
 import {IERC20} from "@protocol/governance/IERC20.sol";
 import {MErc20Interface} from "@protocol/MTokenInterfaces.sol";
 import {UniswapV2PairInterface} from "@protocol/views/UniswapV2PairInterface.sol";
-import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
-import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 
 /**
  * @title Moonwell Views Contract

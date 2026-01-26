@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.19;
-pragma experimental ABIEncoderV2;
 
 import {console} from "@forge-std/console.sol";
 import {Script} from "@forge-std/Script.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-import "@forge-std/Test.sol";
+import {Test} from "@forge-std/Test.sol";
 
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MorphoViewsV2} from "@protocol/views/MorphoViewsV2.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-
-import {console} from "@forge-std/console.sol";
 
 /*
 to run:

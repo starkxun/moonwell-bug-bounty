@@ -4,7 +4,6 @@ pragma solidity 0.8.19;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {MToken} from "@protocol/MToken.sol";
-import {IERC20} from "@protocol/governance/IERC20.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 

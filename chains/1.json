@@ -1,0 +1,12 @@
+[
+    {
+        "addr": "0x27428DD2d3DD32A4D7f7C497eAaa23130d894911",
+        "isContract": true,
+        "name": "WORMHOLE_BRIDGE_RELAYER_PROXY"
+    },
+    {
+        "addr": "0xdDbf679d6332d9E5b409865b9671d1927255B52A",
+        "isContract": false,
+        "name": "PAUSE_GUARDIAN"
+    }
+]

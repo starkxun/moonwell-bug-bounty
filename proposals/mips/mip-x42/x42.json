@@ -15,7 +15,7 @@
             },
             {
                 "collateralFactor": -1,
-                "irm": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X41",
+                "irm": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X42",
                 "market": "MOONWELL_cbBTC",
                 "reserveFactor": -1
             }
@@ -26,7 +26,7 @@
                 "jumpMultiplierPerYear": 2e18,
                 "kink": 0.45e18,
                 "multiplierPerYear": 0.0615e18,
-                "name": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X41"
+                "name": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X42"
             }
         ]
     },
@@ -34,19 +34,19 @@
         "markets": [
             {
                 "collateralFactor": -1,
-                "irm": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X41",
+                "irm": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X42",
                 "market": "MOONWELL_USDT0",
                 "reserveFactor": -1
             },
             {
                 "collateralFactor": -1,
-                "irm": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X41",
+                "irm": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X42",
                 "market": "MOONWELL_USDC",
                 "reserveFactor": -1
             },
             {
                 "collateralFactor": -1,
-                "irm": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X41",
+                "irm": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X42",
                 "market": "MOONWELL_USDT",
                 "reserveFactor": -1
             }
@@ -57,7 +57,7 @@
                 "jumpMultiplierPerYear": 9e18,
                 "kink": 0.9e18,
                 "multiplierPerYear": 0.0615e18,
-                "name": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X41"
+                "name": "JUMP_RATE_IRM_MOONWELL_USDC_USDT_USDT0_MIP_X42"
             }
         ]
     }

@@ -24,12 +24,10 @@ contract StakedWellIntegrationTest is PostProposalCheck {
         address(uint160(uint256(keccak256(abi.encodePacked("STAKER_2")))));
 
     function setUp() public override {
-        uint256 primaryForkId = vm.envUint("PRIMARY_FORK_ID");
-
         super.setUp();
 
         // Moonbeam
-        vm.selectFork(primaryForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
         stkWellMoonbeam = IStakedWell(
             addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
@@ -54,13 +52,13 @@ contract StakedWellIntegrationTest is PostProposalCheck {
         );
         vm.makePersistent(address(stkWellEthereum));
 
-        vm.selectFork(primaryForkId);
+        vm.selectFork(MOONBEAM_FORK_ID);
     }
 
     /// ========== Moonbeam Tests ========== ///
 
     function testMoonbeamInitializeV2WasCalled() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         (bool success, bytes memory data) = address(stkWellMoonbeam).staticcall(
             abi.encodeWithSignature("defaultSnapshotTimestamp()")
@@ -76,7 +74,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamGovernorUsesTimestamps() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         assertTrue(
             governor.useTimestamps(),
@@ -85,7 +83,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamBasicFunctionalityWorks() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // Verify basic view functions work
         assertGt(
@@ -109,7 +107,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamContractUpgraded() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // Verify contract has been upgraded by checking for V2 specific functionality
         // defaultSnapshotTimestamp only exists in V2
@@ -123,7 +121,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamVotingPowerPreservedForOldStakers() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // Create a mock staker
         uint256 stakeAmount = 1000e18;
@@ -156,7 +154,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamCanVoteOnProposalWithStkWellPower() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // Create a mock staker
         uint256 stakeAmount = 1000e18;
@@ -193,7 +191,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamProperSnapshotTimestampRequired() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // Create a mock staker
         uint256 stakeAmount = 1000e18;
@@ -219,7 +217,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     }
 
     function testMoonbeamDefaultSnapshotTimestampForV1Stakers() public {
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
 
         // Get the default snapshot timestamp
         (bool success, bytes memory data) = address(stkWellMoonbeam).staticcall(
@@ -809,7 +807,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
     function testAllChainsHavePositiveTotalSupply() public {
         // Verify all chains have staked tokens (totalSupply > 0)
         // Note: Ethereum may have 0 supply if freshly deployed
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
         uint256 moonbeamSupply = stkWellMoonbeam.totalSupply();
         assertGt(moonbeamSupply, 0, "Moonbeam should have positive supply");
 
@@ -828,7 +826,7 @@ contract StakedWellIntegrationTest is PostProposalCheck {
 
     function testAllChainsUseSameInterface() public {
         // Verify all chains respond to the same core functions
-        vm.selectFork(vm.envUint("PRIMARY_FORK_ID"));
+        vm.selectFork(MOONBEAM_FORK_ID);
         stkWellMoonbeam.totalSupply();
         stkWellMoonbeam.COOLDOWN_SECONDS();
 

@@ -48,6 +48,109 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
     uint256 public constant ETH_STKWELL_UNSTAKE_WINDOW = 172800; // onchain value on base
     uint128 public constant ETH_STKWELL_DISTRIBUTION_END = 4864764777; // onchain value on base
 
+    /// @notice Deploy xWELL system with nonce management to match Base address
+    /// @dev Burns nonces until we reach the correct nonce to deploy xWELL_PROXY
+    ///      at the same address as on Base
+    /// @param addresses The addresses contract for loading Base xWELL_PROXY address
+    /// @param proxyAdmin The proxy admin address to use
+    /// @return xwellLogic The xWELL logic contract address
+    /// @return xwellProxy The xWELL proxy address (will match Base)
+    /// @return wormholeAdapterLogic The wormhole adapter logic address
+    /// @return wormholeAdapter The wormhole adapter proxy address
+    function _deployXWellSystemWithNonceMatching(
+        Addresses addresses,
+        address proxyAdmin
+    )
+        private
+        returns (
+            address xwellLogic,
+            address xwellProxy,
+            address wormholeAdapterLogic,
+            address wormholeAdapter
+        )
+    {
+        // Load target xWELL_PROXY address from Base
+        address targetXwellProxy = addresses.getAddress(
+            "xWELL_PROXY",
+            BASE_CHAIN_ID
+        );
+
+        // Get deployer address from private key
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+        console.log("Deployer address:", deployer);
+
+        uint256 currentNonce = vm.getNonce(deployer);
+
+        // Calculate which nonce will produce the xWELL_PROXY
+        // deployWellSystem deploys in order:
+        //   nonce N:   xwellLogic
+        //   nonce N+1: wormholeAdapterLogic
+        //   nonce N+2: xwellProxy (this is the one we need to match)
+        //   nonce N+3: wormholeAdapter
+        // So we need to find the starting nonce N such that N+2 produces targetXwellProxy
+
+        // Search for the target nonce (try nonces from current up to a reasonable max)
+        uint256 targetStartNonce = type(uint256).max;
+        for (uint256 n = currentNonce; n < currentNonce + 1000; n++) {
+            address predicted = vm.computeCreateAddress(deployer, n + 2);
+            if (predicted == targetXwellProxy) {
+                targetStartNonce = n;
+                break;
+            }
+        }
+
+        require(
+            targetStartNonce != type(uint256).max,
+            "Could not find nonce that produces target xWELL_PROXY address within search range"
+        );
+
+        console.log("Target xWELL_PROXY (from Base):", targetXwellProxy);
+
+        // Burn nonces if needed
+        if (currentNonce < targetStartNonce) {
+            uint256 noncesToBurn = targetStartNonce - currentNonce;
+
+            for (uint256 i = 0; i < noncesToBurn; i++) {
+                // Self-transfer with 0 value - cheapest tx at 21000 gas
+                (bool success, ) = deployer.call{value: 0}("");
+                require(success, "Nonce burn failed");
+            }
+
+            console.log("Nonces burned. New nonce:", vm.getNonce(deployer));
+        }
+
+        // Final verification before deployment
+        uint256 finalNonce = vm.getNonce(deployer);
+        address predictedXwellProxy = vm.computeCreateAddress(
+            deployer,
+            finalNonce + 2
+        );
+        require(
+            predictedXwellProxy == targetXwellProxy,
+            "Predicted xWELL_PROXY address does not match Base"
+        );
+
+        console.log(
+            "Verified: xWELL_PROXY will deploy to:",
+            predictedXwellProxy
+        );
+
+        // Now deploy the xWELL system
+        (
+            xwellLogic,
+            xwellProxy,
+            wormholeAdapterLogic,
+            wormholeAdapter
+        ) = deployWellSystem(proxyAdmin);
+
+        // Final sanity check
+        require(
+            xwellProxy == targetXwellProxy,
+            "Deployed xWELL_PROXY address does not match Base"
+        );
+    }
+
     function run() public {
         Addresses addresses = new Addresses();
 
@@ -84,7 +187,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
                 address _xwellProxy,
                 address wormholeAdapterLogic,
                 address wormholeAdapter
-            ) = deployWellSystem(proxyAdmin);
+            ) = _deployXWellSystemWithNonceMatching(addresses, proxyAdmin);
 
             xwellProxy = _xwellProxy;
 

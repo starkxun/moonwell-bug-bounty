@@ -6,80 +6,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
-
-/// @notice Interface for Morpho Vault V2 (adapter-based architecture)
-interface IMorphoVaultV2 {
-    function name() external view returns (string memory);
-    function symbol() external view returns (string memory);
-    function asset() external view returns (address);
-    function totalAssets() external view returns (uint256);
-    function totalSupply() external view returns (uint256);
-    function decimals() external view returns (uint8);
-    function owner() external view returns (address);
-    function curator() external view returns (address);
-    function adapterRegistry() external view returns (address);
-    function adaptersLength() external view returns (uint256);
-    function adapters(uint256 index) external view returns (address);
-    function balanceOf(address account) external view returns (uint256);
-    function convertToAssets(uint256 shares) external view returns (uint256);
-    function convertToShares(uint256 assets) external view returns (uint256);
-}
-
-/// @notice Interface for Vault V2 Adapters
-interface IVaultV2Adapter {
-    function realAssets() external view returns (uint256);
-    function morphoVaultV1() external view returns (address);
-}
-
-/// @notice Interface for MetaMorpho (underlying vault)
-interface IMetaMorpho {
-    function MORPHO() external view returns (address);
-    function asset() external view returns (address);
-    function totalAssets() external view returns (uint256);
-    function totalSupply() external view returns (uint256);
-    function fee() external view returns (uint96);
-    function timelock() external view returns (uint256);
-    function withdrawQueueLength() external view returns (uint256);
-    function withdrawQueue(uint256 index) external view returns (bytes32);
-    function name() external view returns (string memory);
-    function symbol() external view returns (string memory);
-}
-
-/// @notice Market parameters used by Morpho Blue
-struct MorphoMarketParams {
-    address loanToken;
-    address collateralToken;
-    address oracle;
-    address irm;
-    uint256 lltv;
-}
-
-/// @notice Market state in Morpho Blue
-struct MorphoMarket {
-    uint128 totalSupplyAssets;
-    uint128 totalSupplyShares;
-    uint128 totalBorrowAssets;
-    uint128 totalBorrowShares;
-    uint128 lastUpdate;
-    uint128 fee;
-}
-
-/// @notice Interface for Morpho Blue
-interface IMorphoBlue {
-    function idToMarketParams(
-        bytes32 id
-    ) external view returns (MorphoMarketParams memory);
-
-    function market(bytes32 id) external view returns (MorphoMarket memory);
-}
-
-/// @notice Interface for IRM (Interest Rate Model)
-interface IIrm {
-    function borrowRateView(
-        MorphoMarketParams memory marketParams,
-        MorphoMarket memory market
-    ) external view returns (uint256);
-}
+import {IMorphoVaultV2, IVaultV2Adapter, IMetaMorphoV2, IMorphoBlueV2, IIrmV2, MorphoMarketParams, MorphoMarket} from "@protocol/morpho/IMorphoVaultV2.sol";
 
 /**
  * @title Moonwell Morpho Vault V2 Views Contract
@@ -285,7 +212,7 @@ contract MorphoVaultV2Views is Initializable {
         try adapter.morphoVaultV1() returns (address underlyingVault) {
             info.underlyingVault = underlyingVault;
             if (underlyingVault != address(0)) {
-                IMetaMorpho metaMorpho = IMetaMorpho(underlyingVault);
+                IMetaMorphoV2 metaMorpho = IMetaMorphoV2(underlyingVault);
                 info.underlyingVaultName = metaMorpho.name();
                 info.underlyingVaultTotalAssets = metaMorpho.totalAssets();
                 info.underlyingVaultFee = metaMorpho.fee();
@@ -306,13 +233,13 @@ contract MorphoVaultV2Views is Initializable {
     /// @param _metaMorpho The MetaMorpho vault
     /// @return markets Array of underlying market information
     function _getUnderlyingMarkets(
-        IMetaMorpho _metaMorpho
+        IMetaMorphoV2 _metaMorpho
     ) internal view returns (UnderlyingMarketInfo[] memory markets) {
         uint256 marketsCount = _metaMorpho.withdrawQueueLength();
         markets = new UnderlyingMarketInfo[](marketsCount);
 
         address morphoBlue = _metaMorpho.MORPHO();
-        IMorphoBlue morpho = IMorphoBlue(morphoBlue);
+        IMorphoBlueV2 morpho = IMorphoBlueV2(morphoBlue);
 
         for (uint256 i = 0; i < marketsCount; i++) {
             bytes32 marketId = _metaMorpho.withdrawQueue(i);
@@ -328,7 +255,7 @@ contract MorphoVaultV2Views is Initializable {
     /// @return info Market information
     function _getMarketInfo(
         bytes32 _marketId,
-        IMorphoBlue _morpho
+        IMorphoBlueV2 _morpho
     ) internal view returns (UnderlyingMarketInfo memory info) {
         info.marketId = _marketId;
 
@@ -382,7 +309,7 @@ contract MorphoVaultV2Views is Initializable {
         }
 
         // Get borrow rate from IRM
-        try IIrm(params.irm).borrowRateView(params, market) returns (
+        try IIrmV2(params.irm).borrowRateView(params, market) returns (
             uint256 borrowRate
         ) {
             // Convert rate per second to APY
@@ -468,7 +395,7 @@ contract MorphoVaultV2Views is Initializable {
             address underlyingVault
         ) {
             if (underlyingVault != address(0)) {
-                IMetaMorpho metaMorpho = IMetaMorpho(underlyingVault);
+                IMetaMorphoV2 metaMorpho = IMetaMorphoV2(underlyingVault);
                 return (
                     underlyingVault,
                     metaMorpho.totalAssets(),

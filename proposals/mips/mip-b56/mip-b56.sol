@@ -166,16 +166,7 @@ contract mipb56 is HybridProposal, Configs {
             "Add Anthias as allocator for cbBTC vault"
         );
 
-        // Add Anthias EOA as allocator for meUSDC vault
-        _pushAction(
-            addresses.getAddress("meUSDC_METAMORPHO_VAULT"),
-            abi.encodeWithSignature(
-                "setIsAllocator(address,bool)",
-                anthiasAllocator,
-                true
-            ),
-            "Add Anthias as allocator for meUSDC vault"
-        );
+        // Note: meUSDC already has Anthias EOA as allocator (set in MIP-B49)
     }
 
     function teardown(Addresses, address) public pure override {}

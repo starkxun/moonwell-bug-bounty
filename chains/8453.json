@@ -1303,5 +1303,15 @@
         "addr": "0xbB2F06CeAE42CBcF5559Ed0713538c8892D977c9",
         "isContract": true,
         "name": "MORPHO_meUSDC_VAULT_V2"
+    },
+    {
+        "addr": "0x4D12405e5B52b6607e7102e83382179EDD684C46",
+        "isContract": true,
+        "name": "MORPHO_VAULT_V2_VIEWS_IMPLEMENTATION"
+    },
+    {
+        "addr": "0x8D189997ccD6ab6909eF89836e5bcEf94599Cce0",
+        "isContract": true,
+        "name": "MORPHO_VAULT_V2_VIEWS_PROXY"
     }
 ]

@@ -7,7 +7,6 @@ import {Test} from "@forge-std/Test.sol";
 
 import {MorphoVaultV2Views} from "@protocol/views/MorphoVaultV2Views.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
 contract DeployMorphoVaultV2Views is Script, Test {
@@ -16,11 +15,11 @@ contract DeployMorphoVaultV2Views is Script, Test {
     function setUp() public {
         addresses = new Addresses();
     }
-
     function run() public {
         vm.startBroadcast();
 
         address unitroller = addresses.getAddress("UNITROLLER");
+        address proxyAdmin = addresses.getAddress("MOONWELL_VIEWS_PROXY_ADMIN");
 
         // Deploy implementation
         MorphoVaultV2Views viewsImplementation = new MorphoVaultV2Views();
@@ -29,20 +28,16 @@ contract DeployMorphoVaultV2Views is Script, Test {
             address(viewsImplementation)
         );
 
-        // Deploy proxy admin
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-        console.log("ProxyAdmin deployed at:", address(proxyAdmin));
-
         // Encode initialization data
         bytes memory initData = abi.encodeWithSignature(
             "initialize(address)",
             unitroller
         );
 
-        // Deploy proxy
+        // Deploy proxy with existing ProxyAdmin
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(viewsImplementation),
-            address(proxyAdmin),
+            proxyAdmin,
             initData
         );
         console.log("MorphoVaultV2Views Proxy deployed at:", address(proxy));

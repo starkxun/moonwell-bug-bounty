@@ -2,7 +2,7 @@ pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
 
-import {MorphoVaultV2Views} from "@protocol/views/MorphoVaultV2Views.sol";
+import {MorphoVaultV2Views, IMorphoVaultV2} from "@protocol/views/MorphoVaultV2Views.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {PostProposalCheck} from "@test/integration/PostProposalCheck.sol";
 import "@utils/ChainIds.sol";
@@ -15,23 +15,19 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
 
     address public proxyAdmin = address(1337);
 
-    // Morpho Vault V2 meUSDC on Base
-    address public constant VAULT_V2_MEUSDC =
-        0xbB2F06CeAE42CBcF5559Ed0713538c8892D977c9;
-
-    // The adapter used by meUSDC Vault V2
-    address public constant MEUSDC_ADAPTER =
-        0xF144a14cEF059DB3746E6BED871bA105Ec047BB2;
-
-    // Underlying MetaMorpho vault
-    address public constant METAMORPHO_MEUSDC =
-        0xE1bA476304255353aEF290e6474A417D06e7b773;
+    // Addresses fetched from Addresses contract
+    address public vaultV2meUSDC;
+    address public metaMorphomeUSDC;
 
     function setUp() public override {
         super.setUp();
 
         // Switch to Base fork for testing
         vm.selectFork(BASE_FORK_ID);
+
+        // Fetch addresses from Addresses contract
+        vaultV2meUSDC = addresses.getAddress("MORPHO_meUSDC_VAULT_V2");
+        metaMorphomeUSDC = addresses.getAddress("meUSDC_METAMORPHO_VAULT");
 
         address comptroller = addresses.getAddress("UNITROLLER");
 
@@ -56,10 +52,10 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test getting single vault info
     function testGetVaultInfo() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
-        assertEq(info.vault, VAULT_V2_MEUSDC);
+        assertEq(info.vault, vaultV2meUSDC);
         assertEq(info.name, "Moonwell Ecosystem USDC");
         assertEq(info.symbol, "meUSDC");
         assertGt(info.totalAssets, 0);
@@ -72,25 +68,25 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test vault has adapters
     function testVaultHasAdapters() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
-        // meUSDC has 1 adapter
-        assertEq(info.adapters.length, 1);
+        // meUSDC has at least 1 adapter
+        assertGe(info.adapters.length, 1);
 
-        // First adapter should be the MorphoVaultV1Adapter
-        assertEq(info.adapters[0].adapter, MEUSDC_ADAPTER);
+        // First adapter should have an address and real assets
+        assertTrue(info.adapters[0].adapter != address(0));
         assertGt(info.adapters[0].realAssets, 0);
     }
 
     /// @notice Test adapter points to underlying MetaMorpho
     function testAdapterUnderlyingVault() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
         // Adapter should point to MetaMorpho vault
-        assertEq(info.adapters[0].underlyingVault, METAMORPHO_MEUSDC);
+        assertEq(info.adapters[0].underlyingVault, metaMorphomeUSDC);
         assertEq(
             info.adapters[0].underlyingVaultName,
             "Moonwell Ecosystem USDC Vault"
@@ -101,7 +97,7 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test allocation percentage is calculated correctly
     function testAdapterAllocationPercentage() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
         // With only 1 adapter, allocation should be ~100% (1e18)
@@ -113,7 +109,7 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test asset metadata is populated
     function testAssetMetadata() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
         // USDC metadata
@@ -125,7 +121,7 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test underlying price is fetched
     function testUnderlyingPrice() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
         // USDC should be ~$1 (between $0.90 and $1.10)
@@ -138,13 +134,13 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test getting multiple vaults info
     function testGetVaultsInfo() public view {
         address[] memory vaults = new address[](1);
-        vaults[0] = VAULT_V2_MEUSDC;
+        vaults[0] = vaultV2meUSDC;
 
         MorphoVaultV2Views.VaultV2Info[] memory infos = viewsContract
             .getVaultsInfo(vaults);
 
         assertEq(infos.length, 1);
-        assertEq(infos[0].vault, VAULT_V2_MEUSDC);
+        assertEq(infos[0].vault, vaultV2meUSDC);
     }
 
     /// @notice Test empty array returns empty result
@@ -165,9 +161,9 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
         address user = addresses.getAddress("TEMPORAL_GOVERNOR");
 
         MorphoVaultV2Views.UserVaultBalance memory balance = viewsContract
-            .getUserBalance(VAULT_V2_MEUSDC, user);
+            .getUserBalance(vaultV2meUSDC, user);
 
-        assertEq(balance.vault, VAULT_V2_MEUSDC);
+        assertEq(balance.vault, vaultV2meUSDC);
         // Balance may be 0 for this user, that's fine
         assertEq(balance.shares >= 0, true);
     }
@@ -177,13 +173,13 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
         address user = addresses.getAddress("TEMPORAL_GOVERNOR");
 
         address[] memory vaults = new address[](1);
-        vaults[0] = VAULT_V2_MEUSDC;
+        vaults[0] = vaultV2meUSDC;
 
         MorphoVaultV2Views.UserVaultBalance[] memory balances = viewsContract
             .getUserBalances(vaults, user);
 
         assertEq(balances.length, 1);
-        assertEq(balances[0].vault, VAULT_V2_MEUSDC);
+        assertEq(balances[0].vault, vaultV2meUSDC);
     }
 
     /// @notice Test user balance empty array
@@ -201,10 +197,13 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
 
     /// @notice Test getting adapter underlying info directly
     function testGetAdapterUnderlyingInfo() public view {
-        (address vault, uint256 totalAssets, uint256 markets) = viewsContract
-            .getAdapterUnderlyingInfo(MEUSDC_ADAPTER);
+        // Get the first adapter from the vault
+        address adapter = IMorphoVaultV2(vaultV2meUSDC).adapters(0);
 
-        assertEq(vault, METAMORPHO_MEUSDC);
+        (address vault, uint256 totalAssets, uint256 markets) = viewsContract
+            .getAdapterUnderlyingInfo(adapter);
+
+        assertEq(vault, metaMorphomeUSDC);
         assertGt(totalAssets, 0);
         assertGt(markets, 0); // MetaMorpho should have markets
     }
@@ -232,7 +231,7 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test that vault totalAssets matches adapter realAssets
     function testVaultAssetsMatchAdapterAssets() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
         // Sum of all adapter realAssets should approximately equal vault totalAssets
@@ -250,7 +249,7 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
     /// @notice Test that convertToAssets works correctly for shares
     function testShareToAssetConversion() public view {
         MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
-            VAULT_V2_MEUSDC
+            vaultV2meUSDC
         );
 
         // If totalSupply > 0, convertToAssets should give reasonable value

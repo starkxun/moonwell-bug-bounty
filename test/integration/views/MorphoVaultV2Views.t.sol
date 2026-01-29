@@ -260,4 +260,123 @@ contract MorphoVaultV2ViewsTest is PostProposalCheck {
             assertGt(assetsPerShare, 0);
         }
     }
+
+    // ==================== UNDERLYING VAULT DATA TESTS ====================
+
+    /// @notice Test underlying vault fee is returned
+    function testUnderlyingVaultFee() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // Fee should be a valid percentage (0-100% = 0-1e18)
+        // MetaMorpho fees are typically 0-15%
+        assertLe(info.adapters[0].underlyingVaultFee, 0.15e18);
+    }
+
+    /// @notice Test underlying vault timelock is returned
+    function testUnderlyingVaultTimelock() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // Timelock can be 0 or any positive value
+        // Just verify it doesn't revert
+        assertTrue(info.adapters[0].underlyingVaultTimelock >= 0);
+    }
+
+    /// @notice Test underlying markets are returned
+    function testUnderlyingMarketsExist() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // MetaMorpho vault should have at least 1 underlying market
+        assertGt(info.adapters[0].underlyingMarkets.length, 0);
+    }
+
+    /// @notice Test underlying market data is populated
+    function testUnderlyingMarketData() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // Get first market from first adapter
+        MorphoVaultV2Views.UnderlyingMarketInfo memory market = info
+            .adapters[0]
+            .underlyingMarkets[0];
+
+        // Market ID should be non-zero
+        assertTrue(market.marketId != bytes32(0));
+
+        // LLTV should be a valid percentage (typically 0-100% = 0-1e18)
+        assertLe(market.marketLltv, 1e18);
+    }
+
+    /// @notice Test market collateral info is populated
+    function testMarketCollateralInfo() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // Get first market from first adapter
+        MorphoVaultV2Views.UnderlyingMarketInfo memory market = info
+            .adapters[0]
+            .underlyingMarkets[0];
+
+        // Collateral token should have a valid address (or be address(0) for idle market)
+        // If collateral exists, it should have name and symbol
+        if (market.collateralToken != address(0)) {
+            assertTrue(bytes(market.collateralName).length > 0);
+            assertTrue(bytes(market.collateralSymbol).length > 0);
+        }
+    }
+
+    /// @notice Test market APYs are reasonable
+    function testMarketApys() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // Check all markets have reasonable APYs
+        for (
+            uint256 i = 0;
+            i < info.adapters[0].underlyingMarkets.length;
+            i++
+        ) {
+            MorphoVaultV2Views.UnderlyingMarketInfo memory market = info
+                .adapters[0]
+                .underlyingMarkets[i];
+
+            // Supply APY should be less than 1000% (10e18)
+            assertLt(market.marketSupplyApy, 10e18);
+
+            // Borrow APY should be less than 1000% (10e18)
+            assertLt(market.marketBorrowApy, 10e18);
+
+            // Supply APY should be <= Borrow APY (suppliers earn less than borrowers pay)
+            assertLe(market.marketSupplyApy, market.marketBorrowApy);
+        }
+    }
+
+    /// @notice Test market liquidity is calculated
+    function testMarketLiquidity() public view {
+        MorphoVaultV2Views.VaultV2Info memory info = viewsContract.getVaultInfo(
+            vaultV2meUSDC
+        );
+
+        // At least one market should have liquidity
+        bool hasLiquidity = false;
+        for (
+            uint256 i = 0;
+            i < info.adapters[0].underlyingMarkets.length;
+            i++
+        ) {
+            if (info.adapters[0].underlyingMarkets[i].marketLiquidity > 0) {
+                hasLiquidity = true;
+                break;
+            }
+        }
+        assertTrue(hasLiquidity, "At least one market should have liquidity");
+    }
 }

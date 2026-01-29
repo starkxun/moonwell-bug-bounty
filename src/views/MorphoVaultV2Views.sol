@@ -45,6 +45,42 @@ interface IMetaMorpho {
     function symbol() external view returns (string memory);
 }
 
+/// @notice Market parameters used by Morpho Blue
+struct MorphoMarketParams {
+    address loanToken;
+    address collateralToken;
+    address oracle;
+    address irm;
+    uint256 lltv;
+}
+
+/// @notice Market state in Morpho Blue
+struct MorphoMarket {
+    uint128 totalSupplyAssets;
+    uint128 totalSupplyShares;
+    uint128 totalBorrowAssets;
+    uint128 totalBorrowShares;
+    uint128 lastUpdate;
+    uint128 fee;
+}
+
+/// @notice Interface for Morpho Blue
+interface IMorphoBlue {
+    function idToMarketParams(
+        bytes32 id
+    ) external view returns (MorphoMarketParams memory);
+
+    function market(bytes32 id) external view returns (MorphoMarket memory);
+}
+
+/// @notice Interface for IRM (Interest Rate Model)
+interface IIrm {
+    function borrowRateView(
+        MorphoMarketParams memory marketParams,
+        MorphoMarket memory market
+    ) external view returns (uint256);
+}
+
 /**
  * @title Moonwell Morpho Vault V2 Views Contract
  * @author Moonwell
@@ -52,12 +88,27 @@ interface IMetaMorpho {
  * @dev This contract provides read-only views for Vault V2 vaults that use adapters
  */
 contract MorphoVaultV2Views is Initializable {
+    uint256 constant WAD = 1e18;
+    uint256 constant SECONDS_PER_YEAR = 365 days;
+
     /// @notice User balance in a Vault V2
     struct UserVaultBalance {
         address vault;
         uint256 shares;
         uint256 assets;
         uint256 assetValue; // USD value with 18 decimals
+    }
+
+    /// @notice Underlying market information from MetaMorpho
+    struct UnderlyingMarketInfo {
+        bytes32 marketId;
+        address collateralToken;
+        string collateralName;
+        string collateralSymbol;
+        uint256 marketLiquidity;
+        uint256 marketLltv;
+        uint256 marketSupplyApy;
+        uint256 marketBorrowApy;
     }
 
     /// @notice Adapter information
@@ -67,7 +118,10 @@ contract MorphoVaultV2Views is Initializable {
         address underlyingVault; // MetaMorpho vault if MorphoVaultV1Adapter
         string underlyingVaultName;
         uint256 underlyingVaultTotalAssets;
+        uint256 underlyingVaultFee;
+        uint256 underlyingVaultTimelock;
         uint256 allocationPercentage; // Percentage of vault assets in this adapter (18 decimals)
+        UnderlyingMarketInfo[] underlyingMarkets; // Markets from the underlying MetaMorpho vault
     }
 
     /// @notice Complete Vault V2 information
@@ -207,7 +261,7 @@ contract MorphoVaultV2Views is Initializable {
         return balances;
     }
 
-    /// @notice Get adapter information
+    /// @notice Get adapter information including underlying MetaMorpho data
     /// @param _adapter The adapter address
     /// @param _vaultTotalAssets Total assets of the parent vault (for percentage calculation)
     /// @return info Adapter information
@@ -234,6 +288,11 @@ contract MorphoVaultV2Views is Initializable {
                 IMetaMorpho metaMorpho = IMetaMorpho(underlyingVault);
                 info.underlyingVaultName = metaMorpho.name();
                 info.underlyingVaultTotalAssets = metaMorpho.totalAssets();
+                info.underlyingVaultFee = metaMorpho.fee();
+                info.underlyingVaultTimelock = metaMorpho.timelock();
+
+                // Get underlying markets from MetaMorpho
+                info.underlyingMarkets = _getUnderlyingMarkets(metaMorpho);
             }
         } catch {
             // Not a MorphoVaultV1Adapter or doesn't have this function
@@ -241,6 +300,119 @@ contract MorphoVaultV2Views is Initializable {
         }
 
         return info;
+    }
+
+    /// @notice Get underlying markets from a MetaMorpho vault
+    /// @param _metaMorpho The MetaMorpho vault
+    /// @return markets Array of underlying market information
+    function _getUnderlyingMarkets(
+        IMetaMorpho _metaMorpho
+    ) internal view returns (UnderlyingMarketInfo[] memory markets) {
+        uint256 marketsCount = _metaMorpho.withdrawQueueLength();
+        markets = new UnderlyingMarketInfo[](marketsCount);
+
+        address morphoBlue = _metaMorpho.MORPHO();
+        IMorphoBlue morpho = IMorphoBlue(morphoBlue);
+
+        for (uint256 i = 0; i < marketsCount; i++) {
+            bytes32 marketId = _metaMorpho.withdrawQueue(i);
+            markets[i] = _getMarketInfo(marketId, morpho);
+        }
+
+        return markets;
+    }
+
+    /// @notice Get market information from Morpho Blue
+    /// @param _marketId The market ID
+    /// @param _morpho The Morpho Blue contract
+    /// @return info Market information
+    function _getMarketInfo(
+        bytes32 _marketId,
+        IMorphoBlue _morpho
+    ) internal view returns (UnderlyingMarketInfo memory info) {
+        info.marketId = _marketId;
+
+        MorphoMarketParams memory params = _morpho.idToMarketParams(_marketId);
+        MorphoMarket memory market = _morpho.market(_marketId);
+
+        info.collateralToken = params.collateralToken;
+        info.marketLltv = params.lltv;
+
+        // Get collateral token metadata
+        if (params.collateralToken != address(0)) {
+            try IERC20Metadata(params.collateralToken).name() returns (
+                string memory name
+            ) {
+                info.collateralName = name;
+            } catch {}
+            try IERC20Metadata(params.collateralToken).symbol() returns (
+                string memory symbol
+            ) {
+                info.collateralSymbol = symbol;
+            } catch {}
+        }
+
+        // Calculate liquidity
+        if (market.totalSupplyAssets >= market.totalBorrowAssets) {
+            info.marketLiquidity =
+                market.totalSupplyAssets -
+                market.totalBorrowAssets;
+        }
+
+        // Calculate APYs
+        (info.marketSupplyApy, info.marketBorrowApy) = _calculateApys(
+            params,
+            market
+        );
+
+        return info;
+    }
+
+    /// @notice Calculate supply and borrow APYs for a market
+    /// @param params Market parameters
+    /// @param market Market state
+    /// @return supplyApy Supply APY (18 decimals)
+    /// @return borrowApy Borrow APY (18 decimals)
+    function _calculateApys(
+        MorphoMarketParams memory params,
+        MorphoMarket memory market
+    ) internal view returns (uint256 supplyApy, uint256 borrowApy) {
+        if (params.irm == address(0) || market.totalSupplyAssets == 0) {
+            return (0, 0);
+        }
+
+        // Get borrow rate from IRM
+        try IIrm(params.irm).borrowRateView(params, market) returns (
+            uint256 borrowRate
+        ) {
+            // Convert rate per second to APY
+            // borrowApy = (1 + borrowRate)^SECONDS_PER_YEAR - 1
+            // Simplified: borrowApy ≈ borrowRate * SECONDS_PER_YEAR (for small rates)
+            borrowApy = borrowRate * SECONDS_PER_YEAR;
+
+            // Calculate utilization
+            uint256 utilization = market.totalBorrowAssets > 0
+                ? (uint256(market.totalBorrowAssets) * WAD) /
+                    uint256(market.totalSupplyAssets)
+                : 0;
+
+            // Supply APY = Borrow APY * utilization * (1 - fee)
+            if (utilization > 0) {
+                supplyApy = _mulWad(
+                    _mulWad(borrowApy, utilization),
+                    WAD - uint256(market.fee)
+                );
+            }
+        } catch {
+            return (0, 0);
+        }
+
+        return (supplyApy, borrowApy);
+    }
+
+    /// @dev Multiply two WAD numbers
+    function _mulWad(uint256 a, uint256 b) internal pure returns (uint256) {
+        return (a * b) / WAD;
     }
 
     /// @notice Get Chainlink price from a feed

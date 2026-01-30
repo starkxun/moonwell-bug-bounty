@@ -1283,5 +1283,20 @@
         "addr": "0x98819cC6C48eE912508454b0f1f4e68BD35ca313",
         "isContract": true,
         "name": "CHAINLINK_RETH_ETH_EXCHANGE_RATE_ORACLE"
+    },
+    {
+        "addr": "0x24b53b15dca212d7ba6da287b5e2b801db37c24e",
+        "isContract": true,
+        "name": "MORPHO_VIEWS_V2_IMPLEMENTATION"
+    },
+    {
+        "addr": "0x7465c2cfa4a9ab6acaacbf8eaa28257f6a1d1486",
+        "isContract": true,
+        "name": "MORPHO_VIEWS_V2_PROXY_ADMIN"
+    },
+    {
+        "addr": "0x7fc0dbc713649b96e984b2a5935016d3a5d1ed31",
+        "isContract": true,
+        "name": "MORPHO_VIEWS_V2_PROXY"
     }
 ]

@@ -4,16 +4,86 @@ pragma solidity 0.8.19;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {MToken} from "@protocol/MToken.sol";
-import {IMorpho, IIrm, IOracle, MarketParams as MorphoMarketParams, Market as MorphoMarket, Id, Position as MorphoPosition} from "@protocol/views/MorphoBlueInterface.sol";
-import {IMetaMorpho} from "@protocol/views/MetaMorphoInterface.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 
+/// @notice Market parameters used by Morpho Blue
+struct MorphoMarketParams {
+    address loanToken;
+    address collateralToken;
+    address oracle;
+    address irm;
+    uint256 lltv;
+}
+
+/// @notice Market state in Morpho Blue
+struct MorphoMarket {
+    uint128 totalSupplyAssets;
+    uint128 totalSupplyShares;
+    uint128 totalBorrowAssets;
+    uint128 totalBorrowShares;
+    uint128 lastUpdate;
+    uint128 fee;
+}
+
+/// @notice Position state in Morpho Blue
+struct MorphoPosition {
+    uint256 supplyShares;
+    uint128 borrowShares;
+    uint128 collateral;
+}
+
+/// @notice Oracle interface for Morpho
+interface IOracle {
+    function price() external view returns (uint256);
+}
+
+/// @notice IRM interface for Morpho
+interface IIrm {
+    function borrowRateView(
+        MorphoMarketParams memory marketParams,
+        MorphoMarket memory market
+    ) external view returns (uint256);
+}
+
+/// @notice Morpho Blue interface (compatible with both V1 and V2)
+interface IMorphoBlue {
+    function idToMarketParams(
+        bytes32 id
+    ) external view returns (MorphoMarketParams memory);
+
+    function market(bytes32 id) external view returns (MorphoMarket memory m);
+
+    function position(
+        bytes32 id,
+        address user
+    ) external view returns (MorphoPosition memory p);
+
+    function extSloads(
+        bytes32[] memory slots
+    ) external view returns (bytes32[] memory);
+}
+
+/// @notice MetaMorpho V2 interface (uses bytes32 for market IDs)
+interface IMetaMorphoV2 {
+    function MORPHO() external view returns (address);
+    function asset() external view returns (address);
+    function fee() external view returns (uint96);
+    function timelock() external view returns (uint256);
+    function totalAssets() external view returns (uint256);
+    function totalSupply() external view returns (uint256);
+    function withdrawQueueLength() external view returns (uint256);
+    function withdrawQueue(uint256 index) external view returns (bytes32);
+    function supplyQueueLength() external view returns (uint256);
+    function supplyQueue(uint256 index) external view returns (bytes32);
+}
+
 /**
- * @title Moonwell Morpho Views Contract
+ * @title Moonwell Morpho Views V2 Contract
  * @author Moonwell
+ * @notice View contract compatible with MetaMorpho V2 vaults
  */
-contract MorphoViews is Initializable {
+contract MorphoViewsV2 is Initializable {
     uint256 constant WAD = 1e18;
     uint256 internal constant VIRTUAL_SHARES = 1e6;
     uint256 internal constant VIRTUAL_ASSETS = 1;
@@ -22,7 +92,7 @@ contract MorphoViews is Initializable {
     uint256 internal constant BORROW_SHARES_AND_COLLATERAL_OFFSET = 1;
 
     struct UserMarketBalance {
-        Id marketId;
+        bytes32 marketId;
         address collateralToken;
         uint collateralAssets;
         address loanToken;
@@ -31,7 +101,7 @@ contract MorphoViews is Initializable {
     }
 
     struct MorphoBlueMarket {
-        Id marketId;
+        bytes32 marketId;
         address collateralToken;
         string collateralName;
         string collateralSymbol;
@@ -55,7 +125,7 @@ contract MorphoViews is Initializable {
     }
 
     struct MorphoVaultMarketsInfo {
-        Id marketId;
+        bytes32 marketId;
         address marketCollateral;
         string marketCollateralName;
         string marketCollateralSymbol;
@@ -77,7 +147,7 @@ contract MorphoViews is Initializable {
     }
 
     Comptroller public comptroller;
-    IMorpho public morpho;
+    IMorphoBlue public morpho;
 
     /// construct the logic contract and initialize so that the initialize function is uncallable
     /// from the implementation and only callable from the proxy
@@ -102,7 +172,7 @@ contract MorphoViews is Initializable {
             "Cant bind to something thats not a comptroller!"
         );
 
-        morpho = IMorpho(_morpho);
+        morpho = IMorphoBlue(_morpho);
     }
 
     /// @dev Returns (`x` * `y`) / `WAD` rounded down.
@@ -303,11 +373,11 @@ contract MorphoViews is Initializable {
         }
     }
 
-    /// @notice A view to get a specific market info
+    /// @notice A view to get a specific market info for a V2 vault
     function getVaultMarketInfo(
-        Id _marketId,
-        IMorpho _morpho,
-        IMetaMorpho _vault
+        bytes32 _marketId,
+        IMorphoBlue _morpho,
+        IMetaMorphoV2 _vault
     ) external view returns (MorphoVaultMarketsInfo memory) {
         MorphoVaultMarketsInfo memory _market;
 
@@ -372,9 +442,9 @@ contract MorphoViews is Initializable {
         return _market;
     }
 
-    /// @notice A view to get a specific market info
+    /// @notice A view to get a specific V2 vault info
     function getVaultInfo(
-        IMetaMorpho _vault
+        IMetaMorphoV2 _vault
     ) external view returns (MorphoVault memory) {
         MorphoVault memory _result;
 
@@ -396,11 +466,14 @@ contract MorphoViews is Initializable {
             _vault.withdrawQueueLength()
         );
 
+        // Get the Morpho Blue instance from the vault
+        IMorphoBlue vaultMorpho = IMorphoBlue(_vault.MORPHO());
+
         for (uint index = 0; index < _result.markets.length; index++) {
-            Id _marketId = _vault.withdrawQueue(index);
+            bytes32 _marketId = _vault.withdrawQueue(index);
             _result.markets[index] = this.getVaultMarketInfo(
                 _marketId,
-                _vault.MORPHO(),
+                vaultMorpho,
                 _vault
             );
         }
@@ -408,7 +481,7 @@ contract MorphoViews is Initializable {
         return _result;
     }
 
-    /// @notice A view to return vaults config
+    /// @notice A view to return vaults config for V2 vaults
     function getVaultsInfo(
         address[] calldata morphoVaults
     ) external view returns (MorphoVault[] memory) {
@@ -416,7 +489,7 @@ contract MorphoViews is Initializable {
 
         for (uint256 index = 0; index < morphoVaults.length; index++) {
             _result[index] = this.getVaultInfo(
-                IMetaMorpho(morphoVaults[index])
+                IMetaMorphoV2(morphoVaults[index])
             );
         }
 
@@ -425,7 +498,7 @@ contract MorphoViews is Initializable {
 
     /// @notice A view to get a specific market info
     function getMorphoBlueMarketInfo(
-        Id _marketId
+        bytes32 _marketId
     ) external view returns (MorphoBlueMarket memory) {
         MorphoBlueMarket memory _result;
 
@@ -508,7 +581,7 @@ contract MorphoViews is Initializable {
 
     /// @notice A view to enumerate all market configs
     function getMorphoBlueMarketsInfo(
-        Id[] calldata _marketIds
+        bytes32[] calldata _marketIds
     ) external view returns (MorphoBlueMarket[] memory) {
         MorphoBlueMarket[] memory _result = new MorphoBlueMarket[](
             _marketIds.length
@@ -528,7 +601,7 @@ contract MorphoViews is Initializable {
     }
 
     function positionSupplySharesSlot(
-        Id id,
+        bytes32 id,
         address user
     ) internal pure returns (bytes32) {
         return
@@ -545,7 +618,7 @@ contract MorphoViews is Initializable {
     }
 
     function positionBorrowSharesAndCollateralSlot(
-        Id id,
+        bytes32 id,
         address user
     ) internal pure returns (bytes32) {
         return
@@ -561,19 +634,28 @@ contract MorphoViews is Initializable {
             );
     }
 
-    function supplyShares(Id id, address user) internal view returns (uint256) {
+    function supplyShares(
+        bytes32 id,
+        address user
+    ) internal view returns (uint256) {
         bytes32[] memory slot = _array(positionSupplySharesSlot(id, user));
         return uint256(morpho.extSloads(slot)[0]);
     }
 
-    function borrowShares(Id id, address user) internal view returns (uint256) {
+    function borrowShares(
+        bytes32 id,
+        address user
+    ) internal view returns (uint256) {
         bytes32[] memory slot = _array(
             positionBorrowSharesAndCollateralSlot(id, user)
         );
         return uint128(uint256(morpho.extSloads(slot)[0]));
     }
 
-    function collateral(Id id, address user) internal view returns (uint256) {
+    function collateral(
+        bytes32 id,
+        address user
+    ) internal view returns (uint256) {
         bytes32[] memory slot = _array(
             positionBorrowSharesAndCollateralSlot(id, user)
         );
@@ -581,7 +663,7 @@ contract MorphoViews is Initializable {
     }
 
     function expectedBorrowBalance(
-        Id id,
+        bytes32 id,
         MorphoMarketParams memory marketParams,
         MorphoMarket memory market,
         address user
@@ -602,7 +684,7 @@ contract MorphoViews is Initializable {
 
     /// @notice A view to get a specific market info
     function getMorphoBlueUserBalance(
-        Id _marketId,
+        bytes32 _marketId,
         address user
     ) external view returns (UserMarketBalance memory) {
         UserMarketBalance memory _result;
@@ -633,7 +715,7 @@ contract MorphoViews is Initializable {
 
     /// @notice A view to enumerate all market configs
     function getMorphoBlueUserBalances(
-        Id[] calldata _marketIds,
+        bytes32[] calldata _marketIds,
         address user
     ) external view returns (UserMarketBalance[] memory) {
         UserMarketBalance[] memory _result = new UserMarketBalance[](

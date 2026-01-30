@@ -1,5 +1,10 @@
 [
     {
+        "addr": "0x2D0c1616CaeD53e3d161e53Fe0Ca1402017f2766",
+        "isContract": true,
+        "name": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X42"
+    },
+    {
         "addr": "0x1b2a5f458b627Fb995F834A7B40112c27c2f77e8",
         "isContract": true,
         "name": "JUMP_RATE_IRM_MOONWELL_VIRTUAL_MIP_B53"

@@ -3,13 +3,13 @@
         "markets": [
             {
                 "collateralFactor": 0.83e18,
-                "irm": "",
+                "irm": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X42",
                 "market": "MOONWELL_LBTC",
                 "reserveFactor": -1
             },
             {
                 "collateralFactor": 0.81e18,
-                "irm": "",
+                "irm": "JUMP_RATE_IRM_MOONWELL_cbBTC_LBTC_TBTC_MIP_X42",
                 "market": "MOONWELL_TBTC",
                 "reserveFactor": -1
             },

@@ -29,7 +29,6 @@ contract mipx42 is MarketUpdateTemplate {
         address publicAllocator = addresses.getAddress(
             "MORPHO_PUBLIC_ALLOCATOR"
         );
-        address newAdmin = addresses.getAddress("ANTHIAS_EOA");
 
         /// Vault addresses
         address usdcVault = addresses.getAddress("USDC_METAMORPHO_VAULT");
@@ -82,47 +81,47 @@ contract mipx42 is MarketUpdateTemplate {
         );
 
         /// ============================================
-        /// 2. Change Public Allocator admin for all vaults
+        /// 2. Disable Public Allocator as allocator on all vaults
         /// ============================================
 
         _pushAction(
-            publicAllocator,
+            usdcVault,
             abi.encodeWithSignature(
-                "setAdmin(address,address)",
-                usdcVault,
-                newAdmin
+                "setIsAllocator(address,bool)",
+                publicAllocator,
+                false
             ),
-            "Set Anthias as Public Allocator admin for USDC vault"
+            "Disable Public Allocator on USDC vault"
         );
 
         _pushAction(
-            publicAllocator,
+            wethVault,
             abi.encodeWithSignature(
-                "setAdmin(address,address)",
-                wethVault,
-                newAdmin
+                "setIsAllocator(address,bool)",
+                publicAllocator,
+                false
             ),
-            "Set Anthias as Public Allocator admin for WETH vault"
+            "Disable Public Allocator on WETH vault"
         );
 
         _pushAction(
-            publicAllocator,
+            eurcVault,
             abi.encodeWithSignature(
-                "setAdmin(address,address)",
-                eurcVault,
-                newAdmin
+                "setIsAllocator(address,bool)",
+                publicAllocator,
+                false
             ),
-            "Set Anthias as Public Allocator admin for EURC vault"
+            "Disable Public Allocator on EURC vault"
         );
 
         _pushAction(
-            publicAllocator,
+            cbbtcVault,
             abi.encodeWithSignature(
-                "setAdmin(address,address)",
-                cbbtcVault,
-                newAdmin
+                "setIsAllocator(address,bool)",
+                publicAllocator,
+                false
             ),
-            "Set Anthias as Public Allocator admin for cbBTC vault"
+            "Disable Public Allocator on cbBTC vault"
         );
     }
 
@@ -136,7 +135,6 @@ contract mipx42 is MarketUpdateTemplate {
         address publicAllocator = addresses.getAddress(
             "MORPHO_PUBLIC_ALLOCATOR"
         );
-        address newAdmin = addresses.getAddress("ANTHIAS_EOA");
 
         address usdcVault = addresses.getAddress("USDC_METAMORPHO_VAULT");
         address wethVault = addresses.getAddress("WETH_METAMORPHO_VAULT");
@@ -146,41 +144,37 @@ contract mipx42 is MarketUpdateTemplate {
         /// Validate OLD_ALLOCATOR is no longer allocator on any vault
         assertFalse(
             _isAllocator(usdcVault, OLD_ALLOCATOR),
-            "Warden should not be allocator on USDC vault"
+            "BlockAnalitica should not be allocator on USDC vault"
         );
         assertFalse(
             _isAllocator(wethVault, OLD_ALLOCATOR),
-            "Warden should not be allocator on WETH vault"
+            "BlockAnalitica should not be allocator on WETH vault"
         );
         assertFalse(
             _isAllocator(eurcVault, OLD_ALLOCATOR),
-            "Warden should not be allocator on EURC vault"
+            "BlockAnalitica should not be allocator on EURC vault"
         );
         assertFalse(
             _isAllocator(cbbtcVault, OLD_ALLOCATOR),
-            "Warden should not be allocator on cbBTC vault"
+            "BlockAnalitica should not be allocator on cbBTC vault"
         );
 
-        /// Validate new admin is set on public allocator for each vault
-        assertEq(
-            _getPublicAllocatorAdmin(publicAllocator, usdcVault),
-            newAdmin,
-            "Anthias should be Public Allocator admin for USDC vault"
+        /// Validate Public Allocator is no longer allocator on any vault
+        assertFalse(
+            _isAllocator(usdcVault, publicAllocator),
+            "Public Allocator should not be allocator on USDC vault"
         );
-        assertEq(
-            _getPublicAllocatorAdmin(publicAllocator, wethVault),
-            newAdmin,
-            "Anthias should be Public Allocator admin for WETH vault"
+        assertFalse(
+            _isAllocator(wethVault, publicAllocator),
+            "Public Allocator should not be allocator on WETH vault"
         );
-        assertEq(
-            _getPublicAllocatorAdmin(publicAllocator, eurcVault),
-            newAdmin,
-            "Anthias should be Public Allocator admin for EURC vault"
+        assertFalse(
+            _isAllocator(eurcVault, publicAllocator),
+            "Public Allocator should not be allocator on EURC vault"
         );
-        assertEq(
-            _getPublicAllocatorAdmin(publicAllocator, cbbtcVault),
-            newAdmin,
-            "Anthias should be Public Allocator admin for cbBTC vault"
+        assertFalse(
+            _isAllocator(cbbtcVault, publicAllocator),
+            "Public Allocator should not be allocator on cbBTC vault"
         );
     }
 
@@ -193,16 +187,5 @@ contract mipx42 is MarketUpdateTemplate {
         );
         require(success, "isAllocator call failed");
         return abi.decode(data, (bool));
-    }
-
-    function _getPublicAllocatorAdmin(
-        address publicAllocator,
-        address vault
-    ) internal view returns (address) {
-        (bool success, bytes memory data) = publicAllocator.staticcall(
-            abi.encodeWithSignature("admin(address)", vault)
-        );
-        require(success, "admin call failed");
-        return abi.decode(data, (address));
     }
 }

@@ -515,7 +515,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
 
         require(
             IStakedWell(stkWellProxy).EMISSION_MANAGER() == deployer,
-            "Ethereum: stkWELL emission manager should be PROXY_ADMIN"
+            "Ethereum: stkWELL emission manager should be deployer"
         );
 
         // Validate proxy admin for stkWELL and ecosystem reserve

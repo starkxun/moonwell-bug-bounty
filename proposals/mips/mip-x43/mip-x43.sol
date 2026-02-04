@@ -578,8 +578,8 @@ contract mipx43 is HybridProposal {
 
         assertEq(
             IStakedWell(stkWellProxy).EMISSION_MANAGER(),
-            proxyAdmin,
-            "Ethereum: stkWELL emission manager should be PROXY_ADMIN"
+            addresses.getAddress("MOONWELL_DEPLOYER"),
+            "Ethereum: stkWELL emission manager should be MOONWELL_DEPLOYER"
         );
 
         // Validate proxy admin is admin of stkWELL proxy

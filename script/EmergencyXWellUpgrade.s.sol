@@ -88,7 +88,6 @@ contract EmergencyXWellUpgrade is Script {
         vm.stopBroadcast();
 
         addresses.printAddresses();
-        addresses.printChanges();
 
         // Run validation
         _validateDeployment(addresses, proxyAdmin, deployer);

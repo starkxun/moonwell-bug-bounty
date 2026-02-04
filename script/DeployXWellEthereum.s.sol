@@ -165,6 +165,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
         address xwellProxy;
         address ecosystemReserveProxy;
         address stkWellProxy;
+        address deployer = addresses.getAddress("MOONWELL_DEPLOYER");
 
         // 1. Deploy or get ProxyAdmin
         if (!addresses.isAddressSet("PROXY_ADMIN")) {
@@ -178,7 +179,6 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
 
         // 2. Deploy xWELL system if not exists
         if (!addresses.isAddressSet("xWELL_PROXY")) {
-            // NOTE: this is the moonwell deployer 1 address for now
             // TODO: use grantPauseGuardian in the proposal script to set new PAUSE_GUARDIAN
             address pauseGuardian = addresses.getAddress("PAUSE_GUARDIAN");
 
@@ -203,7 +203,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
                 xwellProxy,
                 "WELL",
                 "WELL",
-                proxyAdmin, // Use PROXY_ADMIN as owner; TODO: transfer ownership to governance in the proposal script
+                deployer, // contract owner
                 limits,
                 ETH_XWELL_PAUSE_DURATION,
                 pauseGuardian
@@ -237,7 +237,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
             initializeWormholeAdapter(
                 wormholeAdapter,
                 xwellProxy,
-                proxyAdmin, // Use PROXY_ADMIN as owner
+                deployer, // contract owner
                 wormholeRelayer,
                 trustedChainIds,
                 trustedSenders

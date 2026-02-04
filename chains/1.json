@@ -50,12 +50,12 @@
         "name": "ECOSYSTEM_RESERVE_PROXY"
     },
     {
-        "addr": "0xEB56C57cEc4d56072942CAF90a8F694Ed766012A",
+        "addr": "0x701551a3cd30A29cCC012e8f160fB2Cac9b0f5Af",
         "isContract": true,
         "name": "STK_GOVTOKEN_IMPL"
     },
     {
-        "addr": "0xF03499F8AE0b883e630558F23760a6A89b1dae7e",
+        "addr": "0xb3a9E0DCf37658a48aa9f018C44f90378ddD4357",
         "isContract": true,
         "name": "STK_GOVTOKEN_PROXY"
     },

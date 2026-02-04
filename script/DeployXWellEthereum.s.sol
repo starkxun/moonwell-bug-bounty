@@ -327,7 +327,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
                 ETH_STKWELL_COOLDOWN_SECONDS,
                 ETH_STKWELL_UNSTAKE_WINDOW,
                 ecosystemReserveProxy, // rewardsVault
-                proxyAdmin, // emissionManager (TODO: use setEmissionsManager in the proposal script to set the emission manager)
+                deployer, // emissionManager (TODO: use deployer in the proposal script to set the emission manager)
                 ETH_STKWELL_DISTRIBUTION_END - block.timestamp, // dynamically calculate duration to match onchain value on base
                 address(0) // governance (no transfer hook needed)
             );
@@ -367,6 +367,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
             "WORMHOLE_BRIDGE_ADAPTER_PROXY"
         );
         address proxyAdmin = addresses.getAddress("PROXY_ADMIN");
+        address deployer = addresses.getAddress("MOONWELL_DEPLOYER");
         address stkWellProxy = addresses.getAddress("STK_GOVTOKEN_PROXY");
         address ecosystemReserveProxy = addresses.getAddress(
             "ECOSYSTEM_RESERVE_PROXY"
@@ -376,7 +377,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
 
         // Validate xWELL and Wormhole Adapter ownership
         require(
-            WormholeBridgeAdapter(wormholeAdapter).owner() == proxyAdmin,
+            WormholeBridgeAdapter(wormholeAdapter).owner() == deployer,
             "Ethereum: wormhole bridge adapter owner is incorrect"
         );
 
@@ -392,7 +393,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
         );
 
         require(
-            xWELL(xwellProxy).owner() == proxyAdmin,
+            xWELL(xwellProxy).owner() == deployer,
             "Ethereum: xWELL owner is incorrect (should be PROXY_ADMIN)"
         );
 
@@ -513,7 +514,7 @@ contract DeployXWellEthereum is Script, xWELLDeploy {
         );
 
         require(
-            IStakedWell(stkWellProxy).EMISSION_MANAGER() == proxyAdmin,
+            IStakedWell(stkWellProxy).EMISSION_MANAGER() == deployer,
             "Ethereum: stkWELL emission manager should be PROXY_ADMIN"
         );
 

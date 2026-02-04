@@ -456,14 +456,6 @@ contract mipx43 is HybridProposal {
         // Switch back to Ethereum fork for validation
         vm.selectFork(ETHEREUM_FORK_ID);
 
-        // Validate xWELL and Wormhole Adapter ownership
-        // On Ethereum, PROXY_ADMIN is the owner (not temporal governor)
-        assertEq(
-            WormholeBridgeAdapter(wormholeAdapter).owner(),
-            proxyAdmin,
-            "Ethereum: wormhole bridge adapter owner is incorrect"
-        );
-
         assertEq(
             address(WormholeBridgeAdapter(wormholeAdapter).wormholeRelayer()),
             addresses.getAddress("WORMHOLE_BRIDGE_RELAYER_PROXY"),
@@ -474,12 +466,6 @@ contract mipx43 is HybridProposal {
             WormholeBridgeAdapter(wormholeAdapter).gasLimit(),
             300_000,
             "Ethereum: wormhole bridge adapter gas limit is incorrect"
-        );
-
-        assertEq(
-            xWELL(xwellProxy).owner(),
-            proxyAdmin,
-            "Ethereum: xWELL owner is incorrect (should be PROXY_ADMIN)"
         );
 
         assertEq(

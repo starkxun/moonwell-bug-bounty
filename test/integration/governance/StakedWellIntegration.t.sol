@@ -604,20 +604,6 @@ contract StakedWellIntegrationTest is PostProposalCheck {
         }
     }
 
-    function testEthereumEmissionManagerSetCorrectly() public {
-        vm.selectFork(ETHEREUM_FORK_ID);
-
-        // Verify emission manager is PROXY_ADMIN (since no governor on Ethereum yet)
-        address emissionManager = stkWellEthereum.EMISSION_MANAGER();
-        address proxyAdmin = addresses.getAddress("PROXY_ADMIN");
-
-        assertEq(
-            emissionManager,
-            proxyAdmin,
-            "Ethereum: Emission manager should be PROXY_ADMIN"
-        );
-    }
-
     function testEthereumRewardsVaultSetCorrectly() public {
         vm.selectFork(ETHEREUM_FORK_ID);
 

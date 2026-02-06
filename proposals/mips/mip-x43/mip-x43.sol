@@ -144,6 +144,11 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
                     abi.encodePacked(wrapperName, "_DEPRECATED")
                 );
 
+                // Skip if already handled (e.g. USDC/USDBC share CHAINLINK_USDC_USD)
+                if (addresses.isAddressSet(deprecatedName)) {
+                    continue;
+                }
+
                 address oldWrapper = addresses.getAddress(wrapperName);
                 addresses.addAddress(deprecatedName, oldWrapper);
 

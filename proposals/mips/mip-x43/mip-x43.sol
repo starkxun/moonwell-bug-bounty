@@ -27,7 +27,7 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
     string public constant MORPHO_IMPLEMENTATION_NAME =
         "CHAINLINK_OEV_MORPHO_WRAPPER_IMPL";
 
-    uint16 public constant FEE_MULTIPLIER = 4000;
+    uint16 public constant FEE_MULTIPLIER = 3000;
     uint256 public constant MAX_ROUND_DELAY = 10;
     uint256 public constant MAX_DECREMENTS = 10;
 

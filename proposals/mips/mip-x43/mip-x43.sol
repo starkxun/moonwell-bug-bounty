@@ -12,7 +12,6 @@ import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
 import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {ChainlinkOEVMorphoWrapper} from "@protocol/oracles/ChainlinkOEVMorphoWrapper.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
-import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
 import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
@@ -84,15 +83,19 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
     }
 
     function build(Addresses addresses) public override {
-        // Base: upgrade Morpho wrappers, wire core feeds, whitelist mTokens
+        // Base: upgrade Morpho wrappers, wire core feeds, whitelist mTokens,
+        // and update fee split on existing MIP-X38 wrappers
         _upgradeMorphoWrappers(addresses, BASE_CHAIN_ID);
         _wireCoreFeeds(addresses, BASE_CHAIN_ID);
         _whitelistMTokens(addresses, BASE_CHAIN_ID);
+        _updateExistingWrapperFees(addresses);
 
-        // Optimism: wire core feeds, whitelist mTokens
+        // Optimism: wire core feeds, whitelist mTokens,
+        // and update fee split on existing MIP-X38 wrappers
         vm.selectFork(OPTIMISM_FORK_ID);
         _wireCoreFeeds(addresses, OPTIMISM_CHAIN_ID);
         _whitelistMTokens(addresses, OPTIMISM_CHAIN_ID);
+        _updateExistingWrapperFees(addresses);
 
         vm.selectFork(BASE_FORK_ID);
     }
@@ -104,6 +107,7 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
         _validateCoreWrappersConstructor(addresses, OPTIMISM_CHAIN_ID);
         _validateDeprecatedWrappers(addresses, OPTIMISM_CHAIN_ID);
         _validateMTokensWhitelisted(addresses, OPTIMISM_CHAIN_ID);
+        _validateExistingWrapperFees(addresses);
 
         // Validate Base
         vm.selectFork(BASE_FORK_ID);
@@ -111,6 +115,7 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
         _validateCoreWrappersConstructor(addresses, BASE_CHAIN_ID);
         _validateDeprecatedWrappers(addresses, BASE_CHAIN_ID);
         _validateMTokensWhitelisted(addresses, BASE_CHAIN_ID);
+        _validateExistingWrapperFees(addresses);
         _validateMorphoWrappersImplementations(addresses, BASE_CHAIN_ID);
         _validateMorphoWrappersState(addresses, BASE_CHAIN_ID);
     }
@@ -280,6 +285,39 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
                     "Whitelist mToken on OEV fee redeemer for ",
                     oracleConfigs[i].mTokenKey
                 )
+            );
+        }
+    }
+
+    /// @dev Update liquidatorFeeBps from 4000 (60/40) to 3000 (70/30) on
+    /// existing MIP-X38 wrappers. On Base this covers the ETH core wrapper and
+    /// the WELL Morpho wrapper. On Optimism only the ETH core wrapper.
+    function _updateExistingWrapperFees(Addresses addresses) internal {
+        // Update ETH/USD core wrapper (deployed by MIP-X38 on both chains)
+        address ethWrapper = addresses.getAddress(
+            "CHAINLINK_ETH_USD_OEV_WRAPPER"
+        );
+        _pushAction(
+            ethWrapper,
+            abi.encodeWithSignature(
+                "setLiquidatorFeeBps(uint16)",
+                FEE_MULTIPLIER
+            ),
+            "Update ETH/USD OEV wrapper fee split to 70/30"
+        );
+
+        // Update WELL Morpho wrapper (only on Base, not Optimism)
+        if (addresses.isAddressSet("CHAINLINK_WELL_USD_ORACLE_PROXY")) {
+            address wellMorphoWrapper = addresses.getAddress(
+                "CHAINLINK_WELL_USD_ORACLE_PROXY"
+            );
+            _pushAction(
+                wellMorphoWrapper,
+                abi.encodeWithSignature(
+                    "setLiquidatorFeeBps(uint16)",
+                    FEE_MULTIPLIER
+                ),
+                "Update WELL/USD Morpho OEV wrapper fee split to 70/30"
             );
         }
     }
@@ -463,6 +501,30 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
         }
     }
 
+    function _validateExistingWrapperFees(Addresses addresses) internal view {
+        // Validate ETH/USD core wrapper fee was updated
+        ChainlinkOEVWrapper ethWrapper = ChainlinkOEVWrapper(
+            payable(addresses.getAddress("CHAINLINK_ETH_USD_OEV_WRAPPER"))
+        );
+        assertEq(
+            ethWrapper.liquidatorFeeBps(),
+            FEE_MULTIPLIER,
+            "ETH/USD OEV wrapper fee not updated to 70/30"
+        );
+
+        // Validate WELL Morpho wrapper fee was updated (only on Base)
+        if (addresses.isAddressSet("CHAINLINK_WELL_USD_ORACLE_PROXY")) {
+            ChainlinkOEVMorphoWrapper wellWrapper = ChainlinkOEVMorphoWrapper(
+                addresses.getAddress("CHAINLINK_WELL_USD_ORACLE_PROXY")
+            );
+            assertEq(
+                wellWrapper.liquidatorFeeBps(),
+                FEE_MULTIPLIER,
+                "WELL/USD Morpho OEV wrapper fee not updated to 70/30"
+            );
+        }
+    }
+
     function _validateMorphoWrappersImplementations(
         Addresses addresses,
         uint256 chainId
@@ -616,9 +678,8 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
                     wrapperName
                 )
             );
-            assertGt(
-                uint256(answer),
-                0,
+            assertTrue(
+                answer > 0,
                 string.concat("Morpho wrapper answer invalid for ", wrapperName)
             );
         }

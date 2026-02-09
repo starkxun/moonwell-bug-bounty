@@ -9,6 +9,7 @@ import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {Networks} from "@proposals/utils/Networks.sol";
 import {ERC20} from "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {ChainlinkOracle} from "@protocol/oracles/ChainlinkOracle.sol";
+import {IChainlinkOracle} from "@protocol/interfaces/IChainlinkOracle.sol";
 import {ChainlinkOEVWrapper} from "@protocol/oracles/ChainlinkOEVWrapper.sol";
 import {ChainlinkOEVMorphoWrapper} from "@protocol/oracles/ChainlinkOEVMorphoWrapper.sol";
 import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol";
@@ -143,16 +144,29 @@ contract mipx43 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 abi.encodePacked(config.oracleName, "_OEV_WRAPPER")
             );
 
-            // If an old wrapper already exists, deprecate it and deploy a new one
+            // If a wrapper already exists for this oracle, check if it needs
+            // deprecation or if it was already handled by a previous config
+            // (e.g. USDC/USDBC both reference CHAINLINK_USDC_USD)
             if (addresses.isAddressSet(wrapperName)) {
                 string memory deprecatedName = string(
                     abi.encodePacked(wrapperName, "_DEPRECATED")
                 );
 
-                // Skip if already handled (e.g. USDC/USDBC share CHAINLINK_USDC_USD)
+                // Skip if already deprecated by a previous iteration
                 if (addresses.isAddressSet(deprecatedName)) {
                     continue;
                 }
+
+                // Skip if the existing wrapper is a new-style one deployed by
+                // a previous iteration in this loop. Old-style wrappers
+                // (ChainlinkFeedOEVWrapper) lack the chainlinkOracle() field.
+                try
+                    ChainlinkOEVWrapper(
+                        payable(addresses.getAddress(wrapperName))
+                    ).chainlinkOracle()
+                returns (IChainlinkOracle) {
+                    continue;
+                } catch {}
 
                 address oldWrapper = addresses.getAddress(wrapperName);
                 addresses.addAddress(deprecatedName, oldWrapper);

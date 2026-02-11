@@ -159,9 +159,11 @@ contract ChainlinkCompositeOEVWrapper is
 
         ) = compositeOracle.latestRoundData();
 
+        (uint80 initBaseRoundId, , , , ) = baseFeed.latestRoundData();
+
         cachedCompositePrice = compositePrice;
         cachedTimestamp = compositeUpdatedAt;
-        cachedBaseRoundId = baseFeed.latestRound();
+        cachedBaseRoundId = uint256(initBaseRoundId);
 
         _transferOwnership(_owner);
     }
@@ -432,10 +434,13 @@ contract ChainlinkCompositeOEVWrapper is
                 "Chainlink price cannot be lower or equal to 0"
             );
 
+            // Get base feed round atomically via latestRoundData
+            (uint80 baseRoundId, , , , ) = baseFeed.latestRoundData();
+
             // Update cache with fresh composite price and current base round
             cachedCompositePrice = freshCompositePrice;
             cachedTimestamp = freshUpdatedAt;
-            cachedBaseRoundId = baseFeed.latestRound();
+            cachedBaseRoundId = uint256(baseRoundId);
 
             collateralAnswer = freshCompositePrice;
         }

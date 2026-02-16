@@ -33,7 +33,6 @@ import {IStakedWell} from "@protocol/IStakedWell.sol";
 
 */
 contract EmergencyXWellUpgrade is Script {
-
     function run() public {
         Addresses addresses = new Addresses();
 
@@ -56,10 +55,15 @@ contract EmergencyXWellUpgrade is Script {
 
         // Save old logic addresses with _DEPRECATED suffix
         address oldXwellLogic = addresses.getAddress("xWELL_LOGIC");
-        address oldWormholeAdapterLogic = addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_LOGIC");
+        address oldWormholeAdapterLogic = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_LOGIC"
+        );
 
         addresses.addAddress("xWELL_LOGIC_DEPRECATED", oldXwellLogic);
-        addresses.addAddress("WORMHOLE_BRIDGE_ADAPTER_LOGIC_DEPRECATED", oldWormholeAdapterLogic);
+        addresses.addAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_LOGIC_DEPRECATED",
+            oldWormholeAdapterLogic
+        );
 
         // 1. Deploy new xWELL logic contract
         address newXwellLogic = address(new xWELL());
@@ -69,7 +73,11 @@ contract EmergencyXWellUpgrade is Script {
 
         // Save new logic addresses
         addresses.changeAddress("xWELL_LOGIC", newXwellLogic, true);
-        addresses.changeAddress("WORMHOLE_BRIDGE_ADAPTER_LOGIC", newWormholeAdapterLogic, true);
+        addresses.changeAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_LOGIC",
+            newWormholeAdapterLogic,
+            true
+        );
 
         // 3. Upgrade xWELL proxy to new logic contract
         proxyAdmin.upgradeAndCall(
@@ -80,7 +88,9 @@ contract EmergencyXWellUpgrade is Script {
 
         // 4. Upgrade WormholeBridgeAdapter proxy to new logic contract
         proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY")),
+            ITransparentUpgradeableProxy(
+                addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY")
+            ),
             newWormholeAdapterLogic,
             abi.encodeWithSignature("initializeV2(address)", deployer)
         );
@@ -103,9 +113,13 @@ contract EmergencyXWellUpgrade is Script {
             "WORMHOLE_BRIDGE_ADAPTER_PROXY"
         );
         address newXwellLogic = addresses.getAddress("xWELL_LOGIC");
-        address newWormholeAdapterLogic = addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_LOGIC");
+        address newWormholeAdapterLogic = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_LOGIC"
+        );
         address oldXwellLogic = addresses.getAddress("xWELL_LOGIC_DEPRECATED");
-        address oldWormholeAdapterLogic = addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_LOGIC_DEPRECATED");
+        address oldWormholeAdapterLogic = addresses.getAddress(
+            "WORMHOLE_BRIDGE_ADAPTER_LOGIC_DEPRECATED"
+        );
 
         console.log("\n=== Running Validation ===");
 
@@ -121,13 +135,23 @@ contract EmergencyXWellUpgrade is Script {
             newXwellLogic != oldXwellLogic,
             "Ethereum: new xWELL logic should be different from old logic"
         );
-        console.log("xWELL logic upgraded from", oldXwellLogic, "to", newXwellLogic);
+        console.log(
+            "xWELL logic upgraded from",
+            oldXwellLogic,
+            "to",
+            newXwellLogic
+        );
 
         require(
             newWormholeAdapterLogic != oldWormholeAdapterLogic,
             "Ethereum: new WormholeBridgeAdapter logic should be different from old logic"
         );
-        console.log("WormholeBridgeAdapter logic upgraded from", oldWormholeAdapterLogic, "to", newWormholeAdapterLogic);
+        console.log(
+            "WormholeBridgeAdapter logic upgraded from",
+            oldWormholeAdapterLogic,
+            "to",
+            newWormholeAdapterLogic
+        );
 
         // Validate xWELL and Wormhole Adapter ownership transferred to deployer
         require(

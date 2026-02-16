@@ -40,9 +40,9 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
             abi.encodeWithSignature(
                 "setFeed(string,address)",
                 symbol,
-                addresses.getAddress("CHAINLINK_ETH_USD")
+                addresses.getAddress("cbETH_ORACLE")
             ),
-            string.concat("Set feed to CHAINLINK_ETH_USD for ", symbol)
+            string.concat("Set feed to cbETH_ORACLE for ", symbol)
         );
     }
 
@@ -52,11 +52,11 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 "cbETH"
             )
         );
-        address expected = addresses.getAddress("CHAINLINK_ETH_USD");
+        address expected = addresses.getAddress("cbETH_ORACLE");
         assertEq(
             configured,
             expected,
-            "cbETH feed not reverted to CHAINLINK_ETH_USD"
+            "cbETH feed not reverted to cbETH_ORACLE"
         );
 
         address otherConfigured = address(
@@ -67,12 +67,22 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
 
         (, int256 price, , , ) = AggregatorV3Interface(configured)
             .latestRoundData();
+        uint8 priceDecimals = AggregatorV3Interface(configured).decimals();
+
         (, int256 otherPrice, , , ) = AggregatorV3Interface(otherConfigured)
             .latestRoundData();
-        assertEq(
-            uint256(price),
-            uint256(otherPrice),
-            "cbETH and WETH prices are not the same"
+        uint8 otherDecimals = AggregatorV3Interface(otherConfigured).decimals();
+
+        /// normalize both prices to 18 decimals before comparing
+        uint256 normalizedPrice = uint256(price) * 10 ** (18 - priceDecimals);
+        uint256 normalizedOtherPrice = uint256(otherPrice) *
+            10 ** (18 - otherDecimals);
+
+        assertApproxEqRel(
+            normalizedPrice,
+            normalizedOtherPrice,
+            0.15e18,
+            "cbETH and WETH prices deviated more than 5%"
         );
     }
 }

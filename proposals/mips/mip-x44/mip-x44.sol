@@ -16,7 +16,7 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
 import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
-/// @notice MIP-X44: Revert the configured oracle for cbETH market on Base from the OEV wrapper to CHAINLINK_ETH_USD
+/// @notice MIP-X44: Revert the configured oracle for cbETH market on Base from the OEV wrapper to cbETH_ORACLE
 contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
     using ChainIds for uint256;
     string public constant override name = "MIP-X44";

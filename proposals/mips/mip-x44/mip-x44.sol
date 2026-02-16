@@ -82,7 +82,7 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
             normalizedPrice,
             normalizedOtherPrice,
             0.15e18,
-            "cbETH and WETH prices deviated more than 5%"
+            "cbETH and WETH prices deviated more than 15%"
         );
     }
 }

@@ -46,7 +46,7 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
         );
     }
 
-    function validate(Addresses addresses, address) public override {
+    function validate(Addresses addresses, address) public view override {
         address configured = address(
             ChainlinkOracle(addresses.getAddress("CHAINLINK_ORACLE")).getFeed(
                 "cbETH"

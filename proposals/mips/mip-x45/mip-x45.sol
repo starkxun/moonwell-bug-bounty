@@ -16,7 +16,7 @@ import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ETHEREUM_FORK_ID, ChainIds} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
-/// @title MIP-X44: Upgrade StakedWell contracts on Base, OP, and Moonbeam; Deploy to Ethereum
+/// @title MIP-X45: Upgrade StakedWell contracts on Base, OP, and Moonbeam; Deploy to Ethereum
 /// @author Moonwell Contributors
 /// @notice Proposal to:
 ///         1. Upgrade stkWELL on Moonbeam to switch snapshot logic to use timestamps instead of block numbers
@@ -28,11 +28,11 @@ import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 ///      This is because multichain proposals cannot handle library linking for xWELL's Zelt libraries.
 ///      Before running this proposal, deploy to Ethereum using:
 ///        forge script script/DeployXWellEthereum.s.sol:DeployXWellEthereum --rpc-url ethereum --broadcast
-contract mipx44 is HybridProposal {
+contract mipx45 is HybridProposal {
     using ProposalActions for *;
     using ChainIds for uint256;
 
-    string public constant override name = "MIP-X44";
+    string public constant override name = "MIP-X45";
 
     /// @notice Constants for Ethereum xWELL deployment
     uint112 public constant ETH_XWELL_BUFFER_CAP = 100_000_000 * 1e18;
@@ -46,7 +46,7 @@ contract mipx44 is HybridProposal {
 
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
-            vm.readFile("./proposals/mips/mip-x44/x44.md")
+            vm.readFile("./proposals/mips/mip-x45/x45.md")
         );
         _setProposalDescription(proposalDescription);
     }
@@ -95,7 +95,7 @@ contract mipx44 is HybridProposal {
 
             require(
                 implementation != address(0),
-                "MIP-X44: failed to deploy STK_GOVTOKEN_IMPL_V2"
+                "MIP-X45: failed to deploy STK_GOVTOKEN_IMPL_V2"
             );
 
             // Save new implementation
@@ -113,7 +113,7 @@ contract mipx44 is HybridProposal {
 
             require(
                 implementation != address(0),
-                "MIP-X44: failed to deploy STK_GOVTOKEN_IMPL_V2"
+                "MIP-X45: failed to deploy STK_GOVTOKEN_IMPL_V2"
             );
 
             // Save new implementation
@@ -131,7 +131,7 @@ contract mipx44 is HybridProposal {
 
             require(
                 implementation != address(0),
-                "MIP-X44: failed to deploy STK_GOVTOKEN_IMPL_V2"
+                "MIP-X45: failed to deploy STK_GOVTOKEN_IMPL_V2"
             );
 
             // Save new implementation

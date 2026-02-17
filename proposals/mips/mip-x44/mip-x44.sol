@@ -21,6 +21,8 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
     using ChainIds for uint256;
     string public constant override name = "MIP-X44";
 
+    int256 public oraclePriceBefore;
+
     constructor() {
         _setProposalDescription(
             bytes(vm.readFile("./proposals/mips/mip-x44/x44.md"))
@@ -29,6 +31,12 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
 
     function primaryForkId() public pure override returns (uint256) {
         return BASE_FORK_ID;
+    }
+
+    function beforeSimulationHook(Addresses addresses) public override {
+        (, oraclePriceBefore, , , ) = AggregatorV3Interface(
+            addresses.getAddress("cbETH_COMPOSITE_ORACLE")
+        ).latestRoundData();
     }
 
     function build(Addresses addresses) public override {
@@ -59,6 +67,7 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
             "cbETH feed not reverted to cbETH_COMPOSITE_ORACLE"
         );
 
+        // WETH price should be ~15% same as cbETH price
         address otherConfigured = address(
             ChainlinkOracle(addresses.getAddress("CHAINLINK_ORACLE")).getFeed(
                 "WETH"
@@ -83,6 +92,14 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
             normalizedOtherPrice,
             0.15e18,
             "cbETH and WETH prices deviated more than 15%"
+        );
+
+        // configured cbETH price should roughly the same as the before simulation price
+        assertApproxEqRel(
+            uint256(price),
+            uint256(oraclePriceBefore),
+            0.01e18,
+            "cbETH price deviated from before simulation price"
         );
     }
 }

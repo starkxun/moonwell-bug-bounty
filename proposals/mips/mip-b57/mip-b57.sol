@@ -16,16 +16,16 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
 import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
-/// @notice MIP-X44: Revert the configured oracle for cbETH market on Base from the OEV wrapper to cbETH_COMPOSITE_ORACLE
-contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
+/// @notice MIP-B57: Revert the configured oracle for cbETH market on Base from the OEV wrapper to cbETH_COMPOSITE_ORACLE
+contract mipb57 is HybridProposal, ChainlinkOracleConfigs, Networks {
     using ChainIds for uint256;
-    string public constant override name = "MIP-X44";
+    string public constant override name = "MIP-B57";
 
     int256 public oraclePriceBefore;
 
     constructor() {
         _setProposalDescription(
-            bytes(vm.readFile("./proposals/mips/mip-x44/x44.md"))
+            bytes(vm.readFile("./proposals/mips/mip-b57/b57.md"))
         );
     }
 

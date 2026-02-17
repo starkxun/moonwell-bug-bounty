@@ -38,7 +38,7 @@ abstract contract ChainlinkOracleConfigs is Test {
         // _oracleConfigs[BASE_CHAIN_ID].push(
         //     OracleConfig("CHAINLINK_ETH_USD", "WETH", "MOONWELL_WETH")
         // );
-        // TODO: reverted this to cbETH_COMPOSITE_ORACLE in MIP-X44; update to oev wrapper in a future proposal
+        // TODO: reverted this to cbETH_COMPOSITE_ORACLE in MIP-B57; update to oev wrapper in a future proposal
         // _oracleConfigs[BASE_CHAIN_ID].push(
         //     OracleConfig("cbETH_COMPOSITE_ORACLE", "cbETH", "MOONWELL_cbETH")
         // );

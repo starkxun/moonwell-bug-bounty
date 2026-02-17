@@ -16,7 +16,7 @@ import {AggregatorV3Interface} from "@protocol/oracles/AggregatorV3Interface.sol
 import {validateProxy} from "@proposals/utils/ProxyUtils.sol";
 import {OEVProtocolFeeRedeemer} from "@protocol/OEVProtocolFeeRedeemer.sol";
 
-/// @notice MIP-X44: Revert the configured oracle for cbETH market on Base from the OEV wrapper to cbETH_ORACLE
+/// @notice MIP-X44: Revert the configured oracle for cbETH market on Base from the OEV wrapper to cbETH_COMPOSITE_ORACLE
 contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
     using ChainIds for uint256;
     string public constant override name = "MIP-X44";
@@ -40,9 +40,9 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
             abi.encodeWithSignature(
                 "setFeed(string,address)",
                 symbol,
-                addresses.getAddress("cbETH_ORACLE")
+                addresses.getAddress("cbETH_COMPOSITE_ORACLE")
             ),
-            string.concat("Set feed to cbETH_ORACLE for ", symbol)
+            string.concat("Set feed to cbETH_COMPOSITE_ORACLE for ", symbol)
         );
     }
 
@@ -52,11 +52,11 @@ contract mipx44 is HybridProposal, ChainlinkOracleConfigs, Networks {
                 "cbETH"
             )
         );
-        address expected = addresses.getAddress("cbETH_ORACLE");
+        address expected = addresses.getAddress("cbETH_COMPOSITE_ORACLE");
         assertEq(
             configured,
             expected,
-            "cbETH feed not reverted to cbETH_ORACLE"
+            "cbETH feed not reverted to cbETH_COMPOSITE_ORACLE"
         );
 
         address otherConfigured = address(

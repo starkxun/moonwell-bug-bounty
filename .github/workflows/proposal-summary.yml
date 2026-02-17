@@ -1,0 +1,113 @@
+name: Proposal Summary
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    paths:
+      - 'proposals/mips/**'
+
+jobs:
+  generate-summary:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Detect proposal directories needing summaries
+        id: detect
+        run: |
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          DIRS=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- 'proposals/mips/' \
+            | grep -oP 'proposals/mips/mip-[^/]+' \
+            | sort -u)
+          NEEDS_SUMMARY=""
+          for dir in $DIRS; do
+            if [ -d "$dir" ] && [ ! -f "$dir/summary.md" ]; then
+              NEEDS_SUMMARY="$NEEDS_SUMMARY $dir"
+            fi
+          done
+          NEEDS_SUMMARY=$(echo "$NEEDS_SUMMARY" | xargs)
+          if [ -z "$NEEDS_SUMMARY" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "dirs=$NEEDS_SUMMARY" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate proposal summaries
+        if: steps.detect.outputs.skip != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--max-turns 12 --model claude-opus-4-6"
+          prompt: |
+            You are a DeFi governance proposal auditor for the Moonwell protocol.
+
+            Generate a summary.md for each of these proposal directories:
+            ${{ steps.detect.outputs.dirs }}
+
+            For EACH directory:
+            1. Read ALL files in the directory (.sol, .md, .json, .sh)
+            2. Analyze on-chain actions from the Solidity contract (build(), deploy(), afterDeploy(), validate())
+            3. Search the test/ directory for integration or unit tests that cover this proposal
+            4. Write a summary.md file in that directory with this structure:
+
+            # [Proposal Name] - Summary & Audit
+
+            ## Executive Summary
+            [2-3 sentence overview]
+
+            ## On-Chain Actions
+            [Numbered list of every action: target contract, function, parameters. Extract from build().]
+
+            ## Contracts Deployed
+            [From deploy(), or "None"]
+
+            ## Risk Assessment
+            - **Complexity**: [Low/Medium/High] - [justification]
+            - **External Dependencies**: [external contracts, oracles, protocols]
+            - **Upgrade Safety**: [proxy upgrades, storage layout preservation]
+            - **Access Control Changes**: [admin/owner/guardian changes]
+            - **Fund Movements**: [token transfers, reserve changes, treasury impacts]
+
+            ## Key Parameters
+            [Table of important numeric parameters]
+
+            ## Affected Markets / Chains
+            [Which chains and markets are affected]
+
+            ## Validation Coverage
+            For EACH on-chain action listed above, determine:
+            - Is it checked in validate()? (yes/no, cite the specific check)
+            - Is it covered by a unit or integration test? (yes/no, cite the test file and function)
+
+            Present as a table:
+            | On-Chain Action | Validated in validate() | Test Coverage | Gap? |
+            |---|---|---|---|
+            | ... | Yes - checks X == Y | Yes - test/integration/TestFoo.t.sol::testBar | No |
+            | ... | No | No | **YES** |
+
+            ## Audit Gaps
+            **This is the most critical section.**
+            List every on-chain action that is NOT validated in validate() AND/OR does NOT have a corresponding test. For each gap:
+            - Describe the unverified action and what could go wrong
+            - Suggest what validation check or test should be added
+            - Rate severity: **Critical** (fund loss risk), **High** (incorrect protocol state), **Medium** (suboptimal config), **Low** (cosmetic)
+
+            If there are no gaps, explicitly state "No gaps identified - all on-chain actions are validated and tested."
+
+            5. Commit the summary.md with message "Add summary.md for [proposal-name]"
+
+            IMPORTANT:
+            - Be precise about on-chain actions - extract exact function signatures and parameters
+            - Include key values from any .json config files
+            - The audit gaps section is the PRIMARY value of this summary - be thorough and specific
+            - Cross-reference every single build() action against validate() checks and test assertions

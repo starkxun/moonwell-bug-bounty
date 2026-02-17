@@ -10,6 +10,7 @@ import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/Pr
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {MintLimits} from "@protocol/xWELL/MintLimits.sol";
 import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
+import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
@@ -214,6 +215,64 @@ contract mipx44 is HybridProposal {
         vm.selectFork(primaryForkId());
     }
 
+    /// @notice Stake tokens before the proposal executes to simulate existing stakers
+    function beforeSimulationHook(Addresses addresses) public override {
+        address testUser = address(0xBEEF);
+        uint256 stakeAmount = 1_000 * 1e18;
+
+        // Stake on Moonbeam
+        vm.selectFork(primaryForkId());
+        _stakeTokens(
+            addresses.getAddress("STK_GOVTOKEN_PROXY"),
+            testUser,
+            stakeAmount
+        );
+
+        // Stake on Base
+        vm.selectFork(BASE_FORK_ID);
+        _stakeTokens(
+            addresses.getAddress("STK_GOVTOKEN_PROXY"),
+            testUser,
+            stakeAmount
+        );
+
+        // Stake on Optimism
+        vm.selectFork(OPTIMISM_FORK_ID);
+        _stakeTokens(
+            addresses.getAddress("STK_GOVTOKEN_PROXY"),
+            testUser,
+            stakeAmount
+        );
+
+        // Switch back to primary fork
+        vm.selectFork(primaryForkId());
+    }
+
+    /// @notice Deal tokens and stake for a user on the current fork
+    function _stakeTokens(
+        address stkWellProxy,
+        address user,
+        uint256 amount
+    ) internal {
+        IStakedWell stkWell = IStakedWell(stkWellProxy);
+        address stakedToken = address(stkWell.STAKED_TOKEN());
+
+        uint256 balanceBefore = stkWell.balanceOf(user);
+
+        deal(stakedToken, user, amount);
+
+        vm.startPrank(user);
+        IERC20(stakedToken).approve(stkWellProxy, amount);
+        stkWell.stake(user, amount);
+        vm.stopPrank();
+
+        assertEq(
+            stkWell.balanceOf(user),
+            balanceBefore + amount,
+            "beforeSimulationHook: stake failed"
+        );
+    }
+
     function teardown(Addresses addresses, address) public pure override {}
 
     function validate(Addresses addresses, address) public override {
@@ -272,6 +331,9 @@ contract mipx44 is HybridProposal {
             useTimestamps,
             "MultichainGovernor useTimestamps not enabled"
         );
+
+        // Sanity check: stake and unstake works after upgrade
+        _validateStakeAndUnstake(proxy, "Moonbeam");
     }
 
     function _validateBaseUpgrade(Addresses addresses) internal {
@@ -286,6 +348,9 @@ contract mipx44 is HybridProposal {
             expectedImpl,
             "Base stkWELL implementation not upgraded"
         );
+
+        // Sanity check: stake and unstake works after upgrade
+        _validateStakeAndUnstake(proxy, "Base");
     }
 
     function _validateOptimismUpgrade(Addresses addresses) internal {
@@ -300,6 +365,9 @@ contract mipx44 is HybridProposal {
             expectedImpl,
             "Optimism stkWELL implementation not upgraded"
         );
+
+        // Sanity check: stake and unstake works after upgrade
+        _validateStakeAndUnstake(proxy, "Optimism");
     }
 
     function _getProxyImplementation(
@@ -439,5 +507,52 @@ contract mipx44 is HybridProposal {
             proxyAdmin,
             "Ethereum: ProxyAdmin is not admin of ecosystem reserve proxy"
         );
+    }
+
+    /// @notice Validate that a pre-existing staker can still withdraw after the upgrade
+    /// @dev The test user staked in beforeSimulationHook before the proposal executed. This verifies the upgrade
+    /// didn't break functionality for existing stakers.
+    function _validateStakeAndUnstake(
+        address stkWellProxy,
+        string memory chainName
+    ) internal {
+        uint256 snapshot = vm.snapshot(); // so that the time warp and state changes don't persist
+
+        IStakedWell stkWell = IStakedWell(stkWellProxy);
+        uint256 cooldownSeconds = stkWell.COOLDOWN_SECONDS();
+
+        address testUser = address(0xBEEF);
+        uint256 stakedBalance = stkWell.balanceOf(testUser);
+
+        // Verify the user still has their staked balance after the upgrade
+        assertGt(
+            stakedBalance,
+            0,
+            string.concat(
+                chainName,
+                ": staker balance should be > 0 after upgrade"
+            )
+        );
+
+        // Initiate cooldown, warp past it, and redeem
+        vm.prank(testUser);
+        stkWell.cooldown();
+
+        vm.warp(block.timestamp + cooldownSeconds + 1);
+
+        vm.prank(testUser);
+        stkWell.redeem(testUser, stakedBalance);
+
+        // Verify balance is 0 after unstake
+        assertEq(
+            stkWell.balanceOf(testUser),
+            0,
+            string.concat(
+                chainName,
+                ": stkWELL balance should be 0 after unstake"
+            )
+        );
+
+        vm.revertTo(snapshot);
     }
 }

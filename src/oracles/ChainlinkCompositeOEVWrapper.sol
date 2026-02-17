@@ -562,7 +562,6 @@ contract ChainlinkCompositeOEVWrapper is
     }
 
     /// @notice Get the loan token price directly from the underlying Chainlink feed
-    /// @dev Bypasses any OEV wrapper to get fresh price data
     function _getLoanTokenPrice(
         EIP20Interface underlyingLoan
     ) internal view returns (uint256) {

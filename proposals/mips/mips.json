@@ -2,7 +2,7 @@
     {
         "envpath": "",
         "governor": "MultichainGovernor",
-        "id": 142,
+        "id": 143,
         "path": "mip-b57.sol/mipb57.json",
         "proposalType": "HybridProposal"
     },

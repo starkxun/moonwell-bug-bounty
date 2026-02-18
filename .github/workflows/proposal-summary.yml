@@ -11,16 +11,29 @@ jobs:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref }}
 
-      - name: Detect proposal directories needing summaries
+      - name: Check for existing summary comment
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            --jq '[.[] | select(.body | startswith("<!-- proposal-summary -->"))] | length')
+          if [ "$EXISTING" -gt "0" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect proposal directories
+        if: steps.check.outputs.skip != 'true'
         id: detect
         run: |
           BASE_SHA=${{ github.event.pull_request.base.sha }}
@@ -28,22 +41,16 @@ jobs:
           DIRS=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- 'proposals/mips/' \
             | grep -oP 'proposals/mips/mip-[^/]+' \
             | sort -u)
-          NEEDS_SUMMARY=""
-          for dir in $DIRS; do
-            if [ -d "$dir" ] && [ ! -f "$dir/summary.md" ]; then
-              NEEDS_SUMMARY="$NEEDS_SUMMARY $dir"
-            fi
-          done
-          NEEDS_SUMMARY=$(echo "$NEEDS_SUMMARY" | xargs)
-          if [ -z "$NEEDS_SUMMARY" ]; then
+          DIRS=$(echo "$DIRS" | xargs)
+          if [ -z "$DIRS" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "dirs=$NEEDS_SUMMARY" >> "$GITHUB_OUTPUT"
+            echo "dirs=$DIRS" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Generate proposal summaries
-        if: steps.detect.outputs.skip != 'true'
+      - name: Generate proposal summary
+        if: steps.check.outputs.skip != 'true' && steps.detect.outputs.skip != 'true'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -51,14 +58,19 @@ jobs:
           prompt: |
             You are a DeFi governance proposal auditor for the Moonwell protocol.
 
-            Generate a summary.md for each of these proposal directories:
+            Audit these proposal directories and post a single PR comment with the results:
             ${{ steps.detect.outputs.dirs }}
 
             For EACH directory:
             1. Read ALL files in the directory (.sol, .md, .json, .sh)
             2. Analyze on-chain actions from the Solidity contract (build(), deploy(), afterDeploy(), validate())
             3. Search the test/ directory for integration or unit tests that cover this proposal
-            4. Write a summary.md file in that directory with this structure:
+
+            Then post a SINGLE comment on PR #${{ github.event.pull_request.number }} using the gh CLI with the following structure.
+            The comment MUST start with the exact HTML comment marker on its own line:
+            <!-- proposal-summary -->
+
+            Then for each proposal directory, include:
 
             # [Proposal Name] - Summary & Audit
 
@@ -104,9 +116,13 @@ jobs:
 
             If there are no gaps, explicitly state "No gaps identified - all on-chain actions are validated and tested."
 
-            5. Commit the summary.md with message "Add summary.md for [proposal-name]"
+            Post the comment using: gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<'COMMENT_EOF'
+            ... your summary here ...
+            COMMENT_EOF
+            )"
 
             IMPORTANT:
+            - Do NOT commit any files - only post a PR comment
             - Be precise about on-chain actions - extract exact function signatures and parameters
             - Include key values from any .json config files
             - The audit gaps section is the PRIMARY value of this summary - be thorough and specific

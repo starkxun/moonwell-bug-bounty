@@ -34,6 +34,7 @@ contract mipb57 is HybridProposal, ChainlinkOracleConfigs, Networks {
     }
 
     function beforeSimulationHook(Addresses addresses) public override {
+        vm.selectFork(BASE_FORK_ID);
         (, oraclePriceBefore, , , ) = AggregatorV3Interface(
             addresses.getAddress("cbETH_COMPOSITE_ORACLE")
         ).latestRoundData();

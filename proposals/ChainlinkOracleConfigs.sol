@@ -38,9 +38,10 @@ abstract contract ChainlinkOracleConfigs is Test {
         // _oracleConfigs[BASE_CHAIN_ID].push(
         //     OracleConfig("CHAINLINK_ETH_USD", "WETH", "MOONWELL_WETH")
         // );
-        _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("cbETHETH_ORACLE", "cbETH", "MOONWELL_cbETH")
-        );
+        // TODO: reverted this to cbETH_COMPOSITE_ORACLE in MIP-B57; update to oev wrapper in a future proposal
+        // _oracleConfigs[BASE_CHAIN_ID].push(
+        //     OracleConfig("cbETH_COMPOSITE_ORACLE", "cbETH", "MOONWELL_cbETH")
+        // );
         // Composite oracles don't support latestRound(), deferred to follow-up
         // _oracleConfigs[BASE_CHAIN_ID].push(
         //     OracleConfig("CHAINLINK_WSTETH_STETH_COMPOSITE_ORACLE", "wstETH", "MOONWELL_wstETH")

@@ -408,10 +408,25 @@ contract mipx44 is HybridProposal {
             "Ethereum: wormhole bridge adapter gas limit is incorrect"
         );
 
+        // Validate xWELL ownership
+        address deployer = addresses.getAddress("MOONWELL_DEPLOYER");
+        assertEq(
+            xWELL(xwellProxy).owner(),
+            deployer,
+            "Ethereum: xWELL owner should be MOONWELL_DEPLOYER"
+        );
+
         assertEq(
             xWELL(xwellProxy).pendingOwner(),
             address(0),
             "Ethereum: xWELL pending owner should be address(0)"
+        );
+
+        // Validate WormholeBridgeAdapter ownership
+        assertEq(
+            WormholeBridgeAdapter(wormholeAdapter).owner(),
+            deployer,
+            "Ethereum: WormholeBridgeAdapter owner should be MOONWELL_DEPLOYER"
         );
 
         // Validate pause duration
@@ -506,6 +521,24 @@ contract mipx44 is HybridProposal {
             ),
             proxyAdmin,
             "Ethereum: ProxyAdmin is not admin of ecosystem reserve proxy"
+        );
+
+        // Validate EcosystemReserve fundsAdmin is the EcosystemReserveController
+        address ecosystemReserveController = addresses.getAddress(
+            "ECOSYSTEM_RESERVE_CONTROLLER"
+        );
+        (
+            bool fundsAdminSuccess,
+            bytes memory fundsAdminData
+        ) = ecosystemReserveProxy.staticcall(
+                abi.encodeWithSignature("getFundsAdmin()")
+            );
+        require(fundsAdminSuccess, "Failed to read getFundsAdmin");
+        address fundsAdmin = abi.decode(fundsAdminData, (address));
+        assertEq(
+            fundsAdmin,
+            ecosystemReserveController,
+            "Ethereum: EcosystemReserve fundsAdmin should be EcosystemReserveController"
         );
     }
 

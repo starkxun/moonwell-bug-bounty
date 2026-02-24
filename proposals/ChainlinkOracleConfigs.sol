@@ -49,9 +49,8 @@ abstract contract ChainlinkOracleConfigs is Test {
         // _oracleConfigs[BASE_CHAIN_ID].push(
         //     OracleConfig("CHAINLINK_ETH_USD", "WETH", "MOONWELL_WETH")
         // );
-        _oracleConfigs[BASE_CHAIN_ID].push(
-            OracleConfig("cbETHETH_ORACLE", "cbETH", "MOONWELL_cbETH")
-        );
+        // cbETH uses cbETH_COMPOSITE_ORACLE (reverted from cbETHETH_ORACLE in MIP-B57)
+        // Now handled via _compositeOracleConfigs below
         _oracleConfigs[BASE_CHAIN_ID].push(
             OracleConfig("CHAINLINK_AERO_ORACLE", "AERO", "MOONWELL_AERO")
         );
@@ -84,6 +83,14 @@ abstract contract ChainlinkOracleConfigs is Test {
         );
 
         /// Initialize composite oracle configurations for Base
+        _compositeOracleConfigs[BASE_CHAIN_ID].push(
+            CompositeOracleConfig(
+                "cbETH_COMPOSITE_ORACLE",
+                "CHAINLINK_ETH_USD",
+                "cbETH",
+                "MOONWELL_cbETH"
+            )
+        );
         _compositeOracleConfigs[BASE_CHAIN_ID].push(
             CompositeOracleConfig(
                 "CHAINLINK_WSTETH_STETH_COMPOSITE_ORACLE",

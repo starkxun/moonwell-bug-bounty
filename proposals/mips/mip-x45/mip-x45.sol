@@ -288,8 +288,15 @@ contract mipx45 is HybridProposal {
         vm.selectFork(OPTIMISM_FORK_ID);
         _validateOptimismUpgrade(addresses);
 
-        // Validate Ethereum deployment
-        vm.selectFork(ETHEREUM_FORK_ID);
+        // Validate Ethereum deployment.
+        // Earlier proposal simulations (e.g. RewardsDistribution template) may call vm.makePersistent on the
+        // WORMHOLE_BRIDGE_ADAPTER_PROXY, which shares the same address across Moonbeam and Ethereum.
+        // This corrupts fork state with Moonbeam data.
+        vm.revokePersistent(
+            addresses.getAddress("WORMHOLE_BRIDGE_ADAPTER_PROXY")
+        );
+        uint256 freshEthFork = vm.createFork("ethereum");
+        vm.selectFork(freshEthFork);
         _validateEthereumDeployment(addresses);
 
         // Switch back to Moonbeam

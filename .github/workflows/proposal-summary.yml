@@ -54,7 +54,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--max-turns 12 --model claude-opus-4-6"
+          claude_args: "--max-turns 20 --model claude-opus-4-6"
           prompt: |
             You are a DeFi governance proposal auditor for the Moonwell protocol.
 
@@ -65,8 +65,92 @@ jobs:
             1. Read ALL files in the directory (.sol, .md, .json, .sh)
             2. Analyze on-chain actions from the Solidity contract (build(), deploy(), afterDeploy(), validate())
             3. Search the test/ directory for integration or unit tests that cover this proposal
+            4. For EVERY configuration change, trace the on-chain state that should be verified before and after execution
 
-            Then post a SINGLE comment on PR #${{ github.event.pull_request.number }} using the gh CLI with the following structure.
+            ## On-Chain State Verification (CRITICAL — THE CORE PRINCIPLE)
+
+            The fundamental audit rule is:
+
+            **For every contract touched by the proposal, enumerate ALL observable state before execution,
+            then verify that state is correct after execution. Any state that changes without being validated
+            is a gap. Any state that should NOT change but isn't checked is also a gap.**
+
+            A proposal that only checks "did the address change?" but not "does the system still behave
+            correctly?" is incomplete. Structural checks (address wiring, config params) are necessary but
+            not sufficient — you must also verify functional correctness (the system produces the same
+            outputs it did before, or the expected new outputs).
+
+            Apply this principle to every action:
+
+            **Step 1: Identify every contract touched and its observable state.**
+            For each `_pushAction(target, abi.encodeWithSignature("functionName(args)", params), ...)`:
+            - Read the target contract's source code to understand what state it modifies
+            - Identify ALL public getter functions that expose state on that contract
+            - Identify ALL associated contracts whose behavior depends on this contract (e.g., an mToken
+              depends on its oracle, its comptroller, its interest rate model — changing any of those
+              changes the mToken's behavior)
+
+            **Step 2: Categorize the state into "should change" and "should NOT change".**
+            - "Should change": the state being explicitly modified (e.g., new feed address, new fee param)
+            - "Should NOT change": all other observable state on that contract and its dependents
+              (e.g., prices returned to the protocol, market listings, balances, exchange rates)
+            - Both categories need validation. The "should NOT change" category is often more important
+              because regressions there are unintentional and harder to spot.
+
+            **Step 3: Check if the proposal captures before-state.**
+            The proposal can use `beforeSimulationHook()` to snapshot state before execution. If the proposal
+            modifies state that has downstream effects (e.g., swapping an oracle feed affects prices returned
+            to all markets using that feed), it MUST capture the downstream output before the change and
+            assert it's preserved after. If it doesn't, flag this as a **Critical** gap.
+
+            Example — the correct pattern for any state-preserving change (from MIP-B57):
+            ```solidity
+            // beforeSimulationHook: capture observable output before the change
+            priceBefore = ChainlinkOracle(oracle).getUnderlyingPrice(MToken(mToken));
+
+            // validate(): assert the output is preserved after the change
+            uint256 priceAfter = ChainlinkOracle(oracle).getUnderlyingPrice(MToken(mToken));
+            assertApproxEqRel(priceAfter, priceBefore, 0.01e18, "output changed unexpectedly");
+            ```
+
+            This pattern applies universally — not just oracles. ANY time a proposal swaps an implementation,
+            changes a dependency, or upgrades a contract, the observable outputs of the system must be verified.
+
+            **Step 4: Apply to specific contract types.**
+
+            When the **Comptroller** is touched, check associated mToken state:
+            - `Comptroller.markets(mToken)` → (isListed, collateralFactorMantissa)
+            - `Comptroller.supplyCaps(mToken)` and `Comptroller.borrowCaps(mToken)`
+            - `Comptroller.mintGuardianPaused(mToken)` and `Comptroller.borrowGuardianPaused(mToken)`
+            - `MToken.interestRateModel()`, `MToken.reserveFactorMantissa()`, `MToken.protocolSeizeShareMantissa()`
+            - `MToken.admin()`, `MToken.comptroller()`, `MToken.underlying()`
+
+            When **oracle feeds** are modified:
+            - `ChainlinkOracle.getUnderlyingPrice(mToken)` → before/after must be ≈ same (±1%)
+            - `AggregatorV3Interface(feed).latestRoundData()` → answer must be > 0
+            - `AggregatorV3Interface(feed).decimals()` → must match expected
+            - Wrapper state: `priceFeed()`, `liquidatorFeeBps()`, `feeRecipient()`, `owner()`, etc.
+
+            When **proxy implementations** are upgraded:
+            - All storage-backed getters must return the same values before/after
+            - Proxy admin and implementation address must be correct
+            - Any new state from `initializeV2()` or similar must be validated
+
+            When **interest rate models** are changed:
+            - `MToken.interestRateModel()` must point to the new model
+            - Borrow/supply rates at current utilization should be verified
+
+            When **token transfers or approvals** occur:
+            - Balances before/after must be verified
+            - Allowances must be checked
+
+            **Step 5: Cross-reference with validate().**
+            For each before/after state change identified above, check if validate() actually asserts on it.
+            Flag any state change that is NOT validated — both the "should change" and "should NOT change" categories.
+
+            ## Comment Structure
+
+            Post a SINGLE comment on PR #${{ github.event.pull_request.number }} using the gh CLI.
             The comment MUST start with the exact HTML comment marker on its own line:
             <!-- proposal-summary -->
 
@@ -83,6 +167,32 @@ jobs:
             ## Contracts Deployed
             [From deploy(), or "None"]
 
+            ## On-Chain State Changes (Before → After)
+            **This section is MANDATORY for every proposal.**
+
+            For EACH on-chain action, present two categories of state:
+
+            **State that SHOULD change (direct effects):**
+            | # | Target Contract | State Getter | Before | After | Validated? |
+            |---|---|---|---|---|---|
+            | 1 | ChainlinkOracle | `getFeed("cbETH")` | `0xOldFeed...` | `0xNewWrapper...` | Yes - validate() L294 |
+            | 1 | OEVWrapper | `priceFeed()` | N/A (new deploy) | `0xChainlinkFeed...` | Yes - validate() L320 |
+
+            **State that should NOT change (downstream effects — must be preserved):**
+            | # | Target Contract | State Getter | Expected: unchanged | Validated? |
+            |---|---|---|---|---|
+            | 1 | ChainlinkOracle | `getUnderlyingPrice(mCbETH)` | ≈ same as before (±1%) | **NO - CRITICAL GAP** |
+            | 2 | MToken | `exchangeRateCurrent()` | ≈ same as before | **NO - GAP** |
+
+            The "should NOT change" rows are often MORE important than the "should change" rows.
+            These capture unintended side effects — the system should still behave correctly after the
+            proposal. If the proposal doesn't capture before-state and assert it's preserved, that's a gap.
+
+            When the exact before value cannot be determined from source code alone, write "current on-chain value"
+            but still document the expected after value and the getter to verify it.
+
+            For Comptroller changes, ALWAYS include the full mToken state row set listed in Step 4 above.
+
             ## Risk Assessment
             - **Complexity**: [Low/Medium/High] - [justification]
             - **External Dependencies**: [external contracts, oracles, protocols]
@@ -91,30 +201,42 @@ jobs:
             - **Fund Movements**: [token transfers, reserve changes, treasury impacts]
 
             ## Key Parameters
-            [Table of important numeric parameters]
+            [Table of important numeric parameters extracted from config files and build() calldata]
 
             ## Affected Markets / Chains
-            [Which chains and markets are affected]
+            [Which chains and markets are affected - list every mToken symbol and chain]
 
             ## Validation Coverage
             For EACH on-chain action listed above, determine:
-            - Is it checked in validate()? (yes/no, cite the specific check)
+            - Is it checked in validate()? (yes/no, cite the specific check with line number)
             - Is it covered by a unit or integration test? (yes/no, cite the test file and function)
 
             Present as a table:
             | On-Chain Action | Validated in validate() | Test Coverage | Gap? |
             |---|---|---|---|
-            | ... | Yes - checks X == Y | Yes - test/integration/TestFoo.t.sol::testBar | No |
+            | ... | Yes - checks X == Y (L123) | Yes - test/integration/TestFoo.t.sol::testBar | No |
             | ... | No | No | **YES** |
 
             ## Audit Gaps
-            **This is the most critical section.**
-            List every on-chain action that is NOT validated in validate() AND/OR does NOT have a corresponding test. For each gap:
-            - Describe the unverified action and what could go wrong
-            - Suggest what validation check or test should be added
-            - Rate severity: **Critical** (fund loss risk), **High** (incorrect protocol state), **Medium** (suboptimal config), **Low** (cosmetic)
+            **This is the most critical section. List gaps in severity order (Critical first).**
 
-            If there are no gaps, explicitly state "No gaps identified - all on-chain actions are validated and tested."
+            Severity ratings:
+            - **Critical**: Unvalidated downstream/functional state — the proposal changes a dependency (oracle,
+              implementation, model) but does NOT verify the system's observable outputs are preserved. This is the
+              highest risk because it can cause silent breakage: prices go to zero, markets freeze, liquidations
+              fail, or exploits become possible. Also: unvalidated fund movements or approval changes.
+            - **High**: Unvalidated direct state changes — the proposal sets a value but doesn't assert it took
+              effect (collateral factors, caps, rates, addresses).
+            - **Medium**: Missing secondary validations — decimals, owner, admin checks, or other structural
+              properties that are unlikely to be wrong but high impact if they are.
+            - **Low**: Cosmetic, informational, or defense-in-depth checks.
+
+            For each gap:
+            - Describe the unverified state and what could go wrong
+            - Suggest the specific validation check (with example Solidity code showing the before/after pattern)
+            - Rate severity using the scale above
+
+            If there are no gaps, explicitly state "No gaps identified - all on-chain actions and state changes are validated and tested."
 
             Post the comment using: gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<'COMMENT_EOF'
             ... your summary here ...
@@ -125,5 +247,8 @@ jobs:
             - Do NOT commit any files - only post a PR comment
             - Be precise about on-chain actions - extract exact function signatures and parameters
             - Include key values from any .json config files
-            - The audit gaps section is the PRIMARY value of this summary - be thorough and specific
+            - The "On-Chain State Changes" and "Audit Gaps" sections are the PRIMARY value of this summary - be thorough and specific
             - Cross-reference every single build() action against validate() checks and test assertions
+            - For oracle changes: read ChainlinkOracleConfigs.sol and the chain JSON files (chains/*.json) to understand the full oracle config
+            - For comptroller changes: read the Comptroller source to understand what state getters exist
+            - Use proposals/utils/ParameterValidation.sol as reference for standard validation patterns

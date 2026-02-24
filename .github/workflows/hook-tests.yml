@@ -14,7 +14,7 @@ env:
 jobs:
   hook-tests:
     name: Hook Tests (Unit + Integration)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code

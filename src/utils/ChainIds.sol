@@ -131,7 +131,7 @@ library ChainIds {
                 string(
                     abi.encodePacked(
                         "ChainIds: moonbeam fork has wrong chain id, expected 1284, got ",
-                        vm.toString(block.chainid)
+                        vmInternal.toString(block.chainid)
                     )
                 )
             );
@@ -142,7 +142,7 @@ library ChainIds {
                 string(
                     abi.encodePacked(
                         "ChainIds: base fork has wrong chain id, expected 8453, got ",
-                        vm.toString(block.chainid)
+                        vmInternal.toString(block.chainid)
                     )
                 )
             );
@@ -153,7 +153,7 @@ library ChainIds {
                 string(
                     abi.encodePacked(
                         "ChainIds: optimism fork has wrong chain id, expected 10, got ",
-                        vm.toString(block.chainid)
+                        vmInternal.toString(block.chainid)
                     )
                 )
             );
@@ -164,7 +164,7 @@ library ChainIds {
                 string(
                     abi.encodePacked(
                         "ChainIds: moonbase fork has wrong chain id, expected 1287, got ",
-                        vm.toString(block.chainid)
+                        vmInternal.toString(block.chainid)
                     )
                 )
             );
@@ -175,7 +175,7 @@ library ChainIds {
                 string(
                     abi.encodePacked(
                         "ChainIds: base sepolia fork has wrong chain id, expected 84532, got ",
-                        vm.toString(block.chainid)
+                        vmInternal.toString(block.chainid)
                     )
                 )
             );
@@ -186,7 +186,7 @@ library ChainIds {
                 string(
                     abi.encodePacked(
                         "ChainIds: optimism sepolia fork has wrong chain id, expected 11155420, got ",
-                        vm.toString(block.chainid)
+                        vmInternal.toString(block.chainid)
                     )
                 )
             );

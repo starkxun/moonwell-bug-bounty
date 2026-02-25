@@ -28,6 +28,13 @@
         "proposalType": "HybridProposal"
     },
     {
+        "envpath": "proposals/mips/mip-x42/x42.sh",
+        "governor": "MultichainGovernor",
+        "id": 140,
+        "path": "mip-x42.sol/mipx42.json",
+        "proposalType": "HybridProposal"
+    },
+    {
         "envpath": "proposals/mips/mip-x41/x41.sh",
         "id": 138,
         "governor": "MultichainGovernor",

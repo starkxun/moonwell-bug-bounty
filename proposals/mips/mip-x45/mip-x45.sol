@@ -14,7 +14,7 @@ import {IERC20} from "@openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IStakedWell} from "@protocol/IStakedWell.sol";
 import {HybridProposal} from "@proposals/proposalTypes/HybridProposal.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
-import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ETHEREUM_FORK_ID, ChainIds} from "@utils/ChainIds.sol";
+import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ETHEREUM_FORK_ID, MOONBEAM_CHAIN_ID, BASE_CHAIN_ID, OPTIMISM_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID, BASE_WORMHOLE_CHAIN_ID, OPTIMISM_WORMHOLE_CHAIN_ID, ChainIds} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
 /// @title MIP-X45: Upgrade StakedWell contracts on Base, OP, and Moonbeam; Deploy to Ethereum
@@ -34,6 +34,21 @@ contract mipx45 is HybridProposal {
     using ChainIds for uint256;
 
     string public constant override name = "MIP-X45";
+
+    /// @notice Before-state snapshots for storage preservation checks
+    struct StkWellSnapshot {
+        address stakedToken;
+        address rewardToken;
+        uint256 cooldownSeconds;
+        uint256 unstakeWindow;
+        address rewardsVault;
+        address emissionManager;
+        uint256 totalSupply;
+    }
+
+    StkWellSnapshot public moonbeamBefore;
+    StkWellSnapshot public baseBefore;
+    StkWellSnapshot public optimismBefore;
 
     /// @notice Constants for Ethereum xWELL deployment
     uint112 public constant ETH_XWELL_BUFFER_CAP = 100_000_000 * 1e18;
@@ -215,33 +230,59 @@ contract mipx45 is HybridProposal {
         vm.selectFork(primaryForkId());
     }
 
+    /// @notice Snapshot stkWELL storage state on the current fork
+    function _snapshotStkWell(
+        address proxy
+    ) internal view returns (StkWellSnapshot memory) {
+        IStakedWell stkWell = IStakedWell(proxy);
+        return
+            StkWellSnapshot({
+                stakedToken: address(stkWell.STAKED_TOKEN()),
+                rewardToken: address(stkWell.REWARD_TOKEN()),
+                cooldownSeconds: stkWell.COOLDOWN_SECONDS(),
+                unstakeWindow: stkWell.UNSTAKE_WINDOW(),
+                rewardsVault: address(stkWell.REWARDS_VAULT()),
+                emissionManager: stkWell.EMISSION_MANAGER(),
+                totalSupply: stkWell.totalSupply()
+            });
+    }
+
     /// @notice Stake tokens before the proposal executes to simulate existing stakers
     function beforeSimulationHook(Addresses addresses) public override {
         address testUser = address(0xBEEF);
         uint256 stakeAmount = 1_000 * 1e18;
 
-        // Stake on Moonbeam
+        // Stake then snapshot on Moonbeam
         vm.selectFork(primaryForkId());
         _stakeTokens(
             addresses.getAddress("STK_GOVTOKEN_PROXY"),
             testUser,
             stakeAmount
         );
+        moonbeamBefore = _snapshotStkWell(
+            addresses.getAddress("STK_GOVTOKEN_PROXY")
+        );
 
-        // Stake on Base
+        // Stake then snapshot on Base
         vm.selectFork(BASE_FORK_ID);
         _stakeTokens(
             addresses.getAddress("STK_GOVTOKEN_PROXY"),
             testUser,
             stakeAmount
         );
+        baseBefore = _snapshotStkWell(
+            addresses.getAddress("STK_GOVTOKEN_PROXY")
+        );
 
-        // Stake on Optimism
+        // Stake then snapshot on Optimism
         vm.selectFork(OPTIMISM_FORK_ID);
         _stakeTokens(
             addresses.getAddress("STK_GOVTOKEN_PROXY"),
             testUser,
             stakeAmount
+        );
+        optimismBefore = _snapshotStkWell(
+            addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
 
         // Switch back to primary fork
@@ -328,6 +369,9 @@ contract mipx45 is HybridProposal {
             "initializeV2 not called - defaultSnapshotTimestamp is 0"
         );
 
+        // Validate storage preservation after upgrade
+        _assertStoragePreserved(proxy, moonbeamBefore, "Moonbeam");
+
         // Validate MultichainGovernor useTimestamps is true
         address governor = addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY");
         (bool timestampSuccess, bytes memory timestampData) = governor
@@ -337,6 +381,18 @@ contract mipx45 is HybridProposal {
         assertTrue(
             useTimestamps,
             "MultichainGovernor useTimestamps not enabled"
+        );
+
+        // Validate MultichainGovernor stkWell address
+        (bool stkWellSuccess, bytes memory stkWellData) = governor.staticcall(
+            abi.encodeWithSignature("stkWell()")
+        );
+        require(stkWellSuccess, "Failed to read stkWell");
+        address stkWellAddr = abi.decode(stkWellData, (address));
+        assertEq(
+            stkWellAddr,
+            proxy,
+            "MultichainGovernor stkWell address incorrect"
         );
 
         // Sanity check: stake and unstake works after upgrade
@@ -356,6 +412,9 @@ contract mipx45 is HybridProposal {
             "Base stkWELL implementation not upgraded"
         );
 
+        // Validate storage preservation after upgrade
+        _assertStoragePreserved(proxy, baseBefore, "Base");
+
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, "Base");
     }
@@ -373,6 +432,9 @@ contract mipx45 is HybridProposal {
             "Optimism stkWELL implementation not upgraded"
         );
 
+        // Validate storage preservation after upgrade
+        _assertStoragePreserved(proxy, optimismBefore, "Optimism");
+
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, "Optimism");
     }
@@ -386,6 +448,50 @@ contract mipx45 is HybridProposal {
         );
         require(success, "Failed to get proxy implementation");
         return abi.decode(data, (address));
+    }
+
+    /// @notice Assert that stkWELL storage-backed getters are preserved after upgrade
+    function _assertStoragePreserved(
+        address proxy,
+        StkWellSnapshot memory before,
+        string memory chainName
+    ) internal {
+        IStakedWell stkWell = IStakedWell(proxy);
+        assertEq(
+            address(stkWell.STAKED_TOKEN()),
+            before.stakedToken,
+            string.concat(chainName, ": STAKED_TOKEN changed after upgrade")
+        );
+        assertEq(
+            address(stkWell.REWARD_TOKEN()),
+            before.rewardToken,
+            string.concat(chainName, ": REWARD_TOKEN changed after upgrade")
+        );
+        assertEq(
+            stkWell.COOLDOWN_SECONDS(),
+            before.cooldownSeconds,
+            string.concat(chainName, ": COOLDOWN_SECONDS changed after upgrade")
+        );
+        assertEq(
+            stkWell.UNSTAKE_WINDOW(),
+            before.unstakeWindow,
+            string.concat(chainName, ": UNSTAKE_WINDOW changed after upgrade")
+        );
+        assertEq(
+            address(stkWell.REWARDS_VAULT()),
+            before.rewardsVault,
+            string.concat(chainName, ": REWARDS_VAULT changed after upgrade")
+        );
+        assertEq(
+            stkWell.EMISSION_MANAGER(),
+            before.emissionManager,
+            string.concat(chainName, ": EMISSION_MANAGER changed after upgrade")
+        );
+        assertEq(
+            stkWell.totalSupply(),
+            before.totalSupply,
+            string.concat(chainName, ": totalSupply changed after upgrade")
+        );
     }
 
     /// @notice Validate Ethereum xWELL and stkWELL deployment
@@ -546,6 +652,38 @@ contract mipx45 is HybridProposal {
             fundsAdmin,
             ecosystemReserveController,
             "Ethereum: EcosystemReserve fundsAdmin should be EcosystemReserveController"
+        );
+
+        // Validate WormholeBridgeAdapter trusted senders for all source chains
+        assertTrue(
+            WormholeBridgeAdapter(wormholeAdapter).isTrustedSender(
+                MOONBEAM_WORMHOLE_CHAIN_ID,
+                addresses.getAddress(
+                    "WORMHOLE_BRIDGE_ADAPTER_PROXY",
+                    MOONBEAM_CHAIN_ID
+                )
+            ),
+            "Ethereum: Moonbeam wormhole adapter not trusted"
+        );
+        assertTrue(
+            WormholeBridgeAdapter(wormholeAdapter).isTrustedSender(
+                BASE_WORMHOLE_CHAIN_ID,
+                addresses.getAddress(
+                    "WORMHOLE_BRIDGE_ADAPTER_PROXY",
+                    BASE_CHAIN_ID
+                )
+            ),
+            "Ethereum: Base wormhole adapter not trusted"
+        );
+        assertTrue(
+            WormholeBridgeAdapter(wormholeAdapter).isTrustedSender(
+                OPTIMISM_WORMHOLE_CHAIN_ID,
+                addresses.getAddress(
+                    "WORMHOLE_BRIDGE_ADAPTER_PROXY",
+                    OPTIMISM_CHAIN_ID
+                )
+            ),
+            "Ethereum: Optimism wormhole adapter not trusted"
         );
     }
 

@@ -23,42 +23,48 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
         addresses = new Addresses();
     }
 
-    function run() public {
-        vm.startBroadcast();
-
-        address unitroller = addresses.getAddress("UNITROLLER");
-        address safetyModule = addresses.getAddress("STK_GOVTOKEN_PROXY");
-        address governanceToken = addresses.getAddress("GOVTOKEN");
-        address nativeMarket = addresses.getAddress("MNATIVE");
-        address governanceTokenLP = addresses.getAddress("GOVTOKEN_LP");
-
-        // Token addresses
-        address wmovr = addresses.getAddress("WMOVR");
-        address usdc = addresses.getAddress("USDC");
-        address xcKSM = addresses.getAddress("xcKSM");
-        address frax = addresses.getAddress("FRAX");
-
-        // Solarbeam DEX pairs
-        address wmovrUsdcPair = addresses.getAddress("WMOVR_USDC_PAIR");
-        address xcKsmWmovrPair = addresses.getAddress("xcKSM_WMOVR_PAIR");
-        address fraxWmovrPair = addresses.getAddress("FRAX_WMOVR_PAIR");
-
+    /// @notice Core deployment logic, reusable from tests
+    /// @param _addresses the address registry to read config from
+    /// @param _admin the address that will be set as DEX pricing admin
+    /// @return views the fully configured MoonwellViewsV1Moonriver behind a proxy
+    function deploy(
+        Addresses _addresses,
+        address _admin
+    ) public returns (MoonwellViewsV1Moonriver views) {
         // 1. Deploy implementation
         MoonwellViewsV1Moonriver viewsImpl = new MoonwellViewsV1Moonriver();
 
-        // 2. Encode initialize calldata
-        bytes memory initdata = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address,address)",
-            unitroller,
-            address(0), // tokenSaleDistributor - not used on Moonriver
-            safetyModule,
-            governanceToken,
-            nativeMarket,
-            governanceTokenLP
-        );
+        // 2. Build init params
+        MoonwellViewsV1Moonriver.InitParams memory params;
+        params.comptroller = _addresses.getAddress("UNITROLLER");
+        params.safetyModule = _addresses.getAddress("STK_GOVTOKEN_PROXY");
+        params.governanceToken = _addresses.getAddress("GOVTOKEN");
+        params.nativeMarket = _addresses.getAddress("MNATIVE");
+        params.governanceTokenLP = _addresses.getAddress("GOVTOKEN_LP");
+        params.admin = _admin;
+        params.nativeWrapped = _addresses.getAddress("WMOVR");
+        params.stableToken = _addresses.getAddress("USDC");
+        params.stableDecimals = 6;
 
-        // 3. Deploy proxy
+        params.tokens = new address[](3);
+        params.pairs = new address[](3);
+
+        params.tokens[0] = _addresses.getAddress("WMOVR");
+        params.pairs[0] = _addresses.getAddress("WMOVR_USDC_PAIR");
+
+        params.tokens[1] = _addresses.getAddress("xcKSM");
+        params.pairs[1] = _addresses.getAddress("xcKSM_WMOVR_PAIR");
+
+        params.tokens[2] = _addresses.getAddress("FRAX");
+        params.pairs[2] = _addresses.getAddress("FRAX_WMOVR_PAIR");
+
+        // 3. Deploy proxy — single initialize sets protocol + DEX config
         ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+        bytes memory initdata = abi.encodeWithSelector(
+            MoonwellViewsV1Moonriver.initialize.selector,
+            params
+        );
 
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(viewsImpl),
@@ -66,22 +72,42 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
             initdata
         );
 
-        MoonwellViewsV1Moonriver views = MoonwellViewsV1Moonriver(
-            address(proxy)
+        views = MoonwellViewsV1Moonriver(address(proxy));
+
+        // 4. Register deployed addresses
+        _setAddress(
+            _addresses,
+            "MOONWELL_VIEWS_IMPLEMENTATION",
+            address(viewsImpl)
         );
+        _setAddress(
+            _addresses,
+            "MOONWELL_VIEWS_PROXY_ADMIN",
+            address(proxyAdmin)
+        );
+        _setAddress(_addresses, "MOONWELL_VIEWS_PROXY", address(proxy));
+    }
 
-        // 4. Configure DEX pricing
-        views.setAdmin(msg.sender);
-        views.setNativeWrapped(wmovr);
-        views.setStableToken(usdc, 6);
-        views.setDexPair(wmovr, wmovrUsdcPair);
-        views.setDexPair(xcKSM, xcKsmWmovrPair);
-        views.setDexPair(frax, fraxWmovrPair);
+    /// @notice Add or update an address in the registry
+    function _setAddress(
+        Addresses _addresses,
+        string memory name,
+        address addr
+    ) internal {
+        if (_addresses.isAddressSet(name)) {
+            _addresses.changeAddress(name, addr, true);
+        } else {
+            _addresses.addAddress(name, addr);
+        }
+    }
 
-        console.log("Implementation:", address(viewsImpl));
-        console.log("ProxyAdmin:", address(proxyAdmin));
-        console.log("Proxy:", address(proxy));
+    function run() public {
+        vm.startBroadcast();
+
+        deploy(addresses, msg.sender);
 
         vm.stopBroadcast();
+
+        addresses.printAddresses();
     }
 }

@@ -4,22 +4,17 @@ pragma solidity 0.8.19;
 import "@forge-std/Test.sol";
 
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
+import {DeployMoonwellViewsV1Moonriver} from "@script/DeployMoonwellViewsV1Moonriver.s.sol";
 import {MoonwellViewsV1Moonriver} from "@protocol/views/MoonwellViewsV1Moonriver.sol";
 import {BaseMoonwellViews} from "@protocol/views/BaseMoonwellViews.sol";
 import {MToken} from "@protocol/MToken.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 contract MoonwellViewsV1MoonriverTest is Test {
     MoonwellViewsV1Moonriver public views;
     Addresses public addresses;
 
     // Resolved from Addresses registry
-    address unitroller;
-    address stkGovtoken;
-    address govtoken;
     address mNative;
-    address govtokenLp;
     address wmovr;
     address usdc;
     address xcKSM;
@@ -29,63 +24,24 @@ contract MoonwellViewsV1MoonriverTest is Test {
     address fraxWmovrPair;
 
     function setUp() public {
-        string memory rpcUrl = vm.envOr(
-            "MOONRIVER_RPC_URL",
-            string("https://rpc.api.moonriver.moonbeam.network")
-        );
+        string memory rpcUrl = vm.envString("MOONRIVER_RPC_URL");
         vm.createSelectFork(rpcUrl);
 
         addresses = new Addresses();
 
-        // Protocol addresses
-        unitroller = addresses.getAddress("UNITROLLER");
-        stkGovtoken = addresses.getAddress("STK_GOVTOKEN_PROXY");
-        govtoken = addresses.getAddress("GOVTOKEN");
-        mNative = addresses.getAddress("MNATIVE");
-        govtokenLp = addresses.getAddress("GOVTOKEN_LP");
+        // Deploy using the deploy script
+        DeployMoonwellViewsV1Moonriver deployer = new DeployMoonwellViewsV1Moonriver();
+        views = deployer.deploy(addresses, address(this));
 
-        // Token addresses
+        // Cache addresses for assertions
+        mNative = addresses.getAddress("MNATIVE");
         wmovr = addresses.getAddress("WMOVR");
         usdc = addresses.getAddress("USDC");
         xcKSM = addresses.getAddress("xcKSM");
         frax = addresses.getAddress("FRAX");
-
-        // Solarbeam DEX pairs
         wmovrUsdcPair = addresses.getAddress("WMOVR_USDC_PAIR");
         xcKsmWmovrPair = addresses.getAddress("xcKSM_WMOVR_PAIR");
         fraxWmovrPair = addresses.getAddress("FRAX_WMOVR_PAIR");
-
-        // Deploy implementation
-        MoonwellViewsV1Moonriver impl = new MoonwellViewsV1Moonriver();
-
-        // Encode initialize
-        bytes memory initdata = abi.encodeWithSignature(
-            "initialize(address,address,address,address,address,address)",
-            unitroller,
-            address(0), // no token sale distributor
-            stkGovtoken,
-            govtoken,
-            mNative,
-            govtokenLp
-        );
-
-        // Deploy proxy
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl),
-            address(proxyAdmin),
-            initdata
-        );
-
-        views = MoonwellViewsV1Moonriver(address(proxy));
-
-        // Configure DEX pricing
-        views.setAdmin(address(this));
-        views.setNativeWrapped(wmovr);
-        views.setStableToken(usdc, 6);
-        views.setDexPair(wmovr, wmovrUsdcPair);
-        views.setDexPair(xcKSM, xcKsmWmovrPair);
-        views.setDexPair(frax, fraxWmovrPair);
     }
 
     function testGetMarketInfoMOVR() public view {

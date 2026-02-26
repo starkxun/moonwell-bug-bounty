@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity 0.8.19;
 
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {MoonwellViewsV1} from "@protocol/views/MoonwellViewsV1.sol";
+import {Comptroller} from "@protocol/Comptroller.sol";
+import {Well} from "@protocol/governance/Well.sol";
 import {MToken} from "@protocol/MToken.sol";
 import {MErc20Interface} from "@protocol/MTokenInterfaces.sol";
+import {SafetyModuleInterfaceV1} from "@protocol/views/SafetyModuleInterfaceV1.sol";
 import {UniswapV2PairInterface} from "@protocol/views/UniswapV2PairInterface.sol";
 
 /**
@@ -14,6 +18,20 @@ import {UniswapV2PairInterface} from "@protocol/views/UniswapV2PairInterface.sol
  *         Uses Solarbeam DEX pairs to compute prices when oracle reverts.
  */
 contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
+    struct InitParams {
+        address comptroller;
+        address safetyModule;
+        address governanceToken;
+        address nativeMarket;
+        address governanceTokenLP;
+        address admin;
+        address nativeWrapped;
+        address stableToken;
+        uint8 stableDecimals;
+        address[] tokens;
+        address[] pairs;
+    }
+
     /// @notice Token address to Solarbeam DEX pair mapping
     mapping(address => address) public dexPairs;
 
@@ -29,9 +47,44 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
     /// @notice Admin address for configuration
     address public admin;
 
+    /// @notice Governance token LP pair (stored here because base field is private)
+    UniswapV2PairInterface public governanceTokenLP;
+
     modifier onlyAdmin() {
         require(msg.sender == admin, "only admin");
         _;
+    }
+
+    /// @notice Initialize all state: protocol config + DEX pricing
+    function initialize(InitParams calldata params) external initializer {
+        // Base protocol config
+        require(
+            params.comptroller != address(0),
+            "Comptroller cant be the 0 address!"
+        );
+        comptroller = Comptroller(payable(params.comptroller));
+        require(
+            comptroller.isComptroller(),
+            "Cant bind to something thats not a comptroller!"
+        );
+
+        safetyModule = SafetyModuleInterfaceV1(params.safetyModule);
+        governanceToken = Well(params.governanceToken);
+        _nativeMarket = params.nativeMarket;
+        governanceTokenLP = UniswapV2PairInterface(params.governanceTokenLP);
+
+        // DEX pricing config
+        require(params.admin != address(0), "zero address");
+        require(params.tokens.length == params.pairs.length, "length mismatch");
+
+        admin = params.admin;
+        nativeWrapped = params.nativeWrapped;
+        stableToken = params.stableToken;
+        stableTokenDecimals = params.stableDecimals;
+
+        for (uint i = 0; i < params.tokens.length; i++) {
+            dexPairs[params.tokens[i]] = params.pairs[i];
+        }
     }
 
     /// @notice Set the admin address. First call is unrestricted (bootstrapping).
@@ -155,6 +208,37 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
         }
 
         return _result;
+    }
+
+    /// @notice Override getGovernanceTokenPrice using our own LP field + DEX native price
+    function getGovernanceTokenPrice()
+        public
+        view
+        virtual
+        override
+        returns (uint _result)
+    {
+        if (
+            address(governanceTokenLP) != address(0) &&
+            _nativeMarket != address(0)
+        ) {
+            (uint reserves0, uint reserves1, ) = governanceTokenLP
+                .getReserves();
+            address token0 = governanceTokenLP.token0();
+
+            uint _nativeReserve = token0 == address(governanceToken)
+                ? reserves1
+                : reserves0;
+            uint _tokenReserve = token0 == address(governanceToken)
+                ? reserves0
+                : reserves1;
+
+            if (_tokenReserve > 0) {
+                _result =
+                    (_nativeReserve * getNativeTokenPrice()) /
+                    _tokenReserve;
+            }
+        }
     }
 
     /// @notice Override getNativeTokenPrice with oracle try/catch + DEX fallback

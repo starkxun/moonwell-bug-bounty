@@ -17,20 +17,6 @@ forge script script/DeployMoonwellViewsV1Moonriver.s.sol:DeployMoonwellViewsV1Mo
 */
 
 contract DeployMoonwellViewsV1Moonriver is Script, Test {
-    // Moonriver token addresses
-    address constant WMOVR = 0x98878B06940aE243284CA214f92Bb71a2b032B8A;
-    address constant USDC = 0xE3F5a90F9cb311505cd691a46596599aA1A0AD7D;
-    address constant xcKSM = 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080;
-    address constant FRAX = 0x1A93B23281CC1CDE4C4741353F3064709A16197d;
-
-    // Solarbeam DEX pairs
-    address constant WMOVR_USDC_PAIR =
-        0xe537f70a8b62204832B8Ba91940B77d3f79AEb81;
-    address constant xcKSM_WMOVR_PAIR =
-        0xea3d1E9e69ADDFA1ee5BBb89778Decd862F1F7C5;
-    address constant FRAX_WMOVR_PAIR =
-        0x2cc54b4A3878e36E1C754871438113C1117a3ad7;
-
     Addresses public addresses;
 
     function setUp() public {
@@ -45,6 +31,17 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
         address governanceToken = addresses.getAddress("GOVTOKEN");
         address nativeMarket = addresses.getAddress("MNATIVE");
         address governanceTokenLP = addresses.getAddress("GOVTOKEN_LP");
+
+        // Token addresses
+        address wmovr = addresses.getAddress("WMOVR");
+        address usdc = addresses.getAddress("USDC");
+        address xcKSM = addresses.getAddress("xcKSM");
+        address frax = addresses.getAddress("FRAX");
+
+        // Solarbeam DEX pairs
+        address wmovrUsdcPair = addresses.getAddress("WMOVR_USDC_PAIR");
+        address xcKsmWmovrPair = addresses.getAddress("xcKSM_WMOVR_PAIR");
+        address fraxWmovrPair = addresses.getAddress("FRAX_WMOVR_PAIR");
 
         // 1. Deploy implementation
         MoonwellViewsV1Moonriver viewsImpl = new MoonwellViewsV1Moonriver();
@@ -75,11 +72,11 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
 
         // 4. Configure DEX pricing
         views.setAdmin(msg.sender);
-        views.setNativeWrapped(WMOVR);
-        views.setStableToken(USDC, 6);
-        views.setDexPair(WMOVR, WMOVR_USDC_PAIR);
-        views.setDexPair(xcKSM, xcKSM_WMOVR_PAIR);
-        views.setDexPair(FRAX, FRAX_WMOVR_PAIR);
+        views.setNativeWrapped(wmovr);
+        views.setStableToken(usdc, 6);
+        views.setDexPair(wmovr, wmovrUsdcPair);
+        views.setDexPair(xcKSM, xcKsmWmovrPair);
+        views.setDexPair(frax, fraxWmovrPair);
 
         console.log("Implementation:", address(viewsImpl));
         console.log("ProxyAdmin:", address(proxyAdmin));

@@ -8,6 +8,8 @@ import {DeployMoonwellViewsV1Moonriver} from "@script/DeployMoonwellViewsV1Moonr
 import {MoonwellViewsV1Moonriver} from "@protocol/views/MoonwellViewsV1Moonriver.sol";
 import {BaseMoonwellViews} from "@protocol/views/BaseMoonwellViews.sol";
 import {MToken} from "@protocol/MToken.sol";
+import {MErc20Interface} from "@protocol/MTokenInterfaces.sol";
+import {Comptroller} from "@protocol/Comptroller.sol";
 
 contract MoonwellViewsV1MoonriverTest is Test {
     MoonwellViewsV1Moonriver public views;
@@ -94,6 +96,54 @@ contract MoonwellViewsV1MoonriverTest is Test {
         // It's ok if it's 0 if LP is empty
         // Just verify it doesn't revert
         assertGe(price, 0, "governance token price should not revert");
+    }
+
+    function testDexPricesForAllConfiguredTokens() public view {
+        BaseMoonwellViews.Market[] memory markets = views.getAllMarketsInfo();
+
+        // Track which DEX-paired tokens we found with valid prices
+        bool foundWMOVR = false;
+        bool foundXcKSM = false;
+        bool foundFRAX = false;
+
+        for (uint i = 0; i < markets.length; i++) {
+            address underlying;
+
+            if (markets[i].market == mNative) {
+                underlying = wmovr;
+            } else {
+                underlying = address(
+                    MErc20Interface(markets[i].market).underlying()
+                );
+            }
+
+            if (underlying == wmovr || markets[i].market == mNative) {
+                foundWMOVR = true;
+                assertGt(
+                    markets[i].underlyingPrice,
+                    0,
+                    "WMOVR/MOVR price should be non-zero"
+                );
+            } else if (underlying == xcKSM) {
+                foundXcKSM = true;
+                assertGt(
+                    markets[i].underlyingPrice,
+                    0,
+                    "xcKSM price should be non-zero"
+                );
+            } else if (underlying == frax) {
+                foundFRAX = true;
+                assertGt(
+                    markets[i].underlyingPrice,
+                    0,
+                    "FRAX price should be non-zero"
+                );
+            }
+        }
+
+        assertTrue(foundWMOVR, "should find WMOVR/MOVR market");
+        assertTrue(foundXcKSM, "should find xcKSM market");
+        assertTrue(foundFRAX, "should find FRAX market");
     }
 
     function testDexPairConfiguration() public view {

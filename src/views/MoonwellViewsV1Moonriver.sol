@@ -86,9 +86,8 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
         }
     }
 
-    /// @notice Set the admin address. First call is unrestricted (bootstrapping).
-    function setAdmin(address _admin) external {
-        require(admin == address(0) || msg.sender == admin, "only admin");
+    /// @notice Set the admin address
+    function setAdmin(address _admin) external onlyAdmin {
         require(_admin != address(0), "zero address");
         admin = _admin;
     }

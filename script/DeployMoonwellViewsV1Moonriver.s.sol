@@ -74,7 +74,12 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
 
         views = MoonwellViewsV1Moonriver(address(proxy));
 
-        // 4. Register deployed addresses
+        // 4. Validate deployment with view calls
+        views.getProtocolInfo();
+        views.getNativeTokenPrice();
+        views.getGovernanceTokenPrice();
+
+        // 5. Register deployed addresses
         _setAddress(
             _addresses,
             "MOONWELL_VIEWS_IMPLEMENTATION",

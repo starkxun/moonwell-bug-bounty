@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "@forge-std/Test.sol";
 
+import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MoonwellViewsV1Moonriver} from "@protocol/views/MoonwellViewsV1Moonriver.sol";
 import {BaseMoonwellViews} from "@protocol/views/BaseMoonwellViews.sol";
 import {MToken} from "@protocol/MToken.sol";
@@ -11,27 +12,21 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract MoonwellViewsV1MoonriverTest is Test {
     MoonwellViewsV1Moonriver public views;
+    Addresses public addresses;
 
-    // Moonriver addresses
-    address constant UNITROLLER = 0x0b7a0EAA884849c6Af7a129e899536dDDcA4905E;
-    address constant STK_GOVTOKEN = 0xCd76e63f3AbFA864c53b4B98F57c1aA6539FDa3a;
-    address constant GOVTOKEN = 0xBb8d88bcD9749636BC4D2bE22aaC4Bb3B01A58F1;
-    address constant MNATIVE = 0x6a1A771C7826596652daDC9145fEAaE62b1cd07f;
-    address constant GOVTOKEN_LP = 0xE6Bfc609A2e58530310D6964ccdd236fc93b4ADB;
-
-    // Tokens
-    address constant WMOVR = 0x98878B06940aE243284CA214f92Bb71a2b032B8A;
-    address constant USDC = 0xE3F5a90F9cb311505cd691a46596599aA1A0AD7D;
-    address constant xcKSM = 0xFfFFfFff1FcaCBd218EDc0EbA20Fc2308C778080;
-    address constant FRAX = 0x1A93B23281CC1CDE4C4741353F3064709A16197d;
-
-    // Solarbeam DEX pairs
-    address constant WMOVR_USDC_PAIR =
-        0xe537f70a8b62204832B8Ba91940B77d3f79AEb81;
-    address constant xcKSM_WMOVR_PAIR =
-        0xea3d1E9e69ADDFA1ee5BBb89778Decd862F1F7C5;
-    address constant FRAX_WMOVR_PAIR =
-        0x2cc54b4A3878e36E1C754871438113C1117a3ad7;
+    // Resolved from Addresses registry
+    address unitroller;
+    address stkGovtoken;
+    address govtoken;
+    address mNative;
+    address govtokenLp;
+    address wmovr;
+    address usdc;
+    address xcKSM;
+    address frax;
+    address wmovrUsdcPair;
+    address xcKsmWmovrPair;
+    address fraxWmovrPair;
 
     function setUp() public {
         string memory rpcUrl = vm.envOr(
@@ -40,18 +35,38 @@ contract MoonwellViewsV1MoonriverTest is Test {
         );
         vm.createSelectFork(rpcUrl);
 
+        addresses = new Addresses();
+
+        // Protocol addresses
+        unitroller = addresses.getAddress("UNITROLLER");
+        stkGovtoken = addresses.getAddress("STK_GOVTOKEN_PROXY");
+        govtoken = addresses.getAddress("GOVTOKEN");
+        mNative = addresses.getAddress("MNATIVE");
+        govtokenLp = addresses.getAddress("GOVTOKEN_LP");
+
+        // Token addresses
+        wmovr = addresses.getAddress("WMOVR");
+        usdc = addresses.getAddress("USDC");
+        xcKSM = addresses.getAddress("xcKSM");
+        frax = addresses.getAddress("FRAX");
+
+        // Solarbeam DEX pairs
+        wmovrUsdcPair = addresses.getAddress("WMOVR_USDC_PAIR");
+        xcKsmWmovrPair = addresses.getAddress("xcKSM_WMOVR_PAIR");
+        fraxWmovrPair = addresses.getAddress("FRAX_WMOVR_PAIR");
+
         // Deploy implementation
         MoonwellViewsV1Moonriver impl = new MoonwellViewsV1Moonriver();
 
         // Encode initialize
         bytes memory initdata = abi.encodeWithSignature(
             "initialize(address,address,address,address,address,address)",
-            UNITROLLER,
+            unitroller,
             address(0), // no token sale distributor
-            STK_GOVTOKEN,
-            GOVTOKEN,
-            MNATIVE,
-            GOVTOKEN_LP
+            stkGovtoken,
+            govtoken,
+            mNative,
+            govtokenLp
         );
 
         // Deploy proxy
@@ -66,16 +81,16 @@ contract MoonwellViewsV1MoonriverTest is Test {
 
         // Configure DEX pricing
         views.setAdmin(address(this));
-        views.setNativeWrapped(WMOVR);
-        views.setStableToken(USDC, 6);
-        views.setDexPair(WMOVR, WMOVR_USDC_PAIR);
-        views.setDexPair(xcKSM, xcKSM_WMOVR_PAIR);
-        views.setDexPair(FRAX, FRAX_WMOVR_PAIR);
+        views.setNativeWrapped(wmovr);
+        views.setStableToken(usdc, 6);
+        views.setDexPair(wmovr, wmovrUsdcPair);
+        views.setDexPair(xcKSM, xcKsmWmovrPair);
+        views.setDexPair(frax, fraxWmovrPair);
     }
 
     function testGetMarketInfoMOVR() public view {
         BaseMoonwellViews.Market memory market = views.getMarketInfo(
-            MToken(MNATIVE)
+            MToken(mNative)
         );
 
         assertTrue(market.isListed, "mMOVR should be listed");
@@ -95,7 +110,7 @@ contract MoonwellViewsV1MoonriverTest is Test {
         // Verify MOVR market (first market) has a price from DEX fallback
         bool foundMOVR = false;
         for (uint i = 0; i < markets.length; i++) {
-            if (markets[i].market == MNATIVE) {
+            if (markets[i].market == mNative) {
                 foundMOVR = true;
                 assertGt(
                     markets[i].underlyingPrice,
@@ -126,15 +141,11 @@ contract MoonwellViewsV1MoonriverTest is Test {
     }
 
     function testDexPairConfiguration() public view {
-        assertEq(views.dexPairs(WMOVR), WMOVR_USDC_PAIR, "WMOVR pair mismatch");
-        assertEq(
-            views.dexPairs(xcKSM),
-            xcKSM_WMOVR_PAIR,
-            "xcKSM pair mismatch"
-        );
-        assertEq(views.dexPairs(FRAX), FRAX_WMOVR_PAIR, "FRAX pair mismatch");
-        assertEq(views.nativeWrapped(), WMOVR, "nativeWrapped mismatch");
-        assertEq(views.stableToken(), USDC, "stableToken mismatch");
+        assertEq(views.dexPairs(wmovr), wmovrUsdcPair, "WMOVR pair mismatch");
+        assertEq(views.dexPairs(xcKSM), xcKsmWmovrPair, "xcKSM pair mismatch");
+        assertEq(views.dexPairs(frax), fraxWmovrPair, "FRAX pair mismatch");
+        assertEq(views.nativeWrapped(), wmovr, "nativeWrapped mismatch");
+        assertEq(views.stableToken(), usdc, "stableToken mismatch");
         assertEq(
             views.stableTokenDecimals(),
             6,

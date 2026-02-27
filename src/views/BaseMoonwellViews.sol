@@ -99,7 +99,7 @@ contract BaseMoonwellViews is Initializable {
     TokenSaleDistributorInterfaceV1 private _tokenSaleDistributor;
     SafetyModuleInterfaceV1 public safetyModule;
     UniswapV2PairInterface private _governanceTokenLP;
-    address private _nativeMarket;
+    address internal _nativeMarket;
 
     /// construct the logic contract and initialize so that the initialize function is uncallable
     /// from the implementation and only callable from the proxy
@@ -146,7 +146,7 @@ contract BaseMoonwellViews is Initializable {
     /// @notice A view to get a specific market info
     function getMarketInfo(
         MToken _mToken
-    ) external view returns (Market memory) {
+    ) external view virtual returns (Market memory) {
         Market memory _result;
 
         (bool _isListed, uint _collateralFactor) = comptroller.markets(
@@ -433,7 +433,7 @@ contract BaseMoonwellViews is Initializable {
     }
 
     /// @notice Function to get native token price
-    function getNativeTokenPrice() public view returns (uint _result) {
+    function getNativeTokenPrice() public view virtual returns (uint _result) {
         if (address(_nativeMarket) != address(0)) {
             _result = comptroller.oracle().getUnderlyingPrice(
                 MToken(_nativeMarket)
@@ -442,7 +442,12 @@ contract BaseMoonwellViews is Initializable {
     }
 
     /// @notice Function to get the governance token price
-    function getGovernanceTokenPrice() public view returns (uint _result) {
+    function getGovernanceTokenPrice()
+        public
+        view
+        virtual
+        returns (uint _result)
+    {
         if (
             address(_governanceTokenLP) != address(0) &&
             address(_nativeMarket) != address(0)

@@ -44,6 +44,7 @@ contract mipx45 is HybridProposal {
         address rewardsVault;
         address emissionManager;
         uint256 totalSupply;
+        uint256 stakeTimestamp;
     }
 
     StkWellSnapshot public moonbeamBefore;
@@ -243,7 +244,8 @@ contract mipx45 is HybridProposal {
                 unstakeWindow: stkWell.UNSTAKE_WINDOW(),
                 rewardsVault: address(stkWell.REWARDS_VAULT()),
                 emissionManager: stkWell.EMISSION_MANAGER(),
-                totalSupply: stkWell.totalSupply()
+                totalSupply: stkWell.totalSupply(),
+                stakeTimestamp: 0
             });
     }
 
@@ -262,6 +264,7 @@ contract mipx45 is HybridProposal {
         moonbeamBefore = _snapshotStkWell(
             addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
+        moonbeamBefore.stakeTimestamp = block.timestamp;
 
         // Stake then snapshot on Base
         vm.selectFork(BASE_FORK_ID);
@@ -273,6 +276,7 @@ contract mipx45 is HybridProposal {
         baseBefore = _snapshotStkWell(
             addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
+        baseBefore.stakeTimestamp = block.timestamp;
 
         // Stake then snapshot on Optimism
         vm.selectFork(OPTIMISM_FORK_ID);
@@ -284,6 +288,7 @@ contract mipx45 is HybridProposal {
         optimismBefore = _snapshotStkWell(
             addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
+        optimismBefore.stakeTimestamp = block.timestamp;
 
         // Switch back to primary fork
         vm.selectFork(primaryForkId());
@@ -396,7 +401,7 @@ contract mipx45 is HybridProposal {
         );
 
         // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, "Moonbeam");
+        _validateStakeAndUnstake(proxy, moonbeamBefore, "Moonbeam");
     }
 
     function _validateBaseUpgrade(Addresses addresses) internal {
@@ -416,7 +421,7 @@ contract mipx45 is HybridProposal {
         _assertStoragePreserved(proxy, baseBefore, "Base");
 
         // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, "Base");
+        _validateStakeAndUnstake(proxy, baseBefore, "Base");
     }
 
     function _validateOptimismUpgrade(Addresses addresses) internal {
@@ -436,7 +441,7 @@ contract mipx45 is HybridProposal {
         _assertStoragePreserved(proxy, optimismBefore, "Optimism");
 
         // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, "Optimism");
+        _validateStakeAndUnstake(proxy, optimismBefore, "Optimism");
     }
 
     function _getProxyImplementation(
@@ -687,11 +692,12 @@ contract mipx45 is HybridProposal {
         );
     }
 
-    /// @notice Validate that a pre-existing staker can still withdraw after the upgrade
+    /// @notice Validate that a pre-existing staker can still withdraw and has voting power after the upgrade
     /// @dev The test user staked in beforeSimulationHook before the proposal executed. This verifies the upgrade
     /// didn't break functionality for existing stakers.
     function _validateStakeAndUnstake(
         address stkWellProxy,
+        StkWellSnapshot memory before,
         string memory chainName
     ) internal {
         uint256 snapshot = vm.snapshot(); // so that the time warp and state changes don't persist
@@ -709,6 +715,25 @@ contract mipx45 is HybridProposal {
             string.concat(
                 chainName,
                 ": staker balance should be > 0 after upgrade"
+            )
+        );
+
+        // Verify voting power is preserved after upgrade.
+        // Need to warp forward 1 second so the query timestamp is in the past (getPriorVotes requires this).
+        // On Moonbeam (V2 upgrade), the Snapshot struct gains a new `timestamp` field. Pre-upgrade V1
+        // snapshots have timestamp=0, which _getSnapshotTimestamp maps to defaultSnapshotTimestamp
+        // (set during initializeV2). So we must query at block.timestamp (after the upgrade), not at
+        // the original stakeTimestamp which predates defaultSnapshotTimestamp.
+        // On Base/OP (V1 to V1), the stakeTimestamp works directly.
+        vm.warp(block.timestamp + 1);
+        uint256 queryTimestamp = block.timestamp - 1;
+        uint256 votes = stkWell.getPriorVotes(testUser, queryTimestamp);
+        assertEq(
+            votes,
+            stakedBalance,
+            string.concat(
+                chainName,
+                ": voting power should equal staked balance after upgrade"
             )
         );
 

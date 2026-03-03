@@ -98,7 +98,7 @@ contract BaseMoonwellViews is Initializable {
 
     TokenSaleDistributorInterfaceV1 private _tokenSaleDistributor;
     SafetyModuleInterfaceV1 public safetyModule;
-    UniswapV2PairInterface private _governanceTokenLP;
+    UniswapV2PairInterface internal _governanceTokenLP;
     address internal _nativeMarket;
 
     /// construct the logic contract and initialize so that the initialize function is uncallable
@@ -114,7 +114,7 @@ contract BaseMoonwellViews is Initializable {
         address _governanceToken,
         address nativeMarket,
         address governanceTokenLP
-    ) external initializer {
+    ) external virtual initializer {
         // Sanity check the params
         require(
             _comptroller != address(0),
@@ -143,6 +143,13 @@ contract BaseMoonwellViews is Initializable {
         address _market
     ) internal view virtual returns (uint) {}
 
+    /// @notice Returns the underlying price for a market. Override to add fallback logic.
+    function _getUnderlyingPrice(
+        MToken _mToken
+    ) internal view virtual returns (uint) {
+        return comptroller.oracle().getUnderlyingPrice(_mToken);
+    }
+
     /// @notice A view to get a specific market info
     function getMarketInfo(
         MToken _mToken
@@ -166,9 +173,7 @@ contract BaseMoonwellViews is Initializable {
             _result.borrowPaused = comptroller.borrowGuardianPaused(
                 address(_mToken)
             );
-            _result.underlyingPrice = comptroller.oracle().getUnderlyingPrice(
-                _mToken
-            );
+            _result.underlyingPrice = _getUnderlyingPrice(_mToken);
             _result.totalSupply = _mToken.totalSupply();
             _result.totalBorrows = _mToken.totalBorrows();
             _result.totalReserves = _mToken.totalReserves();
@@ -179,19 +184,6 @@ contract BaseMoonwellViews is Initializable {
             _result.borrowRate = _mToken.borrowRatePerTimestamp();
             _result.supplyRate = _mToken.supplyRatePerTimestamp();
             _result.incentives = getMarketIncentives(_mToken);
-        }
-
-        return _result;
-    }
-
-    /// @notice A view to enumerate specfic markets configs
-    function getMarketsInfo(
-        MToken[] calldata _mTokens
-    ) external view returns (Market[] memory) {
-        Market[] memory _result = new Market[](_mTokens.length);
-
-        for (uint256 index = 0; index < _mTokens.length; index++) {
-            _result[index] = this.getMarketInfo(_mTokens[index]);
         }
 
         return _result;

@@ -33,7 +33,7 @@ contract MoonwellViewsV1MoonriverTest is Test {
 
         // Deploy using the deploy script
         DeployMoonwellViewsV1Moonriver deployer = new DeployMoonwellViewsV1Moonriver();
-        views = deployer.deploy(addresses, address(this));
+        views = deployer.deploy(addresses);
 
         // Cache addresses for assertions
         mNative = addresses.getAddress("MNATIVE");
@@ -150,39 +150,8 @@ contract MoonwellViewsV1MoonriverTest is Test {
         assertEq(views.dexPairs(wmovr), wmovrUsdcPair, "WMOVR pair mismatch");
         assertEq(views.dexPairs(xcKSM), xcKsmWmovrPair, "xcKSM pair mismatch");
         assertEq(views.dexPairs(frax), fraxWmovrPair, "FRAX pair mismatch");
-        assertEq(views.nativeWrapped(), wmovr, "nativeWrapped mismatch");
-        assertEq(views.stableToken(), usdc, "stableToken mismatch");
-        assertEq(
-            views.stableTokenDecimals(),
-            6,
-            "stableTokenDecimals mismatch"
-        );
-    }
-
-    function testAdminAccess() public {
-        // Non-admin should not be able to set pairs
-        vm.prank(address(0xdead));
-        vm.expectRevert("only admin");
-        views.setDexPair(address(1), address(2));
-
-        // Admin should be able to set pairs
-        views.setDexPair(address(1), address(2));
-        assertEq(views.dexPairs(address(1)), address(2));
-    }
-
-    function testSetAdminTransfer() public {
-        address newAdmin = address(0xBEEF);
-
-        // Transfer admin
-        views.setAdmin(newAdmin);
-        assertEq(views.admin(), newAdmin);
-
-        // Old admin can no longer call
-        vm.expectRevert("only admin");
-        views.setDexPair(address(1), address(2));
-
-        // New admin can call
-        vm.prank(newAdmin);
-        views.setDexPair(address(1), address(2));
+        // nativeWrapped is internal; verified implicitly via price checks
+        // stableToken is internal; verified implicitly via price checks
+        // stableTokenDecimals is internal; verified implicitly via price checks
     }
 }

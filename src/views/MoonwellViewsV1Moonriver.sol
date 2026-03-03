@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 pragma solidity 0.8.19;
 
-import {MoonwellViewsV1} from "@protocol/views/MoonwellViewsV1.sol";
+import {MoonwellViewsV1Simple} from "@protocol/views/MoonwellViewsV1Simple.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {Well} from "@protocol/governance/Well.sol";
 import {MToken} from "@protocol/MToken.sol";
@@ -12,18 +12,17 @@ import {UniswapV2PairInterface} from "@protocol/views/UniswapV2PairInterface.sol
 /**
  * @title Moonwell Views Contract for Moonriver
  * @author Moonwell
- * @notice Extends MoonwellViewsV1 with DEX-based price fallbacks for markets
- *         whose Chainlink oracle feeds are dead (e.g., MOVR/USD).
- *         Uses Solarbeam DEX pairs to compute prices when oracle reverts.
+ * @notice Extends MoonwellViewsV1Simple with DEX-based pricing for Moonriver.
+ *         Chainlink deprecated all Moonriver feeds, so prices come directly
+ *         from Solarbeam DEX pairs.
  */
-contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
+contract MoonwellViewsV1Moonriver is MoonwellViewsV1Simple {
     struct InitParams {
         address comptroller;
         address safetyModule;
         address governanceToken;
         address nativeMarket;
         address governanceTokenLP;
-        address admin;
         address nativeWrapped;
         address stableToken;
         uint8 stableDecimals;
@@ -43,40 +42,21 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
     /// @notice Decimals of the stable token
     uint8 public stableTokenDecimals;
 
-    /// @notice Admin address for configuration
-    address public admin;
-
-    /// @notice Governance token LP pair (stored here because base field is private)
-    UniswapV2PairInterface public governanceTokenLP;
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "only admin");
-        _;
-    }
-
     /// @notice Initialize all state: protocol config + DEX pricing
     function initialize(InitParams calldata params) external initializer {
         // Base protocol config
-        require(
-            params.comptroller != address(0),
-            "Comptroller cant be the 0 address!"
-        );
+        require(params.comptroller != address(0));
         comptroller = Comptroller(payable(params.comptroller));
-        require(
-            comptroller.isComptroller(),
-            "Cant bind to something thats not a comptroller!"
-        );
+        require(comptroller.isComptroller());
 
         safetyModule = SafetyModuleInterfaceV1(params.safetyModule);
         governanceToken = Well(params.governanceToken);
         _nativeMarket = params.nativeMarket;
-        governanceTokenLP = UniswapV2PairInterface(params.governanceTokenLP);
+        _governanceTokenLP = UniswapV2PairInterface(params.governanceTokenLP);
 
         // DEX pricing config
-        require(params.admin != address(0), "zero address");
-        require(params.tokens.length == params.pairs.length, "length mismatch");
+        require(params.tokens.length == params.pairs.length);
 
-        admin = params.admin;
         nativeWrapped = params.nativeWrapped;
         stableToken = params.stableToken;
         stableTokenDecimals = params.stableDecimals;
@@ -84,28 +64,6 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
         for (uint i = 0; i < params.tokens.length; i++) {
             dexPairs[params.tokens[i]] = params.pairs[i];
         }
-    }
-
-    /// @notice Set the admin address
-    function setAdmin(address _admin) external onlyAdmin {
-        require(_admin != address(0), "zero address");
-        admin = _admin;
-    }
-
-    /// @notice Set DEX pair for a token
-    function setDexPair(address token, address pair) external onlyAdmin {
-        dexPairs[token] = pair;
-    }
-
-    /// @notice Set the wrapped native token address
-    function setNativeWrapped(address token) external onlyAdmin {
-        nativeWrapped = token;
-    }
-
-    /// @notice Set the USD stablecoin reference
-    function setStableToken(address token, uint8 decimals) external onlyAdmin {
-        stableToken = token;
-        stableTokenDecimals = decimals;
     }
 
     /// @notice Get native token price from DEX (WMOVR/USDC pair)
@@ -150,96 +108,20 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
         return (nativeReserve * nativePrice) / tokenReserve;
     }
 
-    /// @notice Override getMarketInfo to wrap oracle price call in try/catch with DEX fallback
-    function getMarketInfo(
+    /// @notice Get underlying price purely from DEX (Chainlink deprecated on Moonriver)
+    function _getUnderlyingPrice(
         MToken _mToken
-    ) external view virtual override returns (Market memory) {
-        Market memory _result;
-
-        (bool _isListed, uint _collateralFactor) = comptroller.markets(
-            address(_mToken)
-        );
-
-        if (_isListed) {
-            _result.market = address(_mToken);
-            _result.borrowCap = comptroller.borrowCaps(address(_mToken));
-            _result.supplyCap = _getSupplyCaps(address(_mToken));
-            _result.collateralFactor = _collateralFactor;
-            _result.isListed = _isListed;
-
-            _result.mintPaused = comptroller.mintGuardianPaused(
-                address(_mToken)
-            );
-            _result.borrowPaused = comptroller.borrowGuardianPaused(
-                address(_mToken)
-            );
-
-            // Try oracle first, fallback to DEX pricing
-            try comptroller.oracle().getUnderlyingPrice(_mToken) returns (
-                uint price
-            ) {
-                _result.underlyingPrice = price;
-            } catch {
-                // Determine underlying token for DEX lookup
-                address underlying;
-                try MErc20Interface(address(_mToken)).underlying() returns (
-                    address token
-                ) {
-                    underlying = token;
-                } catch {
-                    // Native market (no underlying() function)
-                    underlying = nativeWrapped;
-                }
-                _result.underlyingPrice = _getTokenPriceFromDex(underlying);
-            }
-
-            _result.totalSupply = _mToken.totalSupply();
-            _result.totalBorrows = _mToken.totalBorrows();
-            _result.totalReserves = _mToken.totalReserves();
-            _result.cash = _mToken.getCash();
-            _result.exchangeRate = _mToken.exchangeRateStored();
-            _result.borrowIndex = _mToken.borrowIndex();
-            _result.reserveFactor = _mToken.reserveFactorMantissa();
-            _result.borrowRate = _mToken.borrowRatePerTimestamp();
-            _result.supplyRate = _mToken.supplyRatePerTimestamp();
-            _result.incentives = getMarketIncentives(_mToken);
+    ) internal view override returns (uint) {
+        if (address(_mToken) == _nativeMarket) {
+            return _getNativeTokenPriceFromDex();
         }
-
-        return _result;
+        return
+            _getTokenPriceFromDex(
+                MErc20Interface(address(_mToken)).underlying()
+            );
     }
 
-    /// @notice Override getGovernanceTokenPrice using our own LP field + DEX native price
-    function getGovernanceTokenPrice()
-        public
-        view
-        virtual
-        override
-        returns (uint _result)
-    {
-        if (
-            address(governanceTokenLP) != address(0) &&
-            _nativeMarket != address(0)
-        ) {
-            (uint reserves0, uint reserves1, ) = governanceTokenLP
-                .getReserves();
-            address token0 = governanceTokenLP.token0();
-
-            uint _nativeReserve = token0 == address(governanceToken)
-                ? reserves1
-                : reserves0;
-            uint _tokenReserve = token0 == address(governanceToken)
-                ? reserves0
-                : reserves1;
-
-            if (_tokenReserve > 0) {
-                _result =
-                    (_nativeReserve * getNativeTokenPrice()) /
-                    _tokenReserve;
-            }
-        }
-    }
-
-    /// @notice Override getNativeTokenPrice with oracle try/catch + DEX fallback
+    /// @notice Native token price purely from DEX (Chainlink deprecated on Moonriver)
     function getNativeTokenPrice()
         public
         view
@@ -247,15 +129,6 @@ contract MoonwellViewsV1Moonriver is MoonwellViewsV1 {
         override
         returns (uint _result)
     {
-        // Try oracle first if native market is configured
-        if (_nativeMarket != address(0)) {
-            try
-                comptroller.oracle().getUnderlyingPrice(MToken(_nativeMarket))
-            returns (uint price) {
-                return price;
-            } catch {}
-        }
-        // Fallback to DEX
         _result = _getNativeTokenPriceFromDex();
     }
 }

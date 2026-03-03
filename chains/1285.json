@@ -40,17 +40,17 @@
         "isContract": true
     },
     {
-        "addr": "0x2a55ba986a8c6EE17979f6233985414A865a280f",
+        "addr": "0xc2dA00D538237822e3c7dcb95114FA1474e4c884",
         "name": "MOONWELL_VIEWS_IMPLEMENTATION",
         "isContract": true
     },
     {
-        "addr": "0x6658ed2f38E4e76BA8F3cb88061372bFdA2821A0",
+        "addr": "0x1a05D666294ad867287fA8AefcCEb89Bd9AeE115",
         "name": "MOONWELL_VIEWS_PROXY_ADMIN",
         "isContract": true
     },
     {
-        "addr": "0xb4104C02BBf4E9be85AAa41a62974E4e28D59A33",
+        "addr": "0x6F0cC02e5a7640B28F538fcc06bCA3BdFA57d1BB",
         "name": "MOONWELL_VIEWS_PROXY",
         "isContract": true
     },

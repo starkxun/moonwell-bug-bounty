@@ -54,7 +54,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--max-turns 20 --model claude-sonnet-4-6-default"
+          claude_args: "--max-turns 20"
+          show_full_output: true
           prompt: |
             You are a DeFi governance proposal auditor for the Moonwell protocol.
 

@@ -25,11 +25,9 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
 
     /// @notice Core deployment logic, reusable from tests
     /// @param _addresses the address registry to read config from
-    /// @param _admin the address that will be set as DEX pricing admin
     /// @return views the fully configured MoonwellViewsV1Moonriver behind a proxy
     function deploy(
-        Addresses _addresses,
-        address _admin
+        Addresses _addresses
     ) public returns (MoonwellViewsV1Moonriver views) {
         // 1. Deploy implementation
         MoonwellViewsV1Moonriver viewsImpl = new MoonwellViewsV1Moonriver();
@@ -41,7 +39,6 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
         params.governanceToken = _addresses.getAddress("GOVTOKEN");
         params.nativeMarket = _addresses.getAddress("MNATIVE");
         params.governanceTokenLP = _addresses.getAddress("GOVTOKEN_LP");
-        params.admin = _admin;
         params.nativeWrapped = _addresses.getAddress("WMOVR");
         params.stableToken = _addresses.getAddress("USDC");
         params.stableDecimals = 6;
@@ -109,7 +106,7 @@ contract DeployMoonwellViewsV1Moonriver is Script, Test {
     function run() public {
         vm.startBroadcast();
 
-        deploy(addresses, msg.sender);
+        deploy(addresses);
 
         vm.stopBroadcast();
 

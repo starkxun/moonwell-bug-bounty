@@ -1649,6 +1649,7 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
             uint256 stkWellTotalSupplyAfter = stkWellMoonbeam.totalSupply();
 
             vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1); // Advance timestamp for snapshot queries
 
             // get votes after
             uint256 votesUserAfter = governor.getVotes(
@@ -1695,6 +1696,7 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
             uint256 stkWellTotalSupplyAfter = stkWellMoonbeam.totalSupply();
 
             vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1); // Advance timestamp for snapshot queries
 
             // get votes after
             uint256 votesUserAfter = governor.getVotes(
@@ -1743,6 +1745,7 @@ contract MultichainGovernorVotingUnitTest is MultichainBaseTest {
             uint256 stkWellTotalSupplyAfter = stkWellMoonbeam.totalSupply();
 
             vm.roll(block.number + 1);
+            vm.warp(block.timestamp + 1); // Advance timestamp for snapshot queries
 
             // get votes after
             uint256 votesUserAfter = governor.getVotes(

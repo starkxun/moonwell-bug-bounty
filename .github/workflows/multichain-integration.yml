@@ -179,6 +179,10 @@ jobs:
               : null;
 
             for (const comment of botComments) {
+              // Preserve proposal summary comments (posted by proposal-summary workflow)
+              if (typeof comment.body === 'string' && comment.body.includes('<!-- proposal-summary -->')) {
+                continue;
+              }
               if (keepId && comment.id === keepId) {
                 continue;
               }

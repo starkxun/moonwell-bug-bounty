@@ -151,6 +151,8 @@ contract mipb58 is HybridProposal {
         );
 
         uint16 wormholeChainId = BASE_CHAIN_ID.toWormholeChainId();
+        /// 5x buffer to account for Wormhole relay price fluctuations
+        /// between proposal creation and execution
         uint256 bridgeCost = xWELLRouter(router).bridgeCost(wormholeChainId) *
             5;
 

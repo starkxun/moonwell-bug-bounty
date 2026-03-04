@@ -27,6 +27,10 @@ contract mipb58 is HybridProposal {
     /// @notice WELL amount to bridge from Moonbeam (19,095,528 WELL, 18 decimals)
     uint256 public constant WELL_AMOUNT = 19_095_528e18;
 
+    /// @notice Pre-simulation balance snapshots
+    uint256 public usdcBalanceBefore;
+    uint256 public xwellBalanceBefore;
+
     constructor() {
         bytes memory proposalDescription = abi.encodePacked(
             vm.readFile("./proposals/mips/mip-b58/b58.md")
@@ -103,6 +107,14 @@ contract mipb58 is HybridProposal {
             USDC_AMOUNT
         );
         vm.stopPrank();
+
+        // Snapshot balances before proposal execution
+        address cBase = addresses.getAddress("C-BASE");
+        usdcBalanceBefore = IERC20(addresses.getAddress("USDC")).balanceOf(
+            cBase
+        );
+        xwellBalanceBefore = IERC20(addresses.getAddress("xWELL_PROXY"))
+            .balanceOf(cBase);
     }
 
     function build(Addresses addresses) public override {
@@ -191,19 +203,22 @@ contract mipb58 is HybridProposal {
     function validate(Addresses addresses, address) public view override {
         address cBase = addresses.getAddress("C-BASE");
 
-        // Validate xWELL transfer
-        uint256 xwellBalance = IERC20(addresses.getAddress("xWELL_PROXY"))
+        // Validate xWELL transfer: balance should have increased by exactly WELL_AMOUNT
+        uint256 xwellBalanceAfter = IERC20(addresses.getAddress("xWELL_PROXY"))
             .balanceOf(cBase);
-        assertGe(
-            xwellBalance,
+        assertEq(
+            xwellBalanceAfter - xwellBalanceBefore,
             WELL_AMOUNT,
-            "C-BASE should have received xWELL"
+            "C-BASE xWELL balance should have increased by WELL_AMOUNT"
         );
 
-        // Validate USDC transfer
-        uint256 usdcBalance = IERC20(addresses.getAddress("USDC")).balanceOf(
-            cBase
+        // Validate USDC transfer: balance should have increased by exactly USDC_AMOUNT
+        uint256 usdcBalanceAfter = IERC20(addresses.getAddress("USDC"))
+            .balanceOf(cBase);
+        assertEq(
+            usdcBalanceAfter - usdcBalanceBefore,
+            USDC_AMOUNT,
+            "C-BASE USDC balance should have increased by USDC_AMOUNT"
         );
-        assertGe(usdcBalance, USDC_AMOUNT, "C-BASE should have received USDC");
     }
 }

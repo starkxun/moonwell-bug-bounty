@@ -41,9 +41,9 @@ contract MultichainGovernorUnitTest is MultichainBaseTest {
     }
 
     function testGovernorSetup() public view {
-        assertFalse(
+        assertTrue(
             governor.useTimestamps(),
-            "useTimestamps should start off false after initialization"
+            "useTimestamps should be true since stkWellMoonbeam uses timestamps"
         );
         assertEq(
             governor.gasLimit(),
@@ -460,7 +460,7 @@ contract MultichainGovernorUnitTest is MultichainBaseTest {
 
     function testSetNewStakedWellGovernorSucceeds() public {
         address newStakedWell = address(1);
-        assertFalse(governor.useTimestamps(), "timestamps incorrectly in use");
+        assertTrue(governor.useTimestamps(), "timestamps not in use initially");
 
         vm.prank(address(governor));
         governor.setNewStakedWell(newStakedWell, true);
@@ -474,13 +474,15 @@ contract MultichainGovernorUnitTest is MultichainBaseTest {
     }
 
     function testSetNewStakedWellBaseWellGovernorSucceeds() public {
+        // Since stkWellMoonbeam is a V2 contract using timestamps, useTimestamps should already be true
+        assertTrue(governor.useTimestamps(), "timestamps not in use initially");
+
         uint256 startingVotes = governor.getVotes(
             address(this),
             block.timestamp - 1,
             block.number - 1
         );
         address newStakedWell = address(stkWellBase);
-        assertFalse(governor.useTimestamps(), "timestamps incorrectly in use");
 
         vm.prank(address(governor));
         governor.setNewStakedWell(newStakedWell, true);

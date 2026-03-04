@@ -783,5 +783,10 @@
         "addr": "0x6aa41dF8FB0deC976B59bf0824FC5fFB88ccA958",
         "isContract": true,
         "name": "CHAINLINK_VELO_USD_OEV_WRAPPER_DEPRECATED"
+    },
+    {
+        "addr": "0x78Feb72aeA00B912ac45438e0764A02213266568",
+        "isContract": true,
+        "name": "STK_GOVTOKEN_IMPL_V2"
     }
 ]

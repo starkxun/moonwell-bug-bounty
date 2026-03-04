@@ -6,7 +6,7 @@ import "@forge-std/Test.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-
+import {MultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
 import {xWELL} from "@protocol/xWELL/xWELL.sol";
 import {MintLimits} from "@protocol/xWELL/MintLimits.sol";
 import {WormholeBridgeAdapter} from "@protocol/xWELL/WormholeBridgeAdapter.sol";
@@ -55,6 +55,8 @@ contract mipx45 is HybridProposal {
     StkWellSnapshot public moonbeamBefore;
     StkWellSnapshot public baseBefore;
     StkWellSnapshot public optimismBefore;
+
+    address public moonbeamStakedWellBefore;
 
     /// @notice Constants for Ethereum xWELL deployment
     uint112 public constant ETH_XWELL_BUFFER_CAP = 100_000_000 * 1e18;
@@ -272,6 +274,11 @@ contract mipx45 is HybridProposal {
             addresses.getAddress("STK_GOVTOKEN_PROXY")
         );
         moonbeamBefore.stakeTimestamp = block.timestamp;
+        moonbeamStakedWellBefore = address(
+            MultichainGovernor(
+                payable(addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY"))
+            ).stkWell()
+        );
 
         // Stake then snapshot on Base
         vm.selectFork(BASE_FORK_ID);
@@ -377,7 +384,7 @@ contract mipx45 is HybridProposal {
 
         // Validate MultichainGovernor state after setNewStakedWell
         address governor = addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY");
-        _validateGovernorState(governor, proxy);
+        _validateGovernorState(governor, proxy, moonbeamStakedWellBefore);
 
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, moonbeamBefore, "Moonbeam");
@@ -420,7 +427,8 @@ contract mipx45 is HybridProposal {
     /// @notice Validate MultichainGovernor state after setNewStakedWell
     function _validateGovernorState(
         address governor,
-        address expectedStkWell
+        address expectedStkWell,
+        address expectedStkWellBefore
     ) internal {
         // Validate useTimestamps is true
         (bool timestampSuccess, bytes memory timestampData) = governor
@@ -440,6 +448,11 @@ contract mipx45 is HybridProposal {
             abi.decode(stkWellData, (address)),
             expectedStkWell,
             "MultichainGovernor stkWell address incorrect"
+        );
+        assertEq(
+            abi.decode(stkWellData, (address)),
+            expectedStkWellBefore,
+            "MultichainGovernor stkWell address changed after setNewStakedWell"
         );
 
         // Validate governance parameters are unchanged after setNewStakedWell

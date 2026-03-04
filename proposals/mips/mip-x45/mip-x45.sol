@@ -44,6 +44,7 @@ contract mipx45 is HybridProposal {
         address rewardsVault;
         address emissionManager;
         uint256 totalSupply;
+        uint128 emissionsPerSecond;
         uint256 stakeTimestamp;
     }
 
@@ -236,6 +237,7 @@ contract mipx45 is HybridProposal {
         address proxy
     ) internal view returns (StkWellSnapshot memory) {
         IStakedWell stkWell = IStakedWell(proxy);
+        (uint128 emissionsPerSecond, , ) = stkWell.assets(proxy);
         return
             StkWellSnapshot({
                 stakedToken: address(stkWell.STAKED_TOKEN()),
@@ -245,6 +247,7 @@ contract mipx45 is HybridProposal {
                 rewardsVault: address(stkWell.REWARDS_VAULT()),
                 emissionManager: stkWell.EMISSION_MANAGER(),
                 totalSupply: stkWell.totalSupply(),
+                emissionsPerSecond: emissionsPerSecond,
                 stakeTimestamp: 0
             });
     }
@@ -350,19 +353,37 @@ contract mipx45 is HybridProposal {
     }
 
     function _validateMoonbeamUpgrade(Addresses addresses) internal {
-        address proxyAdmin = addresses.getAddress("MOONBEAM_PROXY_ADMIN");
         address proxy = addresses.getAddress("STK_GOVTOKEN_PROXY");
-        address expectedImpl = addresses.getAddress("STK_GOVTOKEN_IMPL_V2");
 
         // Validate proxy points to new implementation
-        address actualImpl = _getProxyImplementation(proxyAdmin, proxy);
         assertEq(
-            actualImpl,
-            expectedImpl,
+            _getProxyImplementation(
+                addresses.getAddress("MOONBEAM_PROXY_ADMIN"),
+                proxy
+            ),
+            addresses.getAddress("STK_GOVTOKEN_IMPL_V2"),
             "Moonbeam stkWELL implementation not upgraded"
         );
 
         // Validate initializeV2 was called by checking defaultSnapshotTimestamp
+        _assertInitializeV2Called(proxy);
+
+        // Validate storage preservation after upgrade
+        _assertStoragePreserved(proxy, moonbeamBefore, "Moonbeam");
+
+        // Validate MultichainGovernor state after setNewStakedWell
+        address governor = addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY");
+        _validateGovernorState(governor, proxy);
+
+        // Sanity check: stake and unstake works after upgrade
+        _validateStakeAndUnstake(proxy, moonbeamBefore, "Moonbeam");
+
+        // End-to-end: verify MultichainGovernor.getVotes includes stkWELL contribution
+        _validateGovernorGetVotes(proxy, governor);
+    }
+
+    /// @notice Validate initializeV2 was called on the Moonbeam stkWELL proxy
+    function _assertInitializeV2Called(address proxy) internal {
         (bool success, bytes memory data) = proxy.staticcall(
             abi.encodeWithSignature("defaultSnapshotTimestamp()")
         );
@@ -373,35 +394,52 @@ contract mipx45 is HybridProposal {
             0,
             "initializeV2 not called - defaultSnapshotTimestamp is 0"
         );
+    }
 
-        // Validate storage preservation after upgrade
-        _assertStoragePreserved(proxy, moonbeamBefore, "Moonbeam");
-
-        // Validate MultichainGovernor useTimestamps is true
-        address governor = addresses.getAddress("MULTICHAIN_GOVERNOR_PROXY");
+    /// @notice Validate MultichainGovernor state after setNewStakedWell
+    function _validateGovernorState(
+        address governor,
+        address expectedStkWell
+    ) internal {
+        // Validate useTimestamps is true
         (bool timestampSuccess, bytes memory timestampData) = governor
             .staticcall(abi.encodeWithSignature("useTimestamps()"));
         require(timestampSuccess, "Failed to read useTimestamps");
-        bool useTimestamps = abi.decode(timestampData, (bool));
         assertTrue(
-            useTimestamps,
+            abi.decode(timestampData, (bool)),
             "MultichainGovernor useTimestamps not enabled"
         );
 
-        // Validate MultichainGovernor stkWell address
+        // Validate stkWell address
         (bool stkWellSuccess, bytes memory stkWellData) = governor.staticcall(
             abi.encodeWithSignature("stkWell()")
         );
         require(stkWellSuccess, "Failed to read stkWell");
-        address stkWellAddr = abi.decode(stkWellData, (address));
         assertEq(
-            stkWellAddr,
-            proxy,
+            abi.decode(stkWellData, (address)),
+            expectedStkWell,
             "MultichainGovernor stkWell address incorrect"
         );
 
-        // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, moonbeamBefore, "Moonbeam");
+        // Validate governance parameters are unchanged after setNewStakedWell
+        (bool thresholdSuccess, bytes memory thresholdData) = governor
+            .staticcall(abi.encodeWithSignature("proposalThreshold()"));
+        require(thresholdSuccess, "Failed to read proposalThreshold");
+        assertGt(
+            abi.decode(thresholdData, (uint256)),
+            0,
+            "MultichainGovernor proposalThreshold should be > 0"
+        );
+
+        (bool quorumSuccess, bytes memory quorumData) = governor.staticcall(
+            abi.encodeWithSignature("quorum()")
+        );
+        require(quorumSuccess, "Failed to read quorum");
+        assertGt(
+            abi.decode(quorumData, (uint256)),
+            0,
+            "MultichainGovernor quorum should be > 0"
+        );
     }
 
     function _validateBaseUpgrade(Addresses addresses) internal {
@@ -419,6 +457,9 @@ contract mipx45 is HybridProposal {
 
         // Validate storage preservation after upgrade
         _assertStoragePreserved(proxy, baseBefore, "Base");
+
+        // Validate configureAssets is removed in V2
+        _assertConfigureAssetsRemoved(proxy, "Base");
 
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, baseBefore, "Base");
@@ -439,6 +480,9 @@ contract mipx45 is HybridProposal {
 
         // Validate storage preservation after upgrade
         _assertStoragePreserved(proxy, optimismBefore, "Optimism");
+
+        // Validate configureAssets is removed in V2
+        _assertConfigureAssetsRemoved(proxy, "Optimism");
 
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, optimismBefore, "Optimism");
@@ -496,6 +540,15 @@ contract mipx45 is HybridProposal {
             stkWell.totalSupply(),
             before.totalSupply,
             string.concat(chainName, ": totalSupply changed after upgrade")
+        );
+        (uint128 emissionsAfter, , ) = stkWell.assets(proxy);
+        assertEq(
+            emissionsAfter,
+            before.emissionsPerSecond,
+            string.concat(
+                chainName,
+                ": emissionsPerSecond changed after upgrade"
+            )
         );
     }
 
@@ -584,6 +637,15 @@ contract mipx45 is HybridProposal {
             ),
             proxyAdmin,
             "Ethereum: ProxyAdmin is not admin of wormhole adapter proxy"
+        );
+
+        // Validate stkWELL proxy has a non-zero implementation
+        address stkWellImpl = ProxyAdmin(proxyAdmin).getProxyImplementation(
+            ITransparentUpgradeableProxy(stkWellProxy)
+        );
+        assertTrue(
+            stkWellImpl != address(0),
+            "Ethereum: stkWELL proxy must have non-zero implementation"
         );
 
         // Validate stkWELL deployment
@@ -689,6 +751,73 @@ contract mipx45 is HybridProposal {
                 )
             ),
             "Ethereum: Optimism wormhole adapter not trusted"
+        );
+    }
+
+    /// @notice Validate that MultichainGovernor.getVotes includes stkWELL contribution end-to-end
+    function _validateGovernorGetVotes(
+        address stkWellProxy,
+        address governor
+    ) internal {
+        uint256 snapshot = vm.snapshot();
+
+        address testUser = address(0xBEEF);
+        IStakedWell stkWell = IStakedWell(stkWellProxy);
+
+        vm.warp(block.timestamp + 2);
+        vm.roll(block.number + 1);
+
+        uint256 queryTimestamp = block.timestamp - 1;
+        uint256 queryBlock = block.number - 1;
+
+        uint256 stkWellVotes = stkWell.getPriorVotes(testUser, queryTimestamp);
+        assertGt(
+            stkWellVotes,
+            0,
+            "Moonbeam: stkWELL votes should be > 0 for test staker"
+        );
+
+        (bool success, bytes memory data) = governor.staticcall(
+            abi.encodeWithSignature(
+                "getVotes(address,uint256,uint256)",
+                testUser,
+                queryTimestamp,
+                queryBlock
+            )
+        );
+        require(success, "Failed to call MultichainGovernor.getVotes");
+        uint256 govVotes = abi.decode(data, (uint256));
+        assertGe(
+            govVotes,
+            stkWellVotes,
+            "Moonbeam: MultichainGovernor.getVotes should include stkWELL contribution"
+        );
+
+        vm.revertTo(snapshot);
+    }
+
+    /// @notice Assert that configureAssets is no longer callable after upgrade
+    function _assertConfigureAssetsRemoved(
+        address proxy,
+        string memory chainName
+    ) internal {
+        uint128[] memory emissionsPerSecond = new uint128[](0);
+        uint256[] memory totalStakeCeilings = new uint256[](0);
+        address[] memory underlyingAssets = new address[](0);
+        (bool success, ) = proxy.call(
+            abi.encodeWithSignature(
+                "configureAssets(uint128[],uint256[],address[])",
+                emissionsPerSecond,
+                totalStakeCeilings,
+                underlyingAssets
+            )
+        );
+        assertFalse(
+            success,
+            string.concat(
+                chainName,
+                ": configureAssets should be removed in V2"
+            )
         );
     }
 

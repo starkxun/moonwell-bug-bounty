@@ -387,7 +387,7 @@ contract mipx45 is HybridProposal {
         _validateGovernorState(governor, proxy, moonbeamStakedWellBefore);
 
         // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, moonbeamBefore, "Moonbeam");
+        _validateStakeAndUnstake(proxy, "Moonbeam");
 
         // Validate initializeV2() cannot be called again (reinitializer guard)
         vm.expectRevert();
@@ -411,7 +411,7 @@ contract mipx45 is HybridProposal {
     }
 
     /// @notice Validate initializeV2 was called on the Moonbeam stkWELL proxy
-    function _assertInitializeV2Called(address proxy) internal {
+    function _assertInitializeV2Called(address proxy) internal view {
         (bool success, bytes memory data) = proxy.staticcall(
             abi.encodeWithSignature("defaultSnapshotTimestamp()")
         );
@@ -429,7 +429,7 @@ contract mipx45 is HybridProposal {
         address governor,
         address expectedStkWell,
         address expectedStkWellBefore
-    ) internal {
+    ) internal view {
         // Validate useTimestamps is true
         (bool timestampSuccess, bytes memory timestampData) = governor
             .staticcall(abi.encodeWithSignature("useTimestamps()"));
@@ -500,7 +500,7 @@ contract mipx45 is HybridProposal {
         IStakedWellMoonbeam(proxy).initializeV2();
 
         // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, baseBefore, "Base");
+        _validateStakeAndUnstake(proxy, "Base");
     }
 
     function _validateOptimismUpgrade(Addresses addresses) internal {
@@ -527,7 +527,7 @@ contract mipx45 is HybridProposal {
         IStakedWellMoonbeam(proxy).initializeV2();
 
         // Sanity check: stake and unstake works after upgrade
-        _validateStakeAndUnstake(proxy, optimismBefore, "Optimism");
+        _validateStakeAndUnstake(proxy, "Optimism");
     }
 
     function _getProxyImplementation(
@@ -546,7 +546,7 @@ contract mipx45 is HybridProposal {
         address proxy,
         StkWellSnapshot memory before,
         string memory chainName
-    ) internal {
+    ) internal view {
         IStakedWell stkWell = IStakedWell(proxy);
         assertEq(
             address(stkWell.STAKED_TOKEN()),
@@ -597,7 +597,7 @@ contract mipx45 is HybridProposal {
     /// @notice Validate Ethereum xWELL and stkWELL deployment
     /// @dev Adapted from xwellDeployBase validation logic
     /// @param addresses The addresses contract
-    function _validateEthereumDeployment(Addresses addresses) private {
+    function _validateEthereumDeployment(Addresses addresses) private view {
         // Get addresses from Ethereum fork (current fork)
         address xwellProxy = addresses.getAddress("xWELL_PROXY");
         address wormholeAdapter = addresses.getAddress(
@@ -868,7 +868,6 @@ contract mipx45 is HybridProposal {
     /// didn't break functionality for existing stakers.
     function _validateStakeAndUnstake(
         address stkWellProxy,
-        StkWellSnapshot memory before,
         string memory chainName
     ) internal {
         uint256 snapshot = vm.snapshot(); // so that the time warp and state changes don't persist

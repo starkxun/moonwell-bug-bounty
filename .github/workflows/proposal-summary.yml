@@ -54,7 +54,7 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
-          claude_args: '--max-turns 20 --allowedTools "Bash(gh pr comment:*),Bash(gh api:*)"'
+          claude_args: '--max-turns 20 --allowedTools "Bash(gh pr comment:*),Bash(gh api:*),Write"'
           show_full_output: true
           prompt: |
             You are a DeFi governance proposal auditor for the Moonwell protocol.
@@ -239,10 +239,8 @@ jobs:
 
             If there are no gaps, explicitly state "No gaps identified - all on-chain actions and state changes are validated and tested."
 
-            Post the comment using: gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<'COMMENT_EOF'
-            ... your summary here ...
-            COMMENT_EOF
-            )"
+            Post the comment by first writing the full markdown content to a file called pr_comment.md
+            using the Write tool, then running: gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md
 
             IMPORTANT:
             - Do NOT commit any files - only post a PR comment

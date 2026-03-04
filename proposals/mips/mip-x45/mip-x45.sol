@@ -17,6 +17,10 @@ import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 import {MOONBEAM_FORK_ID, BASE_FORK_ID, OPTIMISM_FORK_ID, ETHEREUM_FORK_ID, MOONBEAM_CHAIN_ID, BASE_CHAIN_ID, OPTIMISM_CHAIN_ID, MOONBEAM_WORMHOLE_CHAIN_ID, BASE_WORMHOLE_CHAIN_ID, OPTIMISM_WORMHOLE_CHAIN_ID, ChainIds} from "@utils/ChainIds.sol";
 import {ProposalActions} from "@proposals/utils/ProposalActions.sol";
 
+interface IStakedWellMoonbeam {
+    function initializeV2() external;
+}
+
 /// @title MIP-X45: Upgrade StakedWell contracts on Base, OP, and Moonbeam; Deploy to Ethereum
 /// @author Moonwell Contributors
 /// @notice Proposal to:
@@ -378,6 +382,23 @@ contract mipx45 is HybridProposal {
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, moonbeamBefore, "Moonbeam");
 
+        // Validate initializeV2() cannot be called again (reinitializer guard)
+        vm.expectRevert();
+        IStakedWellMoonbeam(proxy).initializeV2();
+
+        // Validate initialize() cannot be called again (already initialized)
+        vm.expectRevert();
+        IStakedWell(proxy).initialize(
+            address(0),
+            address(0),
+            0,
+            0,
+            address(0),
+            address(0),
+            0,
+            address(0)
+        );
+
         // End-to-end: verify MultichainGovernor.getVotes includes stkWELL contribution
         _validateGovernorGetVotes(proxy, governor);
     }
@@ -461,6 +482,10 @@ contract mipx45 is HybridProposal {
         // Validate configureAssets is removed in V2
         _assertConfigureAssetsRemoved(proxy, "Base");
 
+        // Validate initializeV2() does not exist on Base stkWELL
+        vm.expectRevert();
+        IStakedWellMoonbeam(proxy).initializeV2();
+
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, baseBefore, "Base");
     }
@@ -483,6 +508,10 @@ contract mipx45 is HybridProposal {
 
         // Validate configureAssets is removed in V2
         _assertConfigureAssetsRemoved(proxy, "Optimism");
+
+        // Validate initializeV2() does not exist on Optimism stkWELL
+        vm.expectRevert();
+        IStakedWellMoonbeam(proxy).initializeV2();
 
         // Sanity check: stake and unstake works after upgrade
         _validateStakeAndUnstake(proxy, optimismBefore, "Optimism");

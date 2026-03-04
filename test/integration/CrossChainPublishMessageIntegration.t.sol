@@ -68,6 +68,9 @@ contract CrossChainPublishMessageTest is Test, PostProposalCheck {
             }
 
             addresses.removeAllRestrictions();
+            // Run beforeSimulationHook to set up pre-conditions
+            // (e.g. multisig approvals, mock relayers for cross-chain bridging)
+            proposal.beforeSimulationHook(addresses);
             // At this point the primaryForkId should not be moonbeam
             vm.selectFork(uint256(proposal.primaryForkId()));
             proposal.build(addresses);

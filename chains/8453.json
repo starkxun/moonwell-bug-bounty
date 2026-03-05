@@ -470,6 +470,11 @@
         "isContract": true
     },
     {
+        "addr": "0x4942E15F4B3B684EEbB7eE28C922fc634Cc751B1",
+        "name": "C-BASE",
+        "isContract": true
+    },
+    {
         "addr": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
         "name": "CHAINLINK_ETH_USD",
         "isContract": true

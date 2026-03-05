@@ -50,16 +50,17 @@ jobs:
 
       - name: Generate proposal summary
         if: steps.check.outputs.skip != 'true' && steps.detect.outputs.skip != 'true'
+        id: generate
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
-          claude_args: "--max-turns 20"
+          claude_args: '--max-turns 20 --allowedTools "Write"'
           show_full_output: true
           prompt: |
             You are a DeFi governance proposal auditor for the Moonwell protocol.
 
-            Audit these proposal directories and post a single PR comment with the results:
+            Audit these proposal directories and write the results to a file:
             ${{ steps.detect.outputs.dirs }}
 
             For EACH directory:
@@ -149,10 +150,10 @@ jobs:
             For each before/after state change identified above, check if validate() actually asserts on it.
             Flag any state change that is NOT validated — both the "should change" and "should NOT change" categories.
 
-            ## Comment Structure
+            ## Output Format
 
-            Post a SINGLE comment on PR #${{ github.event.pull_request.number }} using the gh CLI.
-            The comment MUST start with the exact HTML comment marker on its own line:
+            Write the FULL audit to a file called `pr_comment.md` using the Write tool.
+            The file MUST start with the exact HTML comment marker on its own line:
             <!-- proposal-summary -->
 
             Then for each proposal directory, include:
@@ -239,13 +240,8 @@ jobs:
 
             If there are no gaps, explicitly state "No gaps identified - all on-chain actions and state changes are validated and tested."
 
-            Post the comment using: gh pr comment ${{ github.event.pull_request.number }} --body "$(cat <<'COMMENT_EOF'
-            ... your summary here ...
-            COMMENT_EOF
-            )"
-
             IMPORTANT:
-            - Do NOT commit any files - only post a PR comment
+            - Write the output ONLY to pr_comment.md using the Write tool — do NOT post any comments
             - Be precise about on-chain actions - extract exact function signatures and parameters
             - Include key values from any .json config files
             - The "On-Chain State Changes" and "Audit Gaps" sections are the PRIMARY value of this summary - be thorough and specific
@@ -253,3 +249,22 @@ jobs:
             - For oracle changes: read ChainlinkOracleConfigs.sol and the chain JSON files (chains/*.json) to understand the full oracle config
             - For comptroller changes: read the Comptroller source to understand what state getters exist
             - Use proposals/utils/ParameterValidation.sol as reference for standard validation patterns
+
+      - name: Post comment
+        if: steps.check.outputs.skip != 'true' && steps.detect.outputs.skip != 'true' && hashFiles('pr_comment.md') != ''
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('pr_comment.md')) {
+              const body = fs.readFileSync('pr_comment.md', 'utf8');
+              if (body.trim().length > 0) {
+                const prNumber = context.payload.pull_request.number;
+                await github.rest.issues.createComment({
+                  ...context.repo,
+                  issue_number: prNumber,
+                  body: body
+                });
+              }
+            }

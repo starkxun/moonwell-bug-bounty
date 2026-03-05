@@ -480,6 +480,11 @@
         "isContract": true
     },
     {
+        "addr": "0x4942E15F4B3B684EEbB7eE28C922fc634Cc751B1",
+        "name": "C-BASE",
+        "isContract": true
+    },
+    {
         "addr": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
         "name": "CHAINLINK_ETH_USD",
         "isContract": true
@@ -1418,5 +1423,10 @@
         "addr": "0xfbA86a013f7FD93B5454e147242CF2Bf419e120D",
         "isContract": true,
         "name": "CHAINLINK_MAMO_USD_OEV_WRAPPER"
+    },
+    {
+        "addr": "0xe2747A3f7dD8585eB04c7632a9561D9616454B29",
+        "isContract": true,
+        "name": "STK_GOVTOKEN_IMPL_V2"
     }
 ]

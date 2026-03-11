@@ -441,7 +441,16 @@ contract LiveProposalCheck is Test, ProposalChecker, Networks {
         }
 
         uint256 activeFork = vm.activeFork();
-        vm.warp(crossChainVoteCollectionEndTimestamp);
+
+        // Only warp forward — never backward. Older queued proposals have
+        // earlier crossChainVoteCollectionEndTimestamp values. Warping backward
+        // would put block.timestamp before accrualBlockTimestamp / MRD
+        // globalTimestamp values that were set during earlier (newer) proposal
+        // execution, causing "subtraction underflow" and "could not calculate
+        // block delta" errors.
+        if (crossChainVoteCollectionEndTimestamp > block.timestamp) {
+            vm.warp(crossChainVoteCollectionEndTimestamp);
+        }
 
         TemporalGovernor temporalGovernor;
         bytes memory vaa;

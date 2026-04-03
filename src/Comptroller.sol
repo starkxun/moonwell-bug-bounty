@@ -12,6 +12,9 @@ import "./Unitroller.sol";
  * @title Moonwell's Comptroller Contract
  * @author Moonwell
  */
+
+// 统一决定哪些操作可行
+// 并维护市场参数、清算规则、暂停开关和奖励分发触发
 contract Comptroller is
     ComptrollerV2Storage,
     ComptrollerInterface,
@@ -85,6 +88,7 @@ contract Comptroller is
         MultiRewardDistributor newRewardDistributor
     );
 
+    // q - 这三个参数是干啥的
     // closeFactorMantissa must be strictly greater than this value
     uint internal constant closeFactorMinMantissa = 0.05e18; // 0.05
 

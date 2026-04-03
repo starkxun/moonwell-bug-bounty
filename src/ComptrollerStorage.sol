@@ -50,12 +50,15 @@ contract ComptrollerVXStorage is UnitrollerAdminStorage {
 
     struct Market {
         /// @notice Whether or not this market is listed
+        // 市场是否已上线
         bool isListed;
         /**
          * @notice Multiplier representing the most one can borrow against their collateral in this market.
+         * 翻译 : 乘数代表在这个市场中，个人可以用抵押品借到的最大金额。
          *  For instance, 0.9 to allow borrowing 90% of collateral value.
          *  Must be between 0 and 1, and stored as a mantissa.
          */
+        //  q - 这个参数的是什么意思?
         uint collateralFactorMantissa;
         /// @notice Per-market mapping of "accounts in this asset"
         mapping(address => bool) accountMembership;

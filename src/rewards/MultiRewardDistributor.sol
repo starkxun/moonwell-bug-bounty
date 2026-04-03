@@ -999,6 +999,7 @@ contract MultiRewardDistributor is
      * @notice An internal function to update the global supply index for a given mToken
      * @param _mToken The market to update the global supply index for
      */
+    // 把市场的 全局供应链指数 推进刀到当前时间, 供后续最新指数给用户结算奖励
     function updateMarketSupplyIndexInternal(MToken _mToken) internal {
         MarketEmissionConfig[] storage configs = marketConfigs[
             address(_mToken)

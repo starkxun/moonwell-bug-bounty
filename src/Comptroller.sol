@@ -123,6 +123,7 @@ contract Comptroller is
      * @param mToken The mToken to check
      * @return True if the account is in the asset, otherwise false.
      */
+    // q - 该函数检查 account 的成员资格？
     function checkMembership(
         address account,
         MToken mToken
@@ -135,6 +136,7 @@ contract Comptroller is
      * @param mTokens The list of addresses of the mToken markets to be enabled
      * @return Success indicator for whether each corresponding market was entered
      */
+    //  q - 添加 token 代币进入 Market？
     function enterMarkets(
         address[] memory mTokens
     ) public override returns (uint[] memory) {
@@ -156,6 +158,8 @@ contract Comptroller is
      * @param borrower The address of the account to modify
      * @return Success indicator for whether the market was entered
      */
+    //  q - 添加市场进入内部 borrower？
+    //  imp - 这里有问题，未理解
     function addToMarketInternal(
         MToken mToken,
         address borrower
@@ -192,6 +196,7 @@ contract Comptroller is
      * @param mTokenAddress The address of the asset to be removed
      * @return Whether or not the account successfully exited the market
      */
+    // q - 从 Market 中剔除 token
     function exitMarket(
         address mTokenAddress
     ) external override returns (uint) {
@@ -247,11 +252,13 @@ contract Comptroller is
             }
         }
 
+        // q - 这句注释怎么理解 -> 必须找到 asset 在 list 里的位置，否则 下沉数据 就会被破坏？
         // We *must* have found the asset in the list or our redundant data structure is broken
         assert(assetIndex < len);
 
         // copy last item in list to location of item to be removed, reduce length by 1
         MToken[] storage storedList = accountAssets[msg.sender];
+        // a -  用数组最后一个元素替代被删除的元素，然后删除数组最后一个元素
         storedList[assetIndex] = storedList[storedList.length - 1];
         storedList.pop();
 
@@ -269,6 +276,9 @@ contract Comptroller is
      * @param mintAmount The amount of underlying being supplied to the market in exchange for tokens
      * @return 0 if the mint is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
+    // q - 检查 mint 是否允许
+    // 如果当前 totalSupply 没有超过供应上限，则允许继续 mint
+    // q - mint 发生在当前函数？
     function mintAllowed(
         address mToken,
         address minter,
@@ -284,12 +294,14 @@ contract Comptroller is
             return uint(Error.MARKET_NOT_LISTED);
         }
 
+        //  a - supplyCap 供应上限
         uint supplyCap = supplyCaps[mToken];
-        // Supply cap of 0 corresponds to unlimited supplying
+        // Supply cap of 0 corresponds to unlimited supplying（0 表述供应无上限）
         if (supplyCap != 0) {
             uint totalCash = MToken(mToken).getCash();
             uint totalBorrows = MToken(mToken).totalBorrows();
             uint totalReserves = MToken(mToken).totalReserves();
+            // q - 这里的公式是啥意思，为啥总量要减去 totalReserves
             // totalSupplies = totalCash + totalBorrows - totalReserves
             uint totalSupplies = sub_(
                 add_(totalCash, totalBorrows),
@@ -312,6 +324,7 @@ contract Comptroller is
      * @param redeemTokens The number of mTokens to exchange for the underlying asset in the market
      * @return 0 if the redeem is allowed, otherwise a semi-opaque error code (See ErrorReporter.sol)
      */
+    //  q - 检查当前是否允许赎回
     function redeemAllowed(
         address mToken,
         address redeemer,
@@ -322,6 +335,7 @@ contract Comptroller is
             return allowed;
         }
 
+        // q - 这句是什么意思？ 保持飞轮转动？
         // Keep the flywheel moving
         updateAndDistributeSupplierRewardsForToken(mToken, redeemer);
 
@@ -343,6 +357,7 @@ contract Comptroller is
         }
 
         /* Otherwise, perform a hypothetical liquidity check to guard against shortfall */
+        // q - 假设性流动检查防止资金短缺？
         (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(
             redeemer,
             MToken(mToken),
@@ -403,6 +418,7 @@ contract Comptroller is
 
         if (!markets[mToken].accountMembership[borrower]) {
             // only mTokens may call borrowAllowed if borrower not in market
+            // q - msg.sender 必须是 mToken 是什么意思?
             require(msg.sender == mToken, "sender must be mToken");
 
             // attempt to add borrower to the market
@@ -427,9 +443,11 @@ contract Comptroller is
         if (borrowCap != 0) {
             uint totalBorrows = MToken(mToken).totalBorrows();
             uint nextTotalBorrows = add_(totalBorrows, borrowAmount);
+            // 借款不能超过上限
             require(nextTotalBorrows < borrowCap, "market borrow cap reached");
         }
 
+        // q - shortfall 在这里解释为 差值
         (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(
             borrower,
             MToken(mToken),
@@ -516,6 +534,7 @@ contract Comptroller is
         uint borrowBalance = MToken(mTokenBorrowed).borrowBalanceStored(
             borrower
         );
+        // q - 这里 maxClose 是什么意思?
         uint maxClose = mul_ScalarTruncate(
             Exp({mantissa: closeFactorMantissa}),
             borrowBalance
@@ -562,6 +581,7 @@ contract Comptroller is
             return uint(Error.COMPTROLLER_MISMATCH);
         }
 
+        // q - flywhell 是什么?
         // Keep the flywheel moving
         // Note: We don't update borrower indices here because as part of liquidations
         //       repayBorrowFresh is called, which in turn calls `borrowAllow`, which updates
@@ -708,6 +728,7 @@ contract Comptroller is
                 hypothetical account liquidity in excess of collateral requirements,
      *          hypothetical account shortfall below collateral requirements)
      */
+    // 模拟赎回/借款操作后是否安全
     function getHypotheticalAccountLiquidityInternal(
         address account,
         MToken mTokenModify,
@@ -718,6 +739,7 @@ contract Comptroller is
         uint oErr;
 
         // For each asset the account is in
+        // 遍历这个账户的所有进入市场
         MToken[] memory assets = accountAssets[account];
         for (uint i = 0; i < assets.length; i++) {
             MToken asset = assets[i];
@@ -733,6 +755,7 @@ contract Comptroller is
                 // semi-opaque error code, we assume NO_ERROR == 0 is invariant between upgrades
                 return (Error.SNAPSHOT_ERROR, 0, 0);
             }
+            // q - 这两句代码什么意思? Exp({}) 是什么语法?
             vars.collateralFactor = Exp({
                 mantissa: markets[address(asset)].collateralFactorMantissa
             });
@@ -746,12 +769,14 @@ contract Comptroller is
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
 
             // Pre-compute a conversion factor from tokens -> glmr (normalized price value)
+            // 单个市场抵押换算系数
             vars.tokensToDenom = mul_(
                 mul_(vars.collateralFactor, vars.exchangeRate),
                 vars.oraclePrice
             );
 
             // sumCollateral += tokensToDenom * mTokenBalance
+            // 抵押总和
             vars.sumCollateral = mul_ScalarTruncateAddUInt(
                 vars.tokensToDenom,
                 vars.mTokenBalance,
@@ -759,6 +784,7 @@ contract Comptroller is
             );
 
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
+            // 负债总和
             vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(
                 vars.oraclePrice,
                 vars.borrowBalance,
@@ -786,6 +812,7 @@ contract Comptroller is
         }
 
         // These are safe, as the underflow condition is checked first
+        // q - 安全检查, 赎回/借款后是否安全
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
             return (
                 Error.NO_ERROR,
@@ -1272,6 +1299,7 @@ contract Comptroller is
      * @param mToken The market to synchronize indexes for
      * @param supplier The supplier to whom rewards are going
      */
+    //  q - 这里的调用链比较复杂, 该如何去理解?
     function updateAndDistributeSupplierRewardsForToken(
         address mToken,
         address supplier

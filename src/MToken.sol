@@ -249,6 +249,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param account Address of the account to snapshot
      * @return (possible error, token balance, borrow balance, exchange rate mantissa)
      */
+    // q - 创建一个快照，在让 token 退出 market 前调用?
+    // imp - 涉及到余额的计算公式，需整理理解
     function getAccountSnapshot(
         address account
     ) external view override returns (uint, uint, uint, uint) {
@@ -364,6 +366,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param account The address whose balance should be calculated
      * @return (error code, the calculated balance or 0 if error code is non-zero)
      */
+    //  返回借款地址的余额
+    // q - 是返回还可以借款的数额 or 返回已经借款的数额 ?
     function borrowBalanceStoredInternal(
         address account
     ) internal view returns (MathError, uint) {
@@ -382,6 +386,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
             return (MathError.NO_ERROR, 0);
         }
 
+        // q - 这里的计算公式什么意思？
         /* Calculate new borrow balance using the interest index:
          *  recentBorrowBalance = borrower.borrowBalance * market.borrowIndex / borrower.borrowIndex
          */

@@ -836,6 +836,8 @@ contract Comptroller is
      * @param actualRepayAmount The amount of mTokenBorrowed underlying to convert into mTokenCollateral tokens
      * @return (errorCode, number of mTokenCollateral tokens to be seized in a liquidation)
      */
+    // 根据实际偿还金额, 计算清算人应该拿走多少抵押品代币
+    // q - 逻辑复杂, 该如何去理解 ?
     function liquidateCalculateSeizeTokens(
         address mTokenBorrowed,
         address mTokenCollateral,
@@ -887,6 +889,7 @@ contract Comptroller is
      * @dev Admin function to set a new price oracle
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
+    //  q - 这里为什么不用 openzepplin 的权限机制, 当前的权限模型会更安全吗 ?
     function _setPriceOracle(PriceOracle newOracle) public returns (uint) {
         // Check caller is admin
         if (msg.sender != admin) {
@@ -915,6 +918,13 @@ contract Comptroller is
      * @param newCloseFactorMantissa New close factor, scaled by 1e18
      * @return uint 0=success, otherwise a failure
      */
+    // audit - 函数没有做范围校验?
+    // 参数边界主要依赖治理流程和外部调用约束 ?
+
+    // close factor 的意义
+    // 单次清算最多能还掉借款人多少债 的比例上限
+    // 公式: maxClose = closeFactor * borrowBalance
+    // 例: close factor = 0.5 => 一次最多只能清算 50% 的债
     function _setCloseFactor(
         uint newCloseFactorMantissa
     ) external returns (uint) {
@@ -935,6 +945,8 @@ contract Comptroller is
      * @param newCollateralFactorMantissa The new collateral factor, scaled by 1e18
      * @return uint 0=success, otherwise a failure. (See ErrorReporter for details)
      */
+    //  a - 设置抵押品系数
+    // 例:  collateral factor = 0.8 => 100$ 抵押, 80$ 借款价值
     function _setCollateralFactor(
         MToken mToken,
         uint newCollateralFactorMantissa
@@ -1004,6 +1016,10 @@ contract Comptroller is
      * @param newLiquidationIncentiveMantissa New liquidationIncentive scaled by 1e18
      * @return uint 0=success, otherwise a failure. (See ErrorReporter for details)
      */
+    //  清算激励
+    // 影响清算时，清算人能拿到多少抵押品
+    // 例： liquidationIncentive = 1.08 => 偿还 100$ 债务, 拿到 108$ 抵押品
+    // 再结合价格和汇率换算成 sizeToken
     function _setLiquidationIncentive(
         uint newLiquidationIncentiveMantissa
     ) external returns (uint) {
@@ -1037,6 +1053,7 @@ contract Comptroller is
      * @param mToken The address of the market (token) to list
      * @return uint 0=success, otherwise a failure. (See enum Error for details)
      */
+    //  q - 添加 market 到总的 markets
     function _supportMarket(MToken mToken) external returns (uint) {
         if (msg.sender != admin) {
             return
@@ -1068,6 +1085,7 @@ contract Comptroller is
     }
 
     function _addMarketInternal(address mToken) internal {
+        // q - 这样遍历不会花费很多 gas ？
         for (uint i = 0; i < allMarkets.length; i++) {
             require(allMarkets[i] != MToken(mToken), "market already added");
         }
@@ -1080,6 +1098,7 @@ contract Comptroller is
      * @param mTokens The addresses of the markets (tokens) to change the borrow caps for
      * @param newBorrowCaps The new borrow cap values in underlying to be set. A value of 0 corresponds to unlimited borrowing.
      */
+    //  q - 设置新的 borrowed 上限？
     function _setMarketBorrowCaps(
         MToken[] calldata mTokens,
         uint[] calldata newBorrowCaps

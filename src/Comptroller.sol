@@ -1020,6 +1020,7 @@ contract Comptroller is
     // 影响清算时，清算人能拿到多少抵押品
     // 例： liquidationIncentive = 1.08 => 偿还 100$ 债务, 拿到 108$ 抵押品
     // 再结合价格和汇率换算成 sizeToken
+    // q - sizeToken具体指什么？
     function _setLiquidationIncentive(
         uint newLiquidationIncentiveMantissa
     ) external returns (uint) {
@@ -1126,6 +1127,7 @@ contract Comptroller is
      * @notice Admin function to change the Borrow Cap Guardian
      * @param newBorrowCapGuardian The address of the new Borrow Cap Guardian
      */
+    // q - 设置借款守卫？
     function _setBorrowCapGuardian(address newBorrowCapGuardian) external {
         require(msg.sender == admin, "only admin can set borrow cap guardian");
 
@@ -1145,6 +1147,7 @@ contract Comptroller is
      * @param mTokens The addresses of the markets (tokens) to change the supply caps for
      * @param newSupplyCaps The new supply cap values in underlying to be set. A value of 0 corresponds to unlimited supplying.
      */
+    // q - 设置供应上限？
     function _setMarketSupplyCaps(
         MToken[] calldata mTokens,
         uint[] calldata newSupplyCaps
@@ -1172,6 +1175,7 @@ contract Comptroller is
      * @notice Admin function to change the Supply Cap Guardian
      * @param newSupplyCapGuardian The address of the new Supply Cap Guardian
      */
+    // q - 设置供应守卫？
     function _setSupplyCapGuardian(address newSupplyCapGuardian) external {
         require(msg.sender == admin, "only admin can set supply cap guardian");
 
@@ -1190,6 +1194,8 @@ contract Comptroller is
      * @param newPauseGuardian The address of the new Pause Guardian
      * @return uint 0=success, otherwise a failure. (See enum Error for details)
      */
+    // q - 设置暂停守卫？
+    // q - 这个有什么用？
     function _setPauseGuardian(address newPauseGuardian) public returns (uint) {
         if (msg.sender != admin) {
             return
@@ -1215,6 +1221,7 @@ contract Comptroller is
      * @notice Admin function to change the Reward Distributor
      * @param newRewardDistributor The address of the new Reward Distributor
      */
+    // q - 设置奖励分发？
     function _setRewardDistributor(
         MultiRewardDistributor newRewardDistributor
     ) public {
@@ -1227,6 +1234,7 @@ contract Comptroller is
         emit NewRewardDistributor(oldRewardDistributor, newRewardDistributor);
     }
 
+    // 修改 mint 状态（暂停/启动）
     function _setMintPaused(MToken mToken, bool state) public returns (bool) {
         require(
             markets[address(mToken)].isListed,
@@ -1243,6 +1251,7 @@ contract Comptroller is
         return state;
     }
 
+    // q - 设置借款状态（暂停/启动）
     function _setBorrowPaused(MToken mToken, bool state) public returns (bool) {
         require(
             markets[address(mToken)].isListed,
@@ -1259,6 +1268,7 @@ contract Comptroller is
         return state;
     }
 
+    // q - 设置转账状态（暂停/启动）
     function _setTransferPaused(bool state) public returns (bool) {
         require(
             msg.sender == pauseGuardian || msg.sender == admin,
@@ -1271,6 +1281,8 @@ contract Comptroller is
         return state;
     }
 
+    // 清算扣押开关，紧急暂停/恢复 size 行为
+    // 即清算时从借款人迪亚平扣走 mToken 给清算人
     function _setSeizePaused(bool state) public returns (bool) {
         require(
             msg.sender == pauseGuardian || msg.sender == admin,
@@ -1283,6 +1295,7 @@ contract Comptroller is
         return state;
     }
 
+    // q - 这个函数的作用？
     function _become(Unitroller unitroller) public {
         require(
             msg.sender == unitroller.admin(),
@@ -1299,6 +1312,7 @@ contract Comptroller is
      * @param _tokenAddress The address of the token to transfer
      * @param _amount The amount of tokens to sweep, uint.max means everything
      */
+    // q - 将 ERC20 token 转给 admin ？
     function _rescueFunds(address _tokenAddress, uint _amount) external {
         require(msg.sender == admin, "Unauthorized");
 
@@ -1383,6 +1397,7 @@ contract Comptroller is
      * @param borrowers Whether or not to claim earned by borrowing
      * @param suppliers Whether or not to claim earned by supplying
      */
+    // q - 这个函数的作用是什么？
     function claimReward(
         address[] memory holders,
         MToken[] memory mTokens,

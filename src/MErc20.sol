@@ -202,6 +202,7 @@ contract MErc20 is MToken, MErc20Interface {
      * @dev This excludes the value of the current message, if any
      * @return The quantity of underlying tokens owned by this contract
      */
+    //  获取当前合约余额
     function getCashPrior() internal view virtual override returns (uint) {
         EIP20Interface token = EIP20Interface(underlying);
         return token.balanceOf(address(this));

@@ -89,6 +89,9 @@ contract JumpRateModel is InterestRateModel {
      * @param reserves The amount of reserves in the market (currently unused)
      * @return The utilization rate as a mantissa between [0, 1e18]
      */
+    //  计算资金利用率(市场里借出去的钱 占 可用总资金的比例)
+    // 公式:  `borrows * 1e18 / (cash + borrows - reserves)`
+    // reserves 是协议留存，不算可供借贷的有效流动性，所以要减掉
     function utilizationRate(
         uint cash,
         uint borrows,

@@ -62,6 +62,8 @@ contract Exponential is CarefulMath, ExponentialNoError {
     /**
      * @dev Multiply an Exp by a scalar, returning a new Exp.
      */
+    // 把一个定点小数 Exp 乘上一个普通整数 scalar
+    // 返回新的 Exp
     function mulScalar(
         Exp memory a,
         uint scalar
@@ -77,6 +79,7 @@ contract Exponential is CarefulMath, ExponentialNoError {
     /**
      * @dev Multiply an Exp by a scalar, then truncate to return an unsigned integer.
      */
+    // 和上面的函数相似,但返回 uint, 丢掉小数部分
     function mulScalarTruncate(
         Exp memory a,
         uint scalar

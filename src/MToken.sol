@@ -23,6 +23,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param symbol_ EIP-20 symbol of this token
      * @param decimals_ EIP-20 decimal precision of this token
      */
+    // q - 这里的变量都在 MTokenInterface 接口里声明
     function initialize(
         ComptrollerInterface comptroller_,
         InterestRateModel interestRateModel_,
@@ -38,6 +39,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         );
 
         // Set initial exchange rate
+        // initialExchangeRateMantissa 初始兑换率（1e18）
+        // 早期 mToken 和 底层资产的兑换比率
         initialExchangeRateMantissa = initialExchangeRateMantissa_;
         require(
             initialExchangeRateMantissa > 0,
@@ -45,6 +48,9 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         );
 
         // Set the comptroller
+        // q - comptroller 这个值应该包括哪些内？
+        // 市场绑定的风控/规则合约地址
+        // 后续所有操作都由该合约判断是否合法：mintAllowed, borrowAllowed, redeemAllowed, liquidateBorrowAllowed
         uint err = _setComptroller(comptroller_);
         require(err == uint(Error.NO_ERROR), "setting comptroller failed");
 
@@ -53,6 +59,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         borrowIndex = mantissaOne;
 
         // Set the interest rate model (depends on block timestamp / borrow index)
+        // interestRateModel: 利率模型合约地址
+        // 涉及借款利率和存款利率
         err = _setInterestRateModelFresh(interestRateModel_);
         require(
             err == uint(Error.NO_ERROR),
@@ -83,6 +91,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         uint tokens
     ) internal returns (uint) {
         /* Fail if transfer not allowed */
+        // 先使用 comtroller 判断能否转账
         uint allowed = comptroller.transferAllowed(
             address(this),
             src,
@@ -104,10 +113,13 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         }
 
         /* Get the allowance, infinite for the account owner */
+        // spender == src 表示转的是自己的代币，则无需授权
+        // 直接使用最大值 type(uint).max
         uint startingAllowance = 0;
         if (spender == src) {
             startingAllowance = type(uint).max;
         } else {
+            // 否则则使用真实授权额度
             startingAllowance = transferAllowances[src][spender];
         }
 
@@ -117,6 +129,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         uint srcTokensNew;
         uint dstTokensNew;
 
+        // 做三次安全数学计算
         (mathErr, allowanceNew) = subUInt(startingAllowance, tokens);
         if (mathErr != MathError.NO_ERROR) {
             return fail(Error.MATH_ERROR, FailureInfo.TRANSFER_NOT_ALLOWED);
@@ -140,6 +153,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         accountTokens[dst] = dstTokensNew;
 
         /* Eat some of the allowance (if necessary) */
+        // 第三方授权额度会减少授权
+        // 自己转账则不会减少授权
         if (startingAllowance != type(uint).max) {
             transferAllowances[src][spender] = allowanceNew;
         }
@@ -193,6 +208,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param amount The number of tokens that are approved (uint.max means infinite)
      * @return Whether or not the approval succeeded
      */
+    // audit - 这里是任何人都能调用吗 ?
     function approve(
         address spender,
         uint256 amount
@@ -231,6 +247,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param owner The address of the account to query
      * @return The amount of underlying owned by `owner`
      */
+    //  q - 获取底层资产的余额？
+    //  exchangeRate 的获取逻辑是什么样的？
     function balanceOfUnderlying(
         address owner
     ) external override returns (uint) {
@@ -290,6 +308,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @notice Returns the current per-timestamp borrow interest rate for this mToken
      * @return The borrow interest rate per timestamp, scaled by 1e18
      */
+    //  返回当前时间戳下该 mToken 的借款利率
     function borrowRatePerTimestamp() external view override returns (uint) {
         return
             interestRateModel.getBorrowRate(
@@ -303,6 +322,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @notice Returns the current per-timestamp supply interest rate for this mToken
      * @return The supply interest rate per timestamp, scaled by 1e18
      */
+    //  返回当前时间戳下 底层资产 和 mToken 的兑换比例
     function supplyRatePerTimestamp() external view override returns (uint) {
         return
             interestRateModel.getSupplyRate(
@@ -440,6 +460,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @dev This function does not accrue interest before calculating the exchange rate
      * @return (error code, calculated exchange rate scaled by 1e18)
      */
+    //  q - 获取内部的 mToken 兑换汇率？
+    //  具体逻辑没有理清，需要仔细阅读
     function exchangeRateStoredInternal()
         internal
         view

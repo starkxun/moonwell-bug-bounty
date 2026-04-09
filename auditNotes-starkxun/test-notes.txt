@@ -1,0 +1,18 @@
+由于setUp 里会先创建多链 fork，
+其中 Moonbeam fork 在连接 https://rpc.api.moonbeam.network 时被对端重置连接，测试会失败
+所以采用 anvil 替代
+
+具体的执行代码已经被写入 makefile 文件，可以直接使用：
+
+1. 先加载环境变量（上游真实 RPC）
+set -a; source .env; set +a
+
+2. 一键跑 mint fuzz（自动起 4 条本地 anvil，测试结束自动清理）
+make test-fuzz-mint-local
+
+3. 一键跑 borrow fuzz
+make test-fuzz-borrow-local
+
+4. 如果想手动控制生命周期
+make anvil-forks-up
+make anvil-forks-down

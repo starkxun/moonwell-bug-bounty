@@ -1,5 +1,17 @@
 TAG = moonwell-contracts
 
+ANVIL_HOST ?= 127.0.0.1
+ANVIL_MOONBEAM_PORT ?= 9545
+ANVIL_BASE_PORT ?= 9546
+ANVIL_OPTIMISM_PORT ?= 9547
+ANVIL_ETHEREUM_PORT ?= 9548
+
+ANVIL_STATE_DIR ?= .anvil-local
+ANVIL_LOG_DIR ?= $(ANVIL_STATE_DIR)/logs
+ANVIL_PID_DIR ?= $(ANVIL_STATE_DIR)/pids
+
+.PHONY: anvil-forks-up anvil-forks-down ensure-mip-artifacts test-fuzz-mint-local test-fuzz-borrow-local
+
 build-docker:
 	docker build -t $(TAG) .
 
@@ -42,23 +54,100 @@ base:
 # anvil -f https://goerli.base.org/ --host 0.0.0.0
 
 slither:
-    docker run --rm -it \
+	docker run --rm -it \
 		-v $$(pwd):$$(pwd) \
 		--workdir $$(pwd) \
 		$(TAG) \
-        slither --solc-remaps '@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/' .
+	slither --solc-remaps '@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/' .
 
 # Proxy requests to the local node, useful for debugging opaque failures
 mitmproxy:
-    docker run --rm -it --net=host mitmproxy/mitmproxy mitmproxy --mode reverse:http://host.docker.internal:8545@8081
+	docker run --rm -it --net=host mitmproxy/mitmproxy mitmproxy --mode reverse:http://host.docker.internal:8545@8081
 
 coverage:
 	time forge coverage --skip script \
-        --out artifacts/coverage \
-        --skip "Integration.t.sol" \
+		--out artifacts/coverage \
+		--skip "Integration.t.sol" \
 		--summary --report lcov \
-        --match-contract UnitTest
+		--match-contract UnitTest
 
 test-unit:
 	time forge test --match-contract UnitTest -vvv
+
+# Start four local anvil fork proxies for Moonbeam/Base/Optimism/Ethereum.
+# Uses current *RPC_URL env vars as upstream providers.
+anvil-forks-up:
+	@set -e; \
+	command -v anvil >/dev/null 2>&1 || { echo "anvil not found in PATH"; exit 1; }; \
+	command -v cast >/dev/null 2>&1 || { echo "cast not found in PATH"; exit 1; }; \
+	: "$${MOONBEAM_RPC_URL:?MOONBEAM_RPC_URL is required}"; \
+	: "$${BASE_RPC_URL:?BASE_RPC_URL is required}"; \
+	: "$${OP_RPC_URL:?OP_RPC_URL is required}"; \
+	: "$${ETH_RPC_URL:?ETH_RPC_URL is required}"; \
+	mkdir -p "$(ANVIL_LOG_DIR)" "$(ANVIL_PID_DIR)"; \
+	anvil --fork-url "$${MOONBEAM_RPC_URL}" --chain-id 1284 --host "$(ANVIL_HOST)" --port "$(ANVIL_MOONBEAM_PORT)" > "$(ANVIL_LOG_DIR)/moonbeam.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/moonbeam.pid"; \
+	anvil --fork-url "$${BASE_RPC_URL}" --chain-id 8453 --host "$(ANVIL_HOST)" --port "$(ANVIL_BASE_PORT)" > "$(ANVIL_LOG_DIR)/base.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/base.pid"; \
+	anvil --fork-url "$${OP_RPC_URL}" --chain-id 10 --host "$(ANVIL_HOST)" --port "$(ANVIL_OPTIMISM_PORT)" > "$(ANVIL_LOG_DIR)/optimism.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/optimism.pid"; \
+	anvil --fork-url "$${ETH_RPC_URL}" --chain-id 1 --host "$(ANVIL_HOST)" --port "$(ANVIL_ETHEREUM_PORT)" > "$(ANVIL_LOG_DIR)/ethereum.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/ethereum.pid"; \
+	for url in \
+		"http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+		"http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+		"http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+		"http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)"; do \
+		deadline=$$(( $$(date +%s) + 20 )); \
+		while ! cast block-number --rpc-url "$$url" >/dev/null 2>&1; do \
+			if [ $$(date +%s) -ge $$deadline ]; then \
+				echo "anvil endpoint not ready: $$url"; \
+				$(MAKE) anvil-forks-down; \
+				exit 1; \
+			fi; \
+		done; \
+		if ! cast block-number --rpc-url "$$url" >/dev/null 2>&1; then \
+			echo "anvil endpoint not ready: $$url"; \
+			$(MAKE) anvil-forks-down; \
+			exit 1; \
+		fi; \
+	done; \
+	echo "Local anvil forks started. Logs: $(ANVIL_LOG_DIR)"
+
+anvil-forks-down:
+	@set -e; \
+	for name in moonbeam base optimism ethereum; do \
+		pid_file="$(ANVIL_PID_DIR)/$$name.pid"; \
+		if [ -f "$$pid_file" ]; then \
+			pid=$$(cat "$$pid_file"); \
+			if kill -0 "$$pid" 2>/dev/null; then kill "$$pid"; fi; \
+			rm -f "$$pid_file"; \
+		fi; \
+	done; \
+	echo "Local anvil forks stopped."
+
+ensure-mip-artifacts:
+	@set -e; \
+	if [ ! -f "artifacts/foundry/mip-b58.sol/mipb58.json" ]; then \
+		echo "Generating missing artifact: artifacts/foundry/mip-b58.sol/mipb58.json"; \
+		forge build --contracts proposals/mips/mip-b58/mip-b58.sol; \
+	fi
+
+test-fuzz-mint-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testFuzzMintMTokenSucceed -vv
+
+test-fuzz-borrow-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testFuzzBorrowMTokenSucceed -vv
 

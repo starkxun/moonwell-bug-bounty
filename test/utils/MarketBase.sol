@@ -14,7 +14,10 @@ contract MarketBase is ExponentialNoError, Test {
         comptroller = _comptroller;
     }
 
+    // 获取最大 SupplyAmount
     function getMaxSupplyAmount(MToken mToken) public returns (uint256) {
+        // 先把这个市场的利息结算到当前时间
+        // 再去计算 totalSupply
         mToken.accrueInterest();
 
         uint256 supplyCap = comptroller.supplyCaps(address(mToken));

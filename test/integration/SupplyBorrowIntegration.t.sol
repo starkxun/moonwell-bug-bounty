@@ -29,7 +29,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
     MultiRewardDistributor mrd;
     Comptroller comptroller;
 
-    MToken[] mTokens;
+    MToken[] mTokens;   // q - 这个变量存储的是什么内容？
     MarketAddChecker checker;
     MarketBase public marketBase;
 
@@ -84,12 +84,17 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         address mToken,
         uint256 amount
     ) internal {
+        // 找到这个市场对应的底层代币
         address underlying = MErc20(mToken).underlying();
 
+        // 对 WETH 做一个特殊处理
+        // 避免后续和 WETH 相关路径因为原生 ETH 不足出现干扰问题
         if (underlying == addresses.getAddress("WETH")) {
             vm.deal(addresses.getAddress("WETH"), amount);
         }
         deal(underlying, user, amount);
+        
+        // 模拟真实用户行为
         vm.startPrank(user);
 
         IERC20(underlying).approve(mToken, amount);
@@ -160,6 +165,9 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             mToken.totalBorrows();
     }
 
+    // q - 断言每个 market 的 totalSupply 和 balance 不为空
+    // q - totalSuppley 的断言条件为什么要大于 2000？
+    // assertGT -> 断言左边大于右边
     function testAllMarketsNonZeroTotalSupply() public view {
         MToken[] memory markets = comptroller.getAllMarkets();
 
@@ -169,6 +177,9 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // q - 检查所有市场是否正常初始化
+    // Moonwell 协议里 cbETH 对应的市场合约地址
+    // UNITROLLER 是“管理所有市场的控制器入口
     function testMarketAddChecker() public view {
         checker.checkMarketAdd(addresses.getAddress("MOONWELL_cbETH"));
         checker.checkAllMarkets(addresses.getAddress("UNITROLLER"));
@@ -182,12 +193,15 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         uint256 max = marketBase.getMaxSupplyAmount(mToken);
 
+        // q - 这里的边界是什么意思？
         if (max <= 10e8) {
             return;
         }
 
+        // 把 fuzz 进来的 minAmount 限制到一个安全区间
         mintAmount = _bound(mintAmount, 10e8, max);
 
+        // q - 这句是什么意思？
         IERC20 token = IERC20(MErc20(address(mToken)).underlying());
 
         address sender = address(this);
@@ -195,6 +209,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         _mintMToken(address(this), address(mToken), mintAmount);
 
+        // q - 这里的断言，是针对 mint 给合约自己的 token 是否成功吗？
         assertTrue(
             MErc20Delegator(payable(address(mToken))).balanceOf(sender) > 0,
             "mToken balance should be gt 0 after mint"
@@ -230,11 +245,14 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         _mintMToken(address(this), address(mToken), mintAmount);
 
         uint256 expectedCollateralFactor = 0.5e18;
+        //  collateralFactorMantissa： 个人可以用抵押品借到的最大金额
+        // q - 使用控制器获取可用的抵押因子？
         (, uint256 collateralFactorMantissa) = comptroller.markets(
             address(mToken)
         );
 
         // check colateral factor
+        // q - 这里的意思是提高 抵押因子 吗？
         if (collateralFactorMantissa < expectedCollateralFactor) {
             vm.prank(addresses.getAddress("TEMPORAL_GOVERNOR"));
             comptroller._setCollateralFactor(
@@ -250,6 +268,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         address[] memory _mTokens = new address[](1);
         _mTokens[0] = address(mToken);
 
+        // q - 这里为什么要进入 market？ 这个借款函数的逻辑是什么？
         comptroller.enterMarkets(_mTokens);
         assertTrue(
             comptroller.checkMembership(sender, mToken),
@@ -288,6 +307,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // fuzz borrow 数量
     function testFuzzBorrowMTokenSucceed(uint256 mintAmount) public {
         for (uint256 i = 0; i < mTokens.length; i++) {
             _borrowMTokenSucceed(i, mintAmount);

@@ -23,7 +23,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param symbol_ EIP-20 symbol of this token
      * @param decimals_ EIP-20 decimal precision of this token
      */
-    // q - 这里的变量都在 MTokenInterface 接口里声明
+    // info - 这里的变量都在 MTokenInterface 接口里声明
     function initialize(
         ComptrollerInterface comptroller_,
         InterestRateModel interestRateModel_,
@@ -519,17 +519,21 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @dev This calculates interest accrued from the last checkpointed block
      *   up to the current block and writes new checkpoint to storage.
      */
+    // 把上次结算时刻 到 现在时刻 之间产生的利息，一次性结算到全局状态里
     function accrueInterest() public virtual override returns (uint) {
         /* Remember the initial block timestamp */
+        // 读取上次时间和结算时间
         uint currentBlockTimestamp = getBlockTimestamp();
         uint accrualBlockTimestampPrior = accrualBlockTimestamp;
 
         /* Short-circuit accumulating 0 interest */
+        // 如果时间相同，不做处理，
         if (accrualBlockTimestampPrior == currentBlockTimestamp) {
             return uint(Error.NO_ERROR);
         }
 
         /* Read the previous values out of storage */
+        // q - 借款指数 是什么？
         uint cashPrior = getCashPrior();
         uint borrowsPrior = totalBorrows;
         uint reservesPrior = totalReserves;
@@ -547,6 +551,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         );
 
         /* Calculate the number of blocks elapsed since the last accrual */
+        // q - 计算自上次以来累计的区块数
         (MathError mathErr, uint blockDelta) = subUInt(
             currentBlockTimestamp,
             accrualBlockTimestampPrior

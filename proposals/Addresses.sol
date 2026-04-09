@@ -166,6 +166,7 @@ contract Addresses is IAddresses, Test {
 
     /// @notice get an address for the current chainId
     /// @param name the name of the address
+    // q - 根据 地址 获取链的 id, 但是这个 block.chainid 从哪来的？
     function getAddress(string memory name) public view returns (address) {
         return _getAddress(name, block.chainid);
     }

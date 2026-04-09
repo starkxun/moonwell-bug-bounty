@@ -33,6 +33,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
     MarketAddChecker checker;
     MarketBase public marketBase;
 
+    // q - rewardTokens 存储的是什么数据？
     mapping(MToken => address[] rewardTokens) rewardsConfig;
 
     function setUp() public override {
@@ -107,6 +108,8 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         vm.stopPrank();
     }
 
+    // 参数
+    // emissionToken: 要奖励的币种
     function _calculateSupplyRewards(
         MToken mToken,
         address emissionToken,
@@ -114,11 +117,15 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         uint256 timeBefore,
         uint256 timeAfter
     ) private view returns (uint256 expectedRewards) {
+        // 读取该市场该奖励币的配置
+        // supplyEmissionsPerSec：每秒发多少该奖励币
         MultiRewardDistributorCommon.MarketConfig memory marketConfig = mrd
             .getConfigForMarket(mToken, emissionToken);
 
+        // 奖励发放截止时间
         uint256 endTime = marketConfig.endTime;
 
+        // 计算有效时间 timeDelta
         uint256 timeDelta;
 
         if (timeAfter > endTime) {
@@ -131,6 +138,9 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             timeDelta = timeAfter - timeBefore;
         }
 
+        // 最总计算
+        // 在这段有效时间里，市场总共发出 timeDelta × 每秒发放量
+        // 按自己供应占比 amount / totalSupply 分到对应份额
         expectedRewards =
             (timeDelta * marketConfig.supplyEmissionsPerSec * amount) /
             MErc20(address(mToken)).totalSupply();
@@ -228,6 +238,9 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // 测试流程
+    // 先存款当抵押，再借款
+    // 验证借的钱是否正确到账
     function _borrowMTokenSucceed(
         uint256 mTokenIndex,
         uint256 mintAmount
@@ -242,11 +255,12 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         mintAmount = _bound(mintAmount, 10e8, max);
 
+        // 把底层资产存进市场，拿到 mToken （借款前必须要有抵押品）
         _mintMToken(address(this), address(mToken), mintAmount);
 
         uint256 expectedCollateralFactor = 0.5e18;
-        //  collateralFactorMantissa： 个人可以用抵押品借到的最大金额
-        // q - 使用控制器获取可用的抵押因子？
+        //  collateralFactorMantissa： 抵押资产可计入借款能力的比例
+        // q - 使用控制器获取可用的抵押因子？ -> 为了让测试在不同市场配置下更稳定地走到借款成功路径
         (, uint256 collateralFactorMantissa) = comptroller.markets(
             address(mToken)
         );
@@ -269,6 +283,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         _mTokens[0] = address(mToken);
 
         // q - 这里为什么要进入 market？ 这个借款函数的逻辑是什么？
+        // a - 把该地址的抵押登记为可用于借款，不进入市场，Comptroller 的流动性检查会失败，borrowAllowed 会拒绝
         comptroller.enterMarkets(_mTokens);
         assertTrue(
             comptroller.checkMembership(sender, mToken),
@@ -284,6 +299,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             return;
         }
 
+        // 断言 0， 表示借款成功
         assertEq(
             MErc20Delegator(payable(address(mToken))).borrow(borrowAmount),
             0,
@@ -292,13 +308,17 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         IERC20 token = IERC20(MErc20(address(mToken)).underlying());
 
+        // WETH 市场
         if (address(token) == addresses.getAddress("WETH")) {
+            // 这里按“收到原生 ETH”路径检查 sender.balance 增量
+            // q - 为什么这么写？ 是之前给账户 mint 了一些 WETH 的原因吗？
             assertEq(
                 sender.balance - balanceBefore,
                 borrowAmount,
                 "Wrong borrow amount"
             );
         } else {
+            // 普通 ERC20 市场
             assertEq(
                 token.balanceOf(sender),
                 borrowAmount,
@@ -328,16 +348,19 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
 
         // 1000e8 to 90% of max supply
+        // q - 什么意思？ 最多只收到 90% 的借款？
         supplyAmount = _bound(supplyAmount, 1000e8, max);
 
         _mintMToken(address(this), address(mToken), supplyAmount);
 
+        // q - 这里的 1_000_000 单位是多少？
         toWarp = _bound(toWarp, 1_000_000, 4 weeks);
 
         uint256 timeBefore = vm.getBlockTimestamp();
         vm.warp(timeBefore + toWarp);
         uint256 timeAfter = vm.getBlockTimestamp();
 
+        // q - 计算应该拿到的奖励
         for (uint256 i = 0; i < rewardsConfig[mToken].length; i++) {
             uint256 expectedReward = _calculateSupplyRewards(
                 MToken(mToken),

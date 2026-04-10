@@ -151,3 +151,14 @@ test-fuzz-borrow-local:
 	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
 	forge test --match-test testFuzzBorrowMTokenSucceed -vv
 
+test-fuzz-receive-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testFuzzSupplyReceivesRewards -vv
+

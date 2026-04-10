@@ -334,6 +334,11 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // q - 这个函数是干什么的？
+    // 内部的计算都是围绕奖励数据展开的，所以这个函数实际是在做什么呢？
+    // 先 supply 一笔资金，时间快进一段
+    // 对比 mrd 计算值 和 测试内手工计算值 是否一致
+    // 即 供应测奖励正确性 的正确性 测试
     function _supplyReceivesRewards(
         uint256 mTokenIndex,
         uint256 supplyAmount,
@@ -348,19 +353,20 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
 
         // 1000e8 to 90% of max supply
-        // q - 什么意思？ 最多只收到 90% 的借款？
+        // 实际最多是 max
         supplyAmount = _bound(supplyAmount, 1000e8, max);
 
         _mintMToken(address(this), address(mToken), supplyAmount);
 
         // q - 这里的 1_000_000 单位是多少？
+        // a - 单位是秒，1_000_000 大约 11.57 天
         toWarp = _bound(toWarp, 1_000_000, 4 weeks);
 
         uint256 timeBefore = vm.getBlockTimestamp();
         vm.warp(timeBefore + toWarp);
         uint256 timeAfter = vm.getBlockTimestamp();
 
-        // q - 计算应该拿到的奖励
+        //  计算应该拿到的奖励
         for (uint256 i = 0; i < rewardsConfig[mToken].length; i++) {
             uint256 expectedReward = _calculateSupplyRewards(
                 MToken(mToken),
@@ -370,19 +376,26 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
                 timeAfter
             );
 
+            // 获取奖励数据
             MultiRewardDistributorCommon.RewardInfo[] memory rewards = mrd
                 .getOutstandingRewardsForUser(MToken(mToken), address(this));
 
+            // q - 这里的遍历在判断什么？
             for (uint256 j = 0; j < rewards.length; j++) {
+                // 在返回数组里找到相同 emmisionToken 的那一项
                 if (rewards[j].emissionToken != rewardsConfig[mToken][i]) {
                     continue;
                 }
+                // rewards[j].supplySide ≈ expectedReward
+                // 允许 10% 相对误差，避免精度/四舍五入导致的微差
                 assertApproxEqRel(
                     rewards[j].supplySide,
                     expectedReward,
                     0.1e18,
                     "Supply rewards not correct"
                 );
+                // rewards[j].totalAmount ≈ expectedReward
+                // 允许 10% 相对误差，避免精度/四舍五入导致的微差
                 assertApproxEqRel(
                     rewards[j].totalAmount,
                     expectedReward,

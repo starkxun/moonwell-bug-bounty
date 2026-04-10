@@ -75,8 +75,8 @@ contract MultiRewardDistributor is
     }
 
     struct CalculatedData {
-        CurrentMarketData marketData;
-        MTokenData mTokenInfo;
+        CurrentMarketData marketData;   // 市场数据
+        MTokenData mTokenInfo;          // 用户数据
     }
 
     /// construct the logic contract and initialize so that the initialize function is uncallable
@@ -253,6 +253,10 @@ contract MultiRewardDistributor is
     }
 
     /// @notice A view to enumerate a user's rewards across a specified market and all emission tokens for that market
+    // 单市场版本
+    // 该函数针对市场的每个 emission token(发行代币)
+    // 给出当前用户累计的奖励明细
+    // 这里的奖励，是用户在完成供给或借款行为，按时间累计，最终得到 emission token 奖励
     function getOutstandingRewardsForUser(
         MToken _mToken,
         address _user
@@ -265,19 +269,24 @@ contract MultiRewardDistributor is
         // Output var
         RewardInfo[] memory outputRewardData = new RewardInfo[](configs.length);
 
+        // 预读一次市场和用户快照
+        // q - 这里参数较为复杂， 详细理解
         // Code golf to avoid too many local vars :rolling-eyes:
         CalculatedData memory calcData = CalculatedData({
+            // 市场数据快照
             marketData: CurrentMarketData({
                 totalMTokens: _mToken.totalSupply(),
                 totalBorrows: _mToken.totalBorrows(),
-                marketBorrowIndex: Exp({mantissa: _mToken.borrowIndex()})
+                marketBorrowIndex: Exp({mantissa: _mToken.borrowIndex()})    // borrowIndex: 市场借款指数
             }),
+            // 用户数据快照
             mTokenInfo: MTokenData({
-                mTokenBalance: _mToken.balanceOf(_user),
-                borrowBalanceStored: _mToken.borrowBalanceStored(_user)
+                mTokenBalance: _mToken.balanceOf(_user),                    // 用户持有的 mToken 数量
+                borrowBalanceStored: _mToken.borrowBalanceStored(_user)     // 用户借款余额
             })
         });
 
+        // 对每个配置奖励分别计算 最新全局指数
         for (uint256 index = 0; index < configs.length; index++) {
             MarketEmissionConfig storage emissionConfig = configs[index];
 

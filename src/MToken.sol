@@ -373,6 +373,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
     function borrowBalanceStored(
         address account
     ) public view override returns (uint) {
+        // 调用 borrowBalanceStoredInternal 计算用户的 借款 + 利息
         (MathError err, uint result) = borrowBalanceStoredInternal(account);
         require(
             err == MathError.NO_ERROR,
@@ -387,7 +388,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @return (error code, the calculated balance or 0 if error code is non-zero)
      */
     //  返回借款地址的余额
-    // q - 是返回还可以借款的数额 or 返回已经借款的数额 ?
+    //  即已经借了，计算需要还多少钱（本金 + 利息）
     function borrowBalanceStoredInternal(
         address account
     ) internal view returns (MathError, uint) {
@@ -402,6 +403,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         /* If borrowBalance = 0 then borrowIndex is likely also 0.
          * Rather than failing the calculation with a division by 0, we immediately return 0 in this case.
          */
+        //  用户没有借款
         if (borrowSnapshot.principal == 0) {
             return (MathError.NO_ERROR, 0);
         }

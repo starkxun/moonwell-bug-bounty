@@ -70,8 +70,8 @@ contract MTokenStorage {
      * @member interestIndex Global borrowIndex as of the most recent balance-changing action
      */
     struct BorrowSnapshot {
-        uint principal;
-        uint interestIndex;
+        uint principal;     // 上次结算后的借款余额
+        uint interestIndex; // 用户那次记录对应的 market borrowIndex
     }
 
     // @notice Mapping of account addresses to outstanding borrow balances

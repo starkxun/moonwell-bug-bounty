@@ -151,7 +151,7 @@ test-fuzz-borrow-local:
 	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
 	forge test --match-test testFuzzBorrowMTokenSucceed -vv
 
-test-fuzz-receive-local:
+test-fuzz-supplyReceive-local:
 	@set -e; \
 	$(MAKE) ensure-mip-artifacts; \
 	$(MAKE) anvil-forks-up; \
@@ -162,3 +162,48 @@ test-fuzz-receive-local:
 	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
 	forge test --match-test testFuzzSupplyReceivesRewards -vv
 
+
+test-fuzz-borrowReceive-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testFuzzBorrowReceivesRewards -vv
+
+
+test-fuzz-supplyBorrowReceive-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testFuzzSupplyBorrowReceiveRewards -vv
+
+test-fuzz-liquidateAccountReceive-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testFuzzLiquidateAccountReceiveRewards -vv
+
+test-fuzz-repayBorrowBehalfWethRouter-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testRepayBorrowBehalfWethRouter -vv

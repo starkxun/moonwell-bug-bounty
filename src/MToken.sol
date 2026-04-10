@@ -370,6 +370,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param account The address whose balance should be calculated
      * @return The calculated balance
      */
+    //  返回应当偿还的本金和利息
+    //  返回 0 表示没有借款(或已经偿还完成)
     function borrowBalanceStored(
         address account
     ) public view override returns (uint) {
@@ -1235,10 +1237,12 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param repayAmount The amount to repay
      * @return (uint, uint) An error code (0=success, otherwise a failure, see ErrorReporter.sol), and the actual repayment amount.
      */
+    //  q - repay 也需要防止重入吗？
     function repayBorrowBehalfInternal(
         address borrower,
         uint repayAmount
     ) internal nonReentrant returns (uint, uint) {
+        // q - 这里的作用是更新 利息吗？
         uint error = accrueInterest();
         if (error != uint(Error.NO_ERROR)) {
             // accrueInterest emits logs on errors, but we still want to log the fact that an attempted borrow failed

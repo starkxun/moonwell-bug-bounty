@@ -39,7 +39,10 @@ import {MultiRewardDistributorCommon} from "@protocol/rewards/MultiRewardDistrib
     still happen but no tokens will be sent out when the circuit breaker is popped. Much like the pause
     guardians on the Comptroller, only the comptroller's admin can actually unpause things.
 */
-
+//  奖励分发合约
+// 维护每个市场、每个奖励币的供给/借款奖励全局指数
+// 计算用户应得奖励（supplySide、borrowSide、totalAmount）
+// 在需要时把奖励 token 发给用户（或余额不足时记账为待发）
 contract MultiRewardDistributor is
     Pausable,
     ReentrancyGuard,
@@ -616,6 +619,7 @@ contract MultiRewardDistributor is
         address _borrower,
         bool _sendTokens
     ) external onlyComptrollerOrAdmin {
+        // 把 market 的奖励配置的 借款奖励全局指数 推进到 当前时间
         updateMarketBorrowIndexInternal(_mToken);
         disburseBorrowerRewardsInternal(_mToken, _borrower, _sendTokens);
     }
@@ -871,6 +875,7 @@ contract MultiRewardDistributor is
      * @param _mTokenData A struct holding a borrower's
      * @param _borrower The address of the supplier mToken balance and borrowed balance
      */
+    //  q - 计算每个用户应得的奖励？
     function calculateBorrowRewardsForUser(
         MarketEmissionConfig storage _emissionConfig,
         uint224 _globalBorrowIndex,
@@ -1109,21 +1114,26 @@ contract MultiRewardDistributor is
      * @notice An internal function to update the global borrow index for a given mToken
      * @param _mToken The market to update the global borrow index for
      */
+    //  把 market 的奖励配置的 借款奖励全局指数 推进到 当前时间
     function updateMarketBorrowIndexInternal(MToken _mToken) internal {
         MarketEmissionConfig[] storage configs = marketConfigs[
             address(_mToken)
         ];
 
+        // 读取市场快照 -> mToken 的两个值: borrowIndex 和 totalBorrow 
+        // q - 这里的 marketBorrowIndex 是啥？
         Exp memory marketBorrowIndex = Exp({
             mantissa: MToken(_mToken).borrowIndex()
         });
         uint256 totalBorrows = MToken(_mToken).totalBorrows();
 
         // Iterate over all market configs and update their indexes + timestamps
+        // 逐个遍历 market 下的奖励配置
         for (uint256 index = 0; index < configs.length; index++) {
             MarketEmissionConfig storage emissionConfig = configs[index];
 
             // Go calculate our new borrow index
+            // 更新 借款侧 奖励指数
             IndexUpdate memory borrowIndexUpdate = calculateNewIndex(
                 emissionConfig.config.borrowEmissionsPerSec,
                 emissionConfig.config.borrowGlobalTimestamp,
@@ -1155,11 +1165,14 @@ contract MultiRewardDistributor is
      * @param _borrower The borrower to disburse rewards for
      * @param _sendTokens Whether to actually send tokens instead of just accruing
      */
+    //  结算并记账借款奖励
+    // 在 _sendTokens 为 true 的时候发放
     function disburseBorrowerRewardsInternal(
         MToken _mToken,
         address _borrower,
         bool _sendTokens
     ) internal {
+        // 读取市场快照
         MarketEmissionConfig[] storage configs = marketConfigs[
             address(_mToken)
         ];
@@ -1175,6 +1188,7 @@ contract MultiRewardDistributor is
             MarketEmissionConfig storage emissionConfig = configs[index];
 
             // Go calculate the total outstanding rewards for this user
+            // 计算 历史累计 + 本次新增的 reward
             uint256 owedRewards = calculateBorrowRewardsForUser(
                 emissionConfig,
                 emissionConfig.config.borrowGlobalIndex,
@@ -1184,11 +1198,14 @@ contract MultiRewardDistributor is
             );
 
             // Update user's index to global index
+            // 更新用户的 borrower index 为 全局 borrowGlobalIndex
             emissionConfig.borrowerIndices[_borrower] = emissionConfig
                 .config
                 .borrowGlobalIndex;
 
             // Update the accrued borrow side rewards for this user
+            // 把 borrowerRewardsAccrued 写成最新 owerRewards
+            // mToken 文件里的 accrueInterest() 函数, 和这里是否有关系？
             emissionConfig.borrowerRewardsAccrued[_borrower] = owedRewards;
 
             emit DisbursedBorrowerRewards(
@@ -1208,6 +1225,7 @@ contract MultiRewardDistributor is
                     emissionConfig.config.emissionToken
                 );
 
+                // q - 累计奖励金额
                 emissionConfig.borrowerRewardsAccrued[
                     _borrower
                 ] = pendingRewards;
@@ -1240,6 +1258,8 @@ contract MultiRewardDistributor is
         IERC20 token = IERC20(_rewardToken);
 
         // Get the distributor's current balance
+        // q - 这里贡献者的余额，是指贡献者在合约内的余额吗，还是自身的余额？
+        // a - 这里查询的是当前合约（MRD） 奖励池 里剩多少奖励币
         uint256 currentTokenHoldings = token.balanceOf(address(this));
 
         // Only transfer out if we have enough of a balance to cover it (otherwise just accrue without sending)
@@ -1250,6 +1270,8 @@ contract MultiRewardDistributor is
         } else {
             // If we've hit here it means we weren't able to emit the reward and we should emit an event
             // instead of failing.
+            // 如果发送失败,不回滚
+            // 发 InsufficientTokensToEmit 事件并返回未发出的金额，继续记在应计奖励里
             emit InsufficientTokensToEmit(_user, _rewardToken, _amount);
 
             // By default, return the same amount as what's left over to send, we accrue reward but don't send them out

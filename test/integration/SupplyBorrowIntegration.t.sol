@@ -643,9 +643,13 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // 借款测奖励 和  供应测奖励
     mapping(address token => uint256 borrowRewardPerToken) borrowRewardPerToken;
     mapping(address token => uint256 supplyRewardPerToken) supplyRewardPerToken;
 
+    // q - LPer 接收奖励测试？
+    // a - 测试 供给侧 和 借款侧 的奖励是否符合预期
+    // 用户先 供给 + 借款， 然后进入可清算状态进行清算
     function _liquidateAccountReceiveRewards(
         uint256 mTokenIndex,
         uint256 mintAmount,
@@ -664,6 +668,8 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         mintAmount = _bound(mintAmount, 10e8, max);
 
         // uses different users to each market ensuring that previous liquidations do not impact this test
+        // 用每个市场不同 user 地址测试（q - 为什么可以做到？）
+        // 避免前一个市场 / 清算 的残留状态污染这一次的断言
         address user = address(uint160(mTokenIndex + 123));
 
         _mintMToken(user, address(mToken), mintAmount);
@@ -694,10 +700,13 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             );
         }
 
+        // 这一步判断是什么意义？
+        //  1/3 minAmount 大于最大借款数额，就 return ？
         if (mintAmount / 3 > marketBase.getMaxUserBorrowAmount(mToken, user)) {
             return;
         }
 
+        // q - 这一步判断是什么意思？
         assertEq(
             MErc20Delegator(payable(address(mToken))).borrow(mintAmount / 3),
             0,
@@ -733,22 +742,33 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
 
         /// borrower is now underwater on loan
+        // q - 这里什么意思？ 为什么借款人现在负债过重 ？
+        // 使用 deal 强行把 用户的 mToken 抵押余额 降低到 较低水平（q - 为什么这么做？）
+        // 抵押值下降，债务仍在， shortfall > 0, 进入清算状态
         deal(address(mToken), user, mToken.balanceOf(user) / 3);
 
         {
+            // q - 这里获取的内容是什么？
+            // err: 错误码, 0 表示成功
+            // liquidity: 剩余可用流动性(还能借多少)
+            // shortfall: 可清算程度
             (uint256 err, uint256 liquidity, uint256 shortfall) = comptroller
                 .getHypotheticalAccountLiquidity(user, address(mToken), 0, 0);
 
             assertEq(err, 0, "Error in hypothetical liquidity calculation");
-            assertEq(liquidity, 0, "Liquidity not 0");
+            // liquidity = 0 && shortfall > 0
+            // 即表示可以清算了
+            assertEq(liquidity, 0, "Liquidity not 0"); 
             assertGt(shortfall, 0, "Shortfall not gt 0");
         }
 
         {
+            // q - reapy 数量为什么 是 mint 数量 除以 6 ？
+            // a - 部分清算,不清算全部
             uint256 repayAmount = mintAmount / 6;
             deal(
-                MErc20(address(mToken)).underlying(),
-                address(100_000_000),
+                MErc20(address(mToken)).underlying(),       // q - 这句语法是什么意思？ -> 该市场底层资产地址
+                address(100_000_000),                       // q - 这里 address(100_000_000) 是什么意思？ -> 整数强制转换为地址
                 repayAmount
             );
 
@@ -770,6 +790,14 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
             vm.stopPrank();
         }
+
+        // RewardInfo 结构：
+        // struct RewardInfo {
+        //     address emissionToken;
+        //     uint totalAmount;
+        //     uint supplySide;
+        //     uint borrowSide;
+        // }
 
         MultiRewardDistributorCommon.RewardInfo[] memory rewardsPaid = mrd
             .getOutstandingRewardsForUser(MToken(mToken), user);
@@ -814,6 +842,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // q - 函数的作用 -> 测试路由偿还借款   [目前测试到这里]
     function testRepayBorrowBehalfWethRouter() public {
         MToken mToken = MToken(addresses.getAddress("MOONWELL_WETH"));
         uint256 mintAmount = marketBase.getMaxSupplyAmount(mToken);
@@ -872,6 +901,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         router.repayBorrowBehalf{value: borrowAmount}(address(this));
 
+        // 断言已经偿还完成
         assertEq(MErc20(mweth).borrowBalanceStored(address(this)), 0); /// fully repaid
     }
 

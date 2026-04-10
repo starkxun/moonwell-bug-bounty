@@ -22,12 +22,15 @@ interface MultiRewardDistributorCommon {
         uint borrowEmissionsPerSec;
     }
 
+    // 账本
+    // MarketConfig config,包含
+    // owner, 奖励币地址 emissionToken, 结束时间, 全局供应/借款奖励指数, 每秒供应/借款发放速率 
     struct MarketEmissionConfig {
         MarketConfig config;
-        mapping(address => uint) supplierIndices;
-        mapping(address => uint) supplierRewardsAccrued;
-        mapping(address => uint) borrowerIndices;
-        mapping(address => uint) borrowerRewardsAccrued;
+        mapping(address => uint) supplierIndices;   // 供应测上次结算时记录的个人快照
+        mapping(address => uint) supplierRewardsAccrued;    // 用户在供给侧已累计但可能未转账的奖励余额
+        mapping(address => uint) borrowerIndices;           // 用户在借款侧上次记录的个人指数快照
+        mapping(address => uint) borrowerRewardsAccrued;    // 用户在借款侧已累计但可能未转账的奖励余额
     }
 
     struct RewardInfo {

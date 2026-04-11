@@ -974,13 +974,19 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
     }
 
     // q - 测试使用路由 mint ?
+    // ETH -> router 包装成 WETH 进入 market -> mint 等量 mToken份额给 测试合约(用户) ->
+    // ->  reedem() -> 资本回到原始状态
     function testMintWithRouter() public {
         WETH9 weth = WETH9(addresses.getAddress("WETH"));
         MErc20 mToken = MErc20(addresses.getAddress("MOONWELL_WETH"));
+        // 记录市场当前持有的 WETH 余额
+        // 用于验证存入市场后 WETH 增加了多少
         uint256 startingMTokenWethBalance = weth.balanceOf(address(mToken));
 
         uint256 mintAmount = marketBase.getMaxSupplyAmount(mToken);
-        vm.deal(address(this), mintAmount);     // q - 这里给这个合约打钱干什么？
+        // q - 这里给这个合约打钱干什么？
+        // 后面调用 路由mint, 没这笔 ETH 会导致失败
+        vm.deal(address(this), mintAmount);     
 
         WETHRouter router = new WETHRouter(
             weth,
@@ -988,9 +994,12 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         );
 
         // q - 这里调用路由给这个测试合约 mint WETH 代币？
+        // a - 给测试合约 mint Token 份额, WETH 被送进了 market
         router.mint{value: mintAmount}(address(this));
 
+        // 断言发送出去的 ETH 没有残留在测试合约里
         assertEq(address(this).balance, 0, "incorrect test contract eth value");
+        // 断言市场收到了等量的 WETH 作为底层资产
         assertEq(
             weth.balanceOf(address(mToken)),
             mintAmount + startingMTokenWethBalance,
@@ -1001,12 +1010,14 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         // 调用链 redeem() -> redeemInternal() -> redeemFresh()
         mToken.redeem(type(uint256).max);
 
+        // 断言拿回来的钱近似于 mintAmount
         assertApproxEqRel(
             address(this).balance,
             mintAmount,
             1e15, /// tiny loss due to rounding down
             "incorrect test contract eth value after redeem"
         );
+        // 断言市场余额基本回到起点
         assertApproxEqRel(
             startingMTokenWethBalance,
             weth.balanceOf(address(mToken)),
@@ -1015,26 +1026,32 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         );
     }
 
+    // 供给数量超过供给上限必然导致失败
     function _supplyingOverSupplyCapFails(uint256 mTokenIndex) private {
         MToken mToken = mTokens[mTokenIndex];
 
         uint256 amount = marketBase.getMaxSupplyAmount(mToken) + 1;
 
+        // 意味着该市场 max 是 0（不可供给或异常状态），继续测意义不大
         if (amount == 1) {
             return;
         }
 
         address underlying = MErc20(address(mToken)).underlying();
 
+        // q - 特殊处理? 为什么?
+        // a - 这是测试层面的防御性处理，避免 fork/live 场景里 wrapped native 相关路径出现非目标干扰
         if (underlying == addresses.getAddress("WETH")) {
             vm.deal(addresses.getAddress("WETH"), amount);
         }
 
         deal(underlying, address(this), amount);
-        IERC20(underlying).approve(address(mToken), amount);
+        // approve 给 mToken 防止余额不足
+        // q - 授权 mToken 使用本测试合约的余额?
+        IERC20(underlying).approve(address(mToken), amount);  
 
         vm.expectRevert("market supply cap reached");
-        MErc20Delegator(payable(address(mToken))).mint(amount);
+        MErc20Delegator(payable(address(mToken))).mint(amount); // 通过代理如果调用 mint 逻辑
     }
 
     function testSupplyingOverSupplyCapFails() public {
@@ -1048,6 +1065,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         uint256 mintAmount = marketBase.getMaxSupplyAmount(mToken);
 
+        // q - 不可借款或异常状态?
         if (mintAmount == 0) {
             return;
         }
@@ -1061,6 +1079,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         uint256 amount = marketBase.getMaxBorrowAmount(mToken) + 1;
 
+        // q - 这里的判断是什么意思?
         if (amount == 1 || amount > type(uint128).max) {
             return;
         }
@@ -1091,6 +1110,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             addresses.getAddress("CHAINLINK_ORACLE")
         );
 
+        // 价格应当大于 1
         assertGt(
             oracle.getUnderlyingPrice(mToken),
             1,

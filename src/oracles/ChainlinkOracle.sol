@@ -59,6 +59,7 @@ contract ChainlinkOracle is PriceOracle {
         MToken mToken
     ) public view override returns (uint256) {
         string memory symbol = mToken.symbol();
+        // nativeToken 已经被弃用了?
         if (keccak256(abi.encodePacked(symbol)) == nativeToken) {
             /// @dev this branch should never get called as native tokens are not supported on this deployment
             return getChainlinkPrice(getFeed(symbol));
@@ -104,6 +105,7 @@ contract ChainlinkOracle is PriceOracle {
         require(updatedAt != 0, "Round is in incompleted state");
 
         // Chainlink USD-denominated feeds store answers at 8 decimals
+        // decimalDelta = 18 - feed.decimals()
         uint256 decimalDelta = uint256(18).sub(feed.decimals());
         // Ensure that we don't multiply the result by 0
         if (decimalDelta > 0) {

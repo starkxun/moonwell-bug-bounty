@@ -5,6 +5,7 @@ ANVIL_MOONBEAM_PORT ?= 9545
 ANVIL_BASE_PORT ?= 9546
 ANVIL_OPTIMISM_PORT ?= 9547
 ANVIL_ETHEREUM_PORT ?= 9548
+ANVIL_START_TIMEOUT ?= 60
 
 ANVIL_STATE_DIR ?= .anvil-local
 ANVIL_LOG_DIR ?= $(ANVIL_STATE_DIR)/logs
@@ -94,10 +95,21 @@ anvil-forks-up:
 		"http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
 		"http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
 		"http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)"; do \
-		deadline=$$(( $$(date +%s) + 20 )); \
+		deadline=$$(( $$(date +%s) + $(ANVIL_START_TIMEOUT) )); \
 		while ! cast block-number --rpc-url "$$url" >/dev/null 2>&1; do \
 			if [ $$(date +%s) -ge $$deadline ]; then \
-				echo "anvil endpoint not ready: $$url"; \
+				echo "anvil endpoint not ready within $(ANVIL_START_TIMEOUT)s: $$url"; \
+				case "$$url" in \
+					*:$(ANVIL_MOONBEAM_PORT)) log_file="$(ANVIL_LOG_DIR)/moonbeam.log" ;; \
+					*:$(ANVIL_BASE_PORT)) log_file="$(ANVIL_LOG_DIR)/base.log" ;; \
+					*:$(ANVIL_OPTIMISM_PORT)) log_file="$(ANVIL_LOG_DIR)/optimism.log" ;; \
+					*:$(ANVIL_ETHEREUM_PORT)) log_file="$(ANVIL_LOG_DIR)/ethereum.log" ;; \
+					*) log_file="" ;; \
+				esac; \
+				if [ -n "$$log_file" ] && [ -f "$$log_file" ]; then \
+					echo "--- tail $$log_file ---"; \
+					tail -n 50 "$$log_file"; \
+				fi; \
 				$(MAKE) anvil-forks-down; \
 				exit 1; \
 			fi; \
@@ -218,3 +230,47 @@ test-fuzz-repayMoreThanBorrowBalanceWethRouter-local:
 	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
 	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
 	forge test --match-test testRepayMoreThanBorrowBalanceWethRouter -vv
+
+test-fuzz-mintWithRouter-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testMintWithRouter -vv
+
+test-fuzz-supplyingOverSupplyCapFails-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testSupplyingOverSupplyCapFails -vv
+
+test-fuzz-borrowingOverBorrowCapFails-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testBorrowingOverBorrowCapFails -vv
+
+test-fuzz-oraclesReturnCorrectValues-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test --match-test testOraclesReturnCorrectValues -vv

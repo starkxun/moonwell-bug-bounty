@@ -8,6 +8,9 @@ import "./MTokenInterfaces.sol";
  * @notice MTokens which wrap an EIP-20 underlying and delegate to an implementation
  * @author Moonwell
  */
+
+// mToken 市场的 可升级 代理可,核心目标是 地址不变, 逻辑可换
+// 对外暴露标准市场接口（mint/borrow/repay/redeem 等），但自己不实现业务细节，而是转发给实现合约执行
 contract MErc20Delegator is
     MTokenInterface,
     MErc20Interface,
@@ -26,6 +29,9 @@ contract MErc20Delegator is
      * @param implementation_ The address of the implementation the contract delegates to
      * @param becomeImplementationData The encoded args for becomeImplementation
      */
+    // implementation：当前业务逻辑合约地址, 决定所有转发调用最终执行哪套逻辑
+    // pendingAdmin（两步交接相关，定义在继承的存储结构中）：管理员平滑移交，防止误操作
+
     constructor(
         address underlying_,
         ComptrollerInterface comptroller_,

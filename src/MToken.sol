@@ -40,7 +40,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
 
         // Set initial exchange rate
         // initialExchangeRateMantissa 初始兑换率（1e18）
-        // 早期 mToken 和 底层资产的兑换比率
+        // 初始 mToken 和 底层资产的兑换比率
         initialExchangeRateMantissa = initialExchangeRateMantissa_;
         require(
             initialExchangeRateMantissa > 0,
@@ -464,31 +464,41 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @dev This function does not accrue interest before calculating the exchange rate
      * @return (error code, calculated exchange rate scaled by 1e18)
      */
-    //  q - 获取内部的 mToken 兑换汇率？
-    //  具体逻辑没有理清，需要仔细阅读
+    //  获取内部的 mToken 兑换汇率？
+    //  1 个 mToken 值多少底层资产
     function exchangeRateStoredInternal()
         internal
         view
         virtual
         returns (MathError, uint)
     {
-        uint _totalSupply = totalSupply;
-        if (_totalSupply == 0) {
+        uint _totalSupply = totalSupply;        // mToken 总量
+
+        // totalSupply 为 0， 表示市场上还没人铸造 mToken， 返回初始汇率
+        if (_totalSupply == 0) {    
             /*
              * If there are no tokens minted:
              *  exchangeRate = initialExchangeRate
              */
             return (MathError.NO_ERROR, initialExchangeRateMantissa);
         } else {
+
+            // totalSupply 大于 0 时
+            // 按照市场当前资产负债计算真实汇率
+
+            // totalCash：合约里实际持有的底层资产
+            // totalBorrows：借出去但仍算市场资产的一部分
+            // totalReserves：协议留存储备，要从可分配资产里扣掉
             /*
              * Otherwise:
              *  exchangeRate = (totalCash + totalBorrows - totalReserves) / totalSupply
              */
-            uint totalCash = getCashPrior();
+            uint totalCash = getCashPrior();    // 合约里实际持有的底层资产
             uint cashPlusBorrowsMinusReserves;
             Exp memory exchangeRate;
             MathError mathErr;
 
+            // 根据上面的公式进行计算
             (mathErr, cashPlusBorrowsMinusReserves) = addThenSubUInt(
                 totalCash,
                 totalBorrows,
@@ -498,6 +508,9 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
                 return (mathErr, 0);
             }
 
+            // 安全除法
+            // 并把结果处理成 18 位定点数
+            // 最终返回 exchangeRate.mantissa
             (mathErr, exchangeRate) = getExp(
                 cashPlusBorrowsMinusReserves,
                 _totalSupply
@@ -858,6 +871,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         return redeemFresh(payable(msg.sender), 0, redeemAmount);
     }
 
+    // q - 每个参数的意义？
     struct RedeemLocalVars {
         Error err;
         MathError mathErr;
@@ -881,6 +895,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         uint redeemTokensIn,
         uint redeemAmountIn
     ) internal returns (uint) {
+        // q - 为什么其中一个必须为 0 ?
         require(
             redeemTokensIn == 0 || redeemAmountIn == 0,
             "one of redeemTokensIn or redeemAmountIn must be zero"
@@ -889,6 +904,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         RedeemLocalVars memory vars;
 
         /* exchangeRate = invoke Exchange Rate Stored() */
+        // 获取 mToken / 底层资产 的兑换比率
         (
             vars.mathErr,
             vars.exchangeRateMantissa
@@ -915,6 +931,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
                 vars.redeemTokens = redeemTokensIn;
             }
 
+            // q - 这里进行缩放, 1e18 -> 1 ?
             (vars.mathErr, vars.redeemAmount) = mulScalarTruncate(
                 Exp({mantissa: vars.exchangeRateMantissa}),
                 vars.redeemTokens

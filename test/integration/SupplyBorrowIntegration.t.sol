@@ -521,6 +521,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // 供应侧 和 借款侧 的奖励 
     function _supplyBorrowReceiveRewards(
         uint256 mTokenIndex,
         uint256 supplyAmount,
@@ -905,6 +906,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         assertEq(MErc20(mweth).borrowBalanceStored(address(this)), 0); /// fully repaid
     }
 
+    // q - 测试偿还多于(两倍) borrowAmount 数量的金额
     function testRepayMoreThanBorrowBalanceWethRouter() public {
         MToken mToken = MToken(addresses.getAddress("MOONWELL_WETH"));
         uint256 mintAmount = marketBase.getMaxSupplyAmount(mToken);
@@ -965,23 +967,27 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
         router.repayBorrowBehalf{value: borrowRepayAmount}(address(this));
 
+        // 断言 偿还成功（借款 + 利息 为 0 表示还款成功）
+        // 多付的钱自动退还给用户了
         assertEq(MErc20(mweth).borrowBalanceStored(address(this)), 0); /// fully repaid
         assertEq(address(this).balance, borrowRepayAmount / 2); /// excess eth returned
     }
 
+    // q - 测试使用路由 mint ?
     function testMintWithRouter() public {
         WETH9 weth = WETH9(addresses.getAddress("WETH"));
         MErc20 mToken = MErc20(addresses.getAddress("MOONWELL_WETH"));
         uint256 startingMTokenWethBalance = weth.balanceOf(address(mToken));
 
         uint256 mintAmount = marketBase.getMaxSupplyAmount(mToken);
-        vm.deal(address(this), mintAmount);
+        vm.deal(address(this), mintAmount);     // q - 这里给这个合约打钱干什么？
 
         WETHRouter router = new WETHRouter(
             weth,
             MErc20(addresses.getAddress("MOONWELL_WETH"))
         );
 
+        // q - 这里调用路由给这个测试合约 mint WETH 代币？
         router.mint{value: mintAmount}(address(this));
 
         assertEq(address(this).balance, 0, "incorrect test contract eth value");
@@ -991,6 +997,8 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             "incorrect mToken weth value after mint"
         );
 
+        // 赎回
+        // 调用链 redeem() -> redeemInternal() -> redeemFresh()
         mToken.redeem(type(uint256).max);
 
         assertApproxEqRel(

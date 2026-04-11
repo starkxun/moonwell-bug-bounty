@@ -14,10 +14,14 @@ contract ExponentialNoError {
     uint constant halfExpScale = expScale / 2;
     uint constant mantissaOne = expScale;
 
+    // 用于处理 solidity 的小数
+    // 这里存储的是真实值放大 1e18 后的值，存在 mantissa 里
+    // 例： Exp({mantissa: 1e18}) 表示 1.0
     struct Exp {
         uint mantissa;
     }
 
+    // 同理，真实值放大 1e36
     struct Double {
         uint mantissa;
     }

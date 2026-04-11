@@ -18,16 +18,18 @@ contract Exponential is CarefulMath, ExponentialNoError {
      *      Note: Returns an error if (`num` * 10e18) > MAX_INT,
      *            or if `denom` is zero.
      */
+    // 把普通比例编码成 18 位精度的 EXP
+    // 安全版定点除法
     function getExp(
         uint num,
         uint denom
     ) internal pure returns (MathError, Exp memory) {
-        (MathError err0, uint scaledNumerator) = mulUInt(num, expScale);
+        (MathError err0, uint scaledNumerator) = mulUInt(num, expScale);    // 分子放大 1e18
         if (err0 != MathError.NO_ERROR) {
             return (err0, Exp({mantissa: 0}));
         }
 
-        (MathError err1, uint rational) = divUInt(scaledNumerator, denom);
+        (MathError err1, uint rational) = divUInt(scaledNumerator, denom);  // 除以分母
         if (err1 != MathError.NO_ERROR) {
             return (err1, Exp({mantissa: 0}));
         }
@@ -126,6 +128,7 @@ contract Exponential is CarefulMath, ExponentialNoError {
     /**
      * @dev Divide a scalar by an Exp, returning a new Exp.
      */
+    //  把普通整数 除以 定点小数Exp 的结果, 继续以 Exp 的形式返回
     function divScalarByExp(
         uint scalar,
         Exp memory divisor
@@ -149,6 +152,10 @@ contract Exponential is CarefulMath, ExponentialNoError {
     /**
      * @dev Divide a scalar by an Exp, then truncate to return an unsigned integer.
      */
+    //  q - 普通数 除以 定点小数 Exp, 然后处理返回无符号整数
+    //  在整个系统里的应用
+    //  1. 计算铸造时应拿到多少 mToken
+    //  2. 计算按指定底层金额赎回时，需要销毁多少 mToken
     function divScalarByExpTruncate(
         uint scalar,
         Exp memory divisor

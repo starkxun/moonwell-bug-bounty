@@ -1129,6 +1129,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
     //  starkxun's test
     ///////////////////////////////////////////////////////////////////////////////////
 
+    // 测试跨市场供应+借款+流动性变化
     function testExitMarketFailsWhenNeededCrossCollateral() public {
         address user = address(this);
 

@@ -80,6 +80,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         assertEq(mTokens.length > 0, true, "No markets found");
     }
 
+    //  q - 给用户 mint MToken?
     function _mintMToken(
         address user,
         address mToken,
@@ -1123,6 +1124,128 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             _oraclesReturnCorrectValues(i);
         }
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////
+    //  starkxun's test
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    function testExitMarketFailsWhenNeededCrossCollateral() public {
+        address user = address(this);
+
+        // 选 3 个市场
+        MToken collateralA = mTokens[0];
+        MToken collateralC = mTokens[1];
+        MToken borrowMarketB = mTokens[2];
+
+        uint256 maxSupplyA = marketBase.getMaxSupplyAmount(collateralA);
+        uint256 maxSupplyC = marketBase.getMaxSupplyAmount(collateralC);
+
+        // 某些 live 市场在该 fork 下可能没有可用供给空间，避免无意义失败
+        if (maxSupplyA == 0 || maxSupplyC == 0) {
+            return;
+        }
+
+        // 留出边界余量，避免“恰好打满 cap”因取整触发回滚
+        uint256 mintAmountA = (maxSupplyA * 9) / 10;
+        uint256 mintAmountC = (maxSupplyC * 9) / 10;
+
+        if (mintAmountA == 0 || mintAmountC == 0) {
+            return;
+        }
+
+        // 供给两个抵押市场
+        _mintMToken(user, address(collateralA), mintAmountA);
+        _mintMToken(user, address(collateralC), mintAmountC);
+
+        // enter 两个抵押市场
+        address[] memory entered = new address[](2);
+        entered[0] = address(collateralA);
+        entered[1] = address(collateralC);
+        comptroller.enterMarkets(entered);
+
+        assertTrue(comptroller.checkMembership(user, collateralA));
+        assertTrue(comptroller.checkMembership(user, collateralC));
+
+        {
+            // 借款市场也 enter
+            address[] memory enterBorrow = new address[](1);
+            enterBorrow[0] = address(borrowMarketB);
+            comptroller.enterMarkets(enterBorrow);
+
+            // 借到接近上限，制造退出任意关键抵押都会 shortfall 的状态
+            uint256 maxBorrow = marketBase.getMaxBorrowAmount(borrowMarketB);
+            require(maxBorrow > 0, "maxBorrow = 0");
+            uint256 borrowAmount = (maxBorrow * 95) / 100;
+            assertEq(MErc20Delegator(payable(address(borrowMarketB))).borrow(borrowAmount), 0);
+        }
+
+        // 用 hypothetical 预演退出 A 是否会 shortfall
+        uint256 redeemAllA = collateralA.balanceOf(user);
+        (uint errHypo, , uint shortfallHypo) = 
+            comptroller.getHypotheticalAccountLiquidity(
+                user,
+                address(collateralA),
+                redeemAllA,
+                0
+        );
+        assertEq(errHypo, 0);
+
+        // 调用 exitMarket, 和预演结果对齐
+        uint exitErr = comptroller.exitMarket(address(collateralA));
+
+        _assertExitMarketOutcome(user, collateralA, shortfallHypo, exitErr);
+
+        // 双向一致性
+        _assertAssetsInAndMembershipConsistent(user, collateralA);
+    }
+
+    function _assertExitMarketOutcome(
+        address user,
+        MToken collateralA,
+        uint256 shortfallHypo,
+        uint256 exitErr
+    ) private view {
+        if (shortfallHypo > 0) {
+            assertTrue(
+                exitErr != 0,
+                "should reject exit when hypothetical shortfall > 0"
+            );
+            assertTrue(
+                comptroller.checkMembership(user, collateralA),
+                "membership must reamin true on failed exit"
+            );
+        } else {
+            assertEq(
+                exitErr,
+                0,
+                "should allow exit when hypothetical shortfall = 0"
+            );
+            assertFalse(
+                comptroller.checkMembership(user, collateralA),
+                "membership must be false after successful exit"
+            );
+        }
+    }
+
+    function _assertAssetsInAndMembershipConsistent(
+        address user,
+        MToken collateralA
+    ) private view {
+        MToken[] memory assets = comptroller.getAssetsIn(user);
+        bool foundA = false;
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            if (address(assets[i]) == address(collateralA)) {
+                foundA = true;
+                break;
+            }
+        }
+
+        assertEq(foundA, comptroller.checkMembership(user, collateralA));
+    }
+
+
+
 
     receive() external payable {}
 }

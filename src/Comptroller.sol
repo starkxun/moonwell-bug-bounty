@@ -697,6 +697,7 @@ contract Comptroller is
                 hypothetical account liquidity in excess of collateral requirements,
      *          hypothetical account shortfall below collateral requirements)
      */
+    //  模拟赎回借款操作后是否安全
     function getHypotheticalAccountLiquidity(
         address account,
         address mTokenModify,

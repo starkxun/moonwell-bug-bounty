@@ -38,27 +38,36 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
 
     function setUp() public override {
         uint256 primaryForkId = vm.envUint("PRIMARY_FORK_ID");
-        super.setUp();  // q - 这里的语法是什么意思?
+        
+        // q - 调用父类的 setUp(), 是 PostProposalCheck 的 setUp 吗？
+        super.setUp();
 
+        // 切换到目标fork
         vm.selectFork(primaryForkId);
 
-        mrd = MultiRewardDistributor(addresses.getAddress("MRD_PROXY"));
-        comptroller = Comptroller(addresses.getAddress("UNITROLLER"));
-        checker = MarketAddChecker(addresses.getAddress("MARKET_ADD_CHECKER"));
-        marketBase = new MarketBase(comptroller);
+        mrd = MultiRewardDistributor(addresses.getAddress("MRD_PROXY"));        // 奖励分发器
+        comptroller = Comptroller(addresses.getAddress("UNITROLLER"));          // 风控入口
+        checker = MarketAddChecker(addresses.getAddress("MARKET_ADD_CHECKER")); // 市场检查器
+        marketBase = new MarketBase(comptroller);                               // 测试辅助工具（算 max supply/borrow）
 
+        // 拉取所有 market
         MToken[] memory markets = comptroller.getAllMarkets();
 
+        // 提取一个废弃 market
         MToken deprecatedMoonwellVelo = MToken(
             addresses.getAddress("DEPRECATED_MOONWELL_VELO", OPTIMISM_CHAIN_ID)
         );
 
         for (uint256 i = 0; i < markets.length; i++) {
+            // 过滤掉一个 废弃 market
             if (markets[i] == deprecatedMoonwellVelo) {
                 continue;
             }
             mTokens.push(markets[i]);
 
+            // 读取每个 market 的 MRD 配置
+            // 把每个 emissionToken 存进 rewardsConfig[market]
+            // 后续后面测试可直接遍历某市场有哪些奖励币，不用每次重复链上查询测试
             MultiRewardDistributorCommon.MarketConfig[] memory configs = mrd
                 .getAllMarketConfigs(markets[i]);
 
@@ -67,6 +76,8 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             }
         }
 
+        // 因为测试会 warp 时间，真实 Redstone 可能报 stale price；这里用 vm.etch 替换目标地址代码
+        // 避免喂价过期导致无关失败
         if (primaryForkId == BASE_FORK_ID) {
             // mock redstone internal call to avoid stale price error (we cannot warp more than 30 hours to the future)
             MockRedstoneMultiFeedAdapter redstoneMock = new MockRedstoneMultiFeedAdapter();
@@ -77,6 +88,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
             );
         }
 
+        // 确保 mTokens 不为空，否则后续测试没有意义
         assertEq(mTokens.length > 0, true, "No markets found");
     }
 
@@ -1200,6 +1212,7 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         _assertAssetsInAndMembershipConsistent(user, collateralA);
     }
 
+    // 拆成函数使用，解决 stack too deep 的问题
     function _assertExitMarketOutcome(
         address user,
         MToken collateralA,
@@ -1228,6 +1241,12 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
     }
 
+    // q - 这里的双向一致性不是太清楚？
+    // a - 结构A: 用户资产列表 getAssetsIn(user) 是否包含该市场
+    //     结构B: 布尔映射 checkMembership(user, market) 是否为 true
+    // import:
+    // exitMarket 会改 membership，也会改 accountAssets 列表
+    // 只要其中一个改了、另一个没改，就会导致后续流动性计算或风控判断异常
     function _assertAssetsInAndMembershipConsistent(
         address user,
         MToken collateralA
@@ -1243,6 +1262,45 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         }
 
         assertEq(foundA, comptroller.checkMembership(user, collateralA));
+    }
+
+
+    // 测试 抵押率 变更，退出 市场 会导致revert
+    function testExitAfterCollateralFactorDrop() public {
+        
+        address user;
+
+        MToken collateralA = mTokens[0];
+        MToken collateralB = mTokens[1];
+        MToken borrowC = mTokens[2];
+        
+        // market 最大 supply
+        uint256 mintA = marketBase.getMaxSupplyAmount(collateralA);
+        uint256 mintB = marketBase.getMaxSupplyAmount(collateralB);
+
+        // supply 为 0, 测试无意义 
+        if(mintA == 0 || mintB == 0){
+            return;
+        }
+
+        // 这里传入 address(MToken)
+        // _mintMToken 会处理找到 该 market 的 underly 代币
+        _mintMToken(user, address(collateralA), mintA);
+        _mintMToken(user, address(collateralB), mintB);
+
+
+        // 进入 market, 通过一个数组统一进入 market
+        address[] memory entered = new address[](3);
+        entered[0] = address(collateralA);
+        entered[1] = address(collateralB);
+        entered[2] = address(borrowC);
+        comptroller.enterMarkets(entered);
+
+        // 借款? borrowC 
+
+        
+        
+
     }
 
 

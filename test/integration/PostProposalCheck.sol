@@ -12,6 +12,8 @@ import {LiveProposalCheck} from "@test/utils/LiveProposalCheck.sol";
 import {MultichainGovernor} from "@protocol/governance/multichain/MultichainGovernor.sol";
 import {AllChainAddresses as Addresses} from "@proposals/Addresses.sol";
 
+// 把 治理提案后的链状态 预先构建好
+// 在集成测试接近真实上线后的状态
 contract PostProposalCheck is LiveProposalCheck {
     using String for string;
     using ChainIds for uint256;
@@ -29,6 +31,7 @@ contract PostProposalCheck is LiveProposalCheck {
     /// to this point if needed. Used in ReserveAutomationDeploy Integration Test
     uint256 public proposalStartTime;
 
+    // q - 这里的 setUp 为什么要使用 override ?
     function setUp() public virtual override {
         uint256 primaryForkBefore = vm.envOr("PRIMARY_FORK_ID", uint256(0));
         super.setUp();

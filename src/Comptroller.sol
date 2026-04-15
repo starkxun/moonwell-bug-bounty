@@ -699,10 +699,10 @@ contract Comptroller is
      */
     //  模拟赎回借款操作后是否安全
     function getHypotheticalAccountLiquidity(
-        address account,
-        address mTokenModify,
-        uint redeemTokens,
-        uint borrowAmount
+        address account,    // 要评估的账户地址
+        address mTokenModify,   // 假设发生在哪个 market
+        uint redeemTokens,  // 赎回数量
+        uint borrowAmount   // 假设在该 market 额外借多少 underlying，0 表示无额外借款
     ) public view returns (uint, uint, uint) {
         (
             Error err,
@@ -770,7 +770,8 @@ contract Comptroller is
             vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
 
             // Pre-compute a conversion factor from tokens -> glmr (normalized price value)
-            // 单个市场抵押换算系数
+            // q - 单个市场抵押换算系数
+            // 什么意思？
             vars.tokensToDenom = mul_(
                 mul_(vars.collateralFactor, vars.exchangeRate),
                 vars.oraclePrice
@@ -814,6 +815,9 @@ contract Comptroller is
 
         // These are safe, as the underflow condition is checked first
         // q - 安全检查, 赎回/借款后是否安全
+        // umCollateral：按抵押系数和价格折算后的“可用抵押价值”
+        // sumBorrowPlusEffects：当前借款价值 + 你这次“假设操作”带来的额外负担（比如赎回会减少抵押、借款会增加负债）
+        // shortfall 的本质 -> shortfall=max(0,sumBorrowPlusEffects−sumCollateral)
         if (vars.sumCollateral > vars.sumBorrowPlusEffects) {
             return (
                 Error.NO_ERROR,
@@ -824,7 +828,7 @@ contract Comptroller is
             return (
                 Error.NO_ERROR,
                 0,
-                vars.sumBorrowPlusEffects - vars.sumCollateral
+                vars.sumBorrowPlusEffects - vars.sumCollateral  // shortfall = 总负债和 - 总抵押和
             );
         }
     }

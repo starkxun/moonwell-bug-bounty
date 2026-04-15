@@ -1264,11 +1264,27 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         assertEq(foundA, comptroller.checkMembership(user, collateralA));
     }
 
+    function _getHypotheticalShortfall(
+        address user,
+        MToken collateral,
+        uint256 redeemTokens
+    ) private view returns (uint256 shortfall) {
+        (uint256 err, , uint256 shortfall_) = comptroller
+            .getHypotheticalAccountLiquidity(
+                user,
+                address(collateral),
+                redeemTokens,
+                0
+            );
+
+        assertEq(err, 0, "hypothetical liquidity calculation failed");
+        return shortfall_;
+    }
+
 
     // 测试 抵押率 变更，退出 市场 会导致revert
     function testExitAfterCollateralFactorDrop() public {
-        
-        address user;
+        address user = address(this);
 
         MToken collateralA = mTokens[0];
         MToken collateralB = mTokens[1];
@@ -1297,13 +1313,50 @@ contract SupplyBorrowLiveSystem is Test, PostProposalCheck {
         comptroller.enterMarkets(entered);
 
         // 借款? borrowC 
+        {
+            uint256 maxBorrow = marketBase.getMaxBorrowAmount(borrowC);
+            require(maxBorrow > 0, "Insufficient borrow amount");
+            uint256 borrowAmount = (maxBorrow * 5) / 10;
+            assertEq(
+                MErc20Delegator(payable(address(borrowC))).borrow(borrowAmount),
+                0
+            );
+        }
 
-        
-        
+        // 模拟赎回 A
+        uint256 redeemA = collateralA.balanceOf(user);
+        uint256 shortfallHypoBefore = _getHypotheticalShortfall(
+            user,
+            collateralA,
+            redeemA
+        );
 
+        // 修改 借款市场C 的抵押因子
+        // 默认抵押因子为: collateralFactorMaxMantissa = 0.9
+        vm.prank(addresses.getAddress("TEMPORAL_GOVERNOR"));    // q - 这是什么, 治理者吗?
+        comptroller._setCollateralFactor(collateralB, 0.01e18);     // 这里可能有问题, 该函数会校验 抵押因子 不能小于 0.9, 设置为 0.1 可能会失败
+        
+        // 再次尝试赎回 A（模拟，断言 shortfall 差值）
+        uint256 shortfallHypoAfter = _getHypotheticalShortfall(
+            user,
+            collateralA,
+            redeemA
+        );
+
+        assertGe(
+            shortfallHypoAfter,
+            shortfallHypoBefore,
+            "shortfall should not improved after CF drop"
+        );
+
+        // 退出 marketA，应当 revert
+        uint256 exitErr = comptroller.exitMarket(address(collateralA));
+
+        _assertExitMarketOutcome(user, collateralA, shortfallHypoAfter, exitErr);
+        
+        // 双向一致
+        _assertAssetsInAndMembershipConsistent(user, collateralA);
     }
-
-
 
 
     receive() external payable {}

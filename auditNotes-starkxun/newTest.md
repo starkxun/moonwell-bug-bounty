@@ -15,3 +15,8 @@
 ```bash
 testExitMarketFailsWhenNeededCrossCollateral
 ```
+
+
+### 测试 抵押率变更 -> 退出市场失败
+
+**基础断言：**

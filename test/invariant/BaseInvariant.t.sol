@@ -23,6 +23,7 @@ contract BaseInvariant is PostProposalCheck {
 
 		comptroller = Comptroller(addresses.getAddress("UNITROLLER"));
 
+		// 剔除 DEPRECATED_MOONWELL_VELO
 		MToken[] memory markets = comptroller.getAllMarkets();
 		MToken deprecatedMoonwellVelo = MToken(
 			addresses.getAddress("DEPRECATED_MOONWELL_VELO", OPTIMISM_CHAIN_ID)
@@ -35,6 +36,7 @@ contract BaseInvariant is PostProposalCheck {
 			mTokens.push(markets[i]);
 		}
 
+		// q - 这里是什么意思? Handler 的定义接受多少参数?
 		handler = new Handler(comptroller, addresses, mTokens);
 
 		bytes4[] memory selectors = new bytes4[](9);

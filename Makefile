@@ -6,6 +6,7 @@ ANVIL_BASE_PORT ?= 9546
 ANVIL_OPTIMISM_PORT ?= 9547
 ANVIL_ETHEREUM_PORT ?= 9548
 ANVIL_START_TIMEOUT ?= 60
+INVARIANT_RUNS ?= 8
 
 ANVIL_STATE_DIR ?= .anvil-local
 ANVIL_LOG_DIR ?= $(ANVIL_STATE_DIR)/logs
@@ -286,3 +287,17 @@ test-fuzz-exitMarketFailsWhenNeededCrossCollateral-local:
 	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
 	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
 	forge test --match-test testExitMarketFailsWhenNeededCrossCollateral -vv
+
+test-invariant-marketsAreListedAndUnique-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	forge test \
+		--match-test invariant_marketsAreListedAndUnique \
+		--fuzz-runs $(INVARIANT_RUNS) \
+		-vv

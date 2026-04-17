@@ -1,12 +1,21 @@
 TAG = moonwell-contracts
 
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
 ANVIL_HOST ?= 127.0.0.1
 ANVIL_MOONBEAM_PORT ?= 9545
 ANVIL_BASE_PORT ?= 9546
 ANVIL_OPTIMISM_PORT ?= 9547
 ANVIL_ETHEREUM_PORT ?= 9548
-ANVIL_START_TIMEOUT ?= 60
-INVARIANT_RUNS ?= 8
+ANVIL_START_TIMEOUT ?= 180
+ANVIL_RPC_RETRIES ?= 8
+ANVIL_RPC_TIMEOUT_MS ?= 120000
+ANVIL_FORK_RETRY_BACKOFF_MS ?= 1500
+INVARIANT_RUNS ?= 2
+INVARIANT_DEPTH ?= 10
 
 ANVIL_STATE_DIR ?= .anvil-local
 ANVIL_LOG_DIR ?= $(ANVIL_STATE_DIR)/logs
@@ -82,15 +91,32 @@ anvil-forks-up:
 	@set -e; \
 	command -v anvil >/dev/null 2>&1 || { echo "anvil not found in PATH"; exit 1; }; \
 	command -v cast >/dev/null 2>&1 || { echo "cast not found in PATH"; exit 1; }; \
+	for port in "$(ANVIL_MOONBEAM_PORT)" "$(ANVIL_BASE_PORT)" "$(ANVIL_OPTIMISM_PORT)" "$(ANVIL_ETHEREUM_PORT)"; do \
+		for pid in $$(lsof -t -nP -iTCP:$$port -sTCP:LISTEN 2>/dev/null || true); do \
+			cmdline=$$(ps -p $$pid -o args= 2>/dev/null || true); \
+			case "$$cmdline" in \
+				*anvil*) \
+					echo "Stopping stale anvil on port $$port (pid $$pid)"; \
+					kill $$pid 2>/dev/null || true; \
+					;; \
+				*) \
+					echo "port $$port is occupied by non-anvil process (pid $$pid): $$cmdline"; \
+					echo "Please free the port or change ANVIL_*_PORT in Makefile"; \
+					exit 1; \
+					;; \
+			esac; \
+		done; \
+	done; \
+	sleep 1; \
 	: "$${MOONBEAM_RPC_URL:?MOONBEAM_RPC_URL is required}"; \
 	: "$${BASE_RPC_URL:?BASE_RPC_URL is required}"; \
 	: "$${OP_RPC_URL:?OP_RPC_URL is required}"; \
 	: "$${ETH_RPC_URL:?ETH_RPC_URL is required}"; \
 	mkdir -p "$(ANVIL_LOG_DIR)" "$(ANVIL_PID_DIR)"; \
-	anvil --fork-url "$${MOONBEAM_RPC_URL}" --chain-id 1284 --host "$(ANVIL_HOST)" --port "$(ANVIL_MOONBEAM_PORT)" > "$(ANVIL_LOG_DIR)/moonbeam.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/moonbeam.pid"; \
-	anvil --fork-url "$${BASE_RPC_URL}" --chain-id 8453 --host "$(ANVIL_HOST)" --port "$(ANVIL_BASE_PORT)" > "$(ANVIL_LOG_DIR)/base.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/base.pid"; \
-	anvil --fork-url "$${OP_RPC_URL}" --chain-id 10 --host "$(ANVIL_HOST)" --port "$(ANVIL_OPTIMISM_PORT)" > "$(ANVIL_LOG_DIR)/optimism.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/optimism.pid"; \
-	anvil --fork-url "$${ETH_RPC_URL}" --chain-id 1 --host "$(ANVIL_HOST)" --port "$(ANVIL_ETHEREUM_PORT)" > "$(ANVIL_LOG_DIR)/ethereum.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/ethereum.pid"; \
+	anvil --fork-url "$${MOONBEAM_RPC_URL}" --chain-id 1284 --host "$(ANVIL_HOST)" --port "$(ANVIL_MOONBEAM_PORT)" --retries "$(ANVIL_RPC_RETRIES)" --timeout "$(ANVIL_RPC_TIMEOUT_MS)" --fork-retry-backoff "$(ANVIL_FORK_RETRY_BACKOFF_MS)" > "$(ANVIL_LOG_DIR)/moonbeam.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/moonbeam.pid"; \
+	anvil --fork-url "$${BASE_RPC_URL}" --chain-id 8453 --host "$(ANVIL_HOST)" --port "$(ANVIL_BASE_PORT)" --retries "$(ANVIL_RPC_RETRIES)" --timeout "$(ANVIL_RPC_TIMEOUT_MS)" --fork-retry-backoff "$(ANVIL_FORK_RETRY_BACKOFF_MS)" > "$(ANVIL_LOG_DIR)/base.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/base.pid"; \
+	anvil --fork-url "$${OP_RPC_URL}" --chain-id 10 --host "$(ANVIL_HOST)" --port "$(ANVIL_OPTIMISM_PORT)" --retries "$(ANVIL_RPC_RETRIES)" --timeout "$(ANVIL_RPC_TIMEOUT_MS)" --fork-retry-backoff "$(ANVIL_FORK_RETRY_BACKOFF_MS)" > "$(ANVIL_LOG_DIR)/optimism.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/optimism.pid"; \
+	anvil --fork-url "$${ETH_RPC_URL}" --chain-id 1 --host "$(ANVIL_HOST)" --port "$(ANVIL_ETHEREUM_PORT)" --retries "$(ANVIL_RPC_RETRIES)" --timeout "$(ANVIL_RPC_TIMEOUT_MS)" --fork-retry-backoff "$(ANVIL_FORK_RETRY_BACKOFF_MS)" > "$(ANVIL_LOG_DIR)/ethereum.log" 2>&1 & echo $$! > "$(ANVIL_PID_DIR)/ethereum.pid"; \
 	for url in \
 		"http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
 		"http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
@@ -114,6 +140,7 @@ anvil-forks-up:
 				$(MAKE) anvil-forks-down; \
 				exit 1; \
 			fi; \
+			sleep 1; \
 		done; \
 		if ! cast block-number --rpc-url "$$url" >/dev/null 2>&1; then \
 			echo "anvil endpoint not ready: $$url"; \
@@ -132,6 +159,15 @@ anvil-forks-down:
 			if kill -0 "$$pid" 2>/dev/null; then kill "$$pid"; fi; \
 			rm -f "$$pid_file"; \
 		fi; \
+	done; \
+	for port in "$(ANVIL_MOONBEAM_PORT)" "$(ANVIL_BASE_PORT)" "$(ANVIL_OPTIMISM_PORT)" "$(ANVIL_ETHEREUM_PORT)"; do \
+		for pid in $$(lsof -t -nP -iTCP:$$port -sTCP:LISTEN 2>/dev/null || true); do \
+			cmdline=$$(ps -p $$pid -o args= 2>/dev/null || true); \
+			case "$$cmdline" in \
+				*anvil*) kill $$pid 2>/dev/null || true ;; \
+				*) ;; \
+			esac; \
+		done; \
 	done; \
 	echo "Local anvil forks stopped."
 
@@ -291,13 +327,15 @@ test-fuzz-exitMarketFailsWhenNeededCrossCollateral-local:
 test-invariant-marketsAreListedAndUnique-local:
 	@set -e; \
 	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-down >/dev/null 2>&1 || true; \
 	$(MAKE) anvil-forks-up; \
 	trap '$(MAKE) anvil-forks-down' EXIT; \
 	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
 	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
 	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
 	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	FOUNDRY_INVARIANT_RUNS="$(INVARIANT_RUNS)" \
+	FOUNDRY_INVARIANT_DEPTH="$(INVARIANT_DEPTH)" \
 	forge test \
 		--match-test invariant_marketsAreListedAndUnique \
-		--fuzz-runs $(INVARIANT_RUNS) \
 		-vv

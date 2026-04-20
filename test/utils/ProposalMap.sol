@@ -180,8 +180,13 @@ contract ProposalMap is Script {
             // call setEnv for each env variable
             // so we can later call vm.envString
             for (uint256 k = 0; k < envs.length; k++) {
-                string memory key = split(envs[k], "=")[0];
-                string memory value = split(envs[k], "=")[1];
+                string[] memory envPair = split(envs[k], "=");
+                if (envPair.length < 2 || bytes(envPair[0]).length == 0) {
+                    continue;
+                }
+
+                string memory key = envPair[0];
+                string memory value = envPair[1];
                 vm.setEnv(key, value);
             }
         }
@@ -197,7 +202,12 @@ contract ProposalMap is Script {
             string[] memory envs = split(output, "\n");
 
             for (uint256 k = 0; k < envs.length; k++) {
-                string memory key = split(envs[k], "=")[0];
+                string[] memory envPair = split(envs[k], "=");
+                if (envPair.length == 0 || bytes(envPair[0]).length == 0) {
+                    continue;
+                }
+
+                string memory key = envPair[0];
                 vm.setEnv(key, "");
             }
         }
@@ -284,6 +294,11 @@ contract ProposalMap is Script {
         while (i < strBytes.length && strBytes[i] == delimiter) {
             i++;
             startIndex++;
+        }
+
+        // If the string ends with delimiters, there is no last token to write.
+        if (splitIndex >= splitStrings.length) {
+            return splitStrings;
         }
 
         /// handle the last word

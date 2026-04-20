@@ -339,3 +339,19 @@ test-invariant-marketsAreListedAndUnique-local:
 	forge test \
 		--match-test invariant_marketsAreListedAndUnique \
 		-vv
+
+test-invariant-accountMembershipBidirectionalTemplate-local:
+	@set -e; \
+	$(MAKE) ensure-mip-artifacts; \
+	$(MAKE) anvil-forks-down >/dev/null 2>&1 || true; \
+	$(MAKE) anvil-forks-up; \
+	trap '$(MAKE) anvil-forks-down' EXIT; \
+	MOONBEAM_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_MOONBEAM_PORT)" \
+	BASE_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_BASE_PORT)" \
+	OP_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_OPTIMISM_PORT)" \
+	ETH_RPC_URL="http://$(ANVIL_HOST):$(ANVIL_ETHEREUM_PORT)" \
+	FOUNDRY_INVARIANT_RUNS="$(INVARIANT_RUNS)" \
+	FOUNDRY_INVARIANT_DEPTH="$(INVARIANT_DEPTH)" \
+	forge test \
+		--match-test invariant_accountMembershipBidirectionalTemplate \
+		-vv

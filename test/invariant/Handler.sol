@@ -34,7 +34,8 @@ contract Handler is Test {
 		for (uint256 i = 0; i < _markets.length; i++) {
 			markets.push(_markets[i]);
 		}
-
+		
+		// q - 这里的 user 都是本地模拟的？
 		for (uint256 i = 0; i < MAX_USERS; i++) {
 			users.push(address(uint160(10_000 + i)));
 		}

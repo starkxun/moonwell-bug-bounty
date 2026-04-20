@@ -95,11 +95,38 @@ contract BaseInvariant is PostProposalCheck {
 	// ---------------------------------------------------------------------
 
 	function invariant_accountMembershipBidirectionalTemplate() public view {
-		// TODO:
-		// 1) 为每个 user 拉取 comptroller.getAssetsIn(user)
-		// 2) 对每个 asset 校验 comptroller.checkMembership(user, asset) == true
-		// 3) 再反向验证 membership==true 的资产都出现在 getAssetsIn 中
-		// 注意：这里需要额外索引结构，避免 O(n^2) 误伤 gas/time。
+		address[] memory users = handler.getUsers();
+
+		for (uint256 i = 0; i < users.length; i++) {
+			MToken[] memory assetsIn = comptroller.getAssetsIn(users[i]);
+
+			for (uint256 j = 0; j < assetsIn.length; j++) {
+				assertTrue(
+					comptroller.checkMembership(users[i], assetsIn[j]),
+					"asset in getAssetsIn must have membership"
+				);
+			}
+
+			MToken[] memory allMarkets = comptroller.getAllMarkets();
+			for (uint256 j = 0; j < allMarkets.length; j++) {
+				if (!comptroller.checkMembership(users[i], allMarkets[j])) {
+					continue;
+				}
+
+				bool found = false;
+				for (uint256 k = 0; k < assetsIn.length; k++) {
+					if (address(allMarkets[j]) == address(assetsIn[k])) {
+						found = true;
+						break;
+					}
+				}
+
+				assertTrue(
+					found,
+					"membership market must appear in getAssetsIn"
+				);
+			}
+		}
 	}
 
 	function invariant_coreAccountingTemplate() public view {

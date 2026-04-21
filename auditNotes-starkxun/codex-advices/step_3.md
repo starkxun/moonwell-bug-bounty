@@ -246,3 +246,36 @@
   - assertUserDebtConsistency(alice, mToken)
   - assertRewardAccounting(alice, mToken, emissionToken)
 - 对关键路径增加 snapshot 前后对比，确保失败路径“零状态污染”。
+
+---
+
+## 补充：会计类缺口的最低成本验证顺序
+
+### 第一层（手推）
+- 先把每个 P0 主题写成公式与不变量：
+  - borrowIndex 单调
+  - exchangeRate 资产负债恒等式
+  - liquidation 拆分守恒
+  - totalReward = supplySide + borrowSide
+- 每条公式配最小反例：dt=0、dt>0、极小金额、临界 close factor。
+
+### 第二层（unit + mock）
+- 会计类几乎都能先脱离 fork：
+  - 利率模型参数、oracle、reward distributor 全部 mock。
+  - 用确定性时间推进验证分段会计（参数变更前后）。
+- 目标：先把 P0 的“等式是否成立”在本地跑稳定。
+
+### 第三层（invariant）
+- 将已验证公式提升为长序列不变量：
+  - user/global 同步
+  - 债务随时间单调
+  - reserve 增长可解释
+- 建议把动作按阶段放开，先 borrow/repay，再加 liquidation/claim。
+
+### 第四层（fork fuzz）
+- 只验证 mock 难以覆盖的“真实参数组合”：
+  - 多市场真实配置、真实奖励计划、真实治理后状态
+- 用于发现环境耦合问题，不用于替代基础公式验证。
+
+### 一句话准则
+- 会计问题优先“公式先行”：手推和 unit 能证明 80% 风险，fork 只验证剩下 20% 真实环境耦合。

@@ -221,3 +221,35 @@
 - `invariant_UserGlobalAccountingSyncUnderMultiActorActions()`
 - `invariant_PauseRulesConsistentAcrossUsers()`
 - `invariant_LiquidationSplitConservationAcrossRaces()`
+
+---
+
+## 补充：多用户场景的成本控制路线
+
+### 第一层：手写反例剧本（先定攻击路径）
+- 每个场景先写最小三人剧本：谁先手、谁后手、谁获利。
+- 明确“若存在漏洞，价值会从谁转移到谁”。
+
+### 第二层：unit + mock 重放剧本（主力）
+- 用 mock oracle、mock rate、mock reward 把 10 个场景逐条重放。
+- 同一初始快照跑 A/B 顺序分支，比较最终价值分配差异。
+- 这是多用户审计最划算的一层，定位最清晰。
+
+### 第三层：stateful invariant（扩展覆盖）
+- 把已验证的剧本抽象成不变量：
+	- 无未授权价值转移
+	- 清算拆分守恒
+	- pause 规则跨用户一致
+- 通过随机顺序扩大覆盖，但仍保持本地 mock 环境。
+
+### 第四层：fork fuzz（最终验真）
+- 仅将以下类型上 fork：
+	- 治理时序 + 多用户竞争
+	- 真实流动性深度影响清算资格
+	- 真实奖励配置下的插队稀释
+- 建议作为定时回归，不作为日常开发主回路。
+
+### 优先落地建议
+1. 先做场景 1/3/9 的 unit+mock（顺序依赖、奖励归属、repayBehalf）。
+2. 再把场景 5/7 抽成 invariant（共享流动性与多清算人竞争）。
+3. 最后只把场景 6/10 放到 fork fuzz 做真实性验证。

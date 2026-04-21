@@ -1,34 +1,92 @@
 # Step 5 - 借贷协议多用户交互缺失场景审查（审计视角）
 
-角色约定
-- Alice：健康供应者（主要提供流动性/抵押）
-- Bob：借款人（高频借还）
-- Carol：清算人/机会主义用户（抢先交易、奖励捕获）
-- Admin/Guardian/Governor：参数与开关控制
+> **这份清单干什么用？**
+> 单用户测试就像只测“我一个人使用这个 ATM”，但真实世界里多人同时操作时会发生什么？这份清单专门覆盖“多用户交互才能触发”的风险场景——它们在单用户测试中根本不可见。
 
-目标：只讨论“多用户交互才会出现”的风险，不重复单用户快乐路径。
+---
+
+## 角色约定（统一使用，贯穿所有场景）
+
+| 角色 | 身份 | 典型行为 |
+|------|------|---------|
+| **Alice** | 健康供应者 | 主要提供流动性/抵押，被动受其他用户影响 |
+| **Bob** | 借款人 | 高频借还，健康度接近阈值 |
+| **Carol** | 清算人/机会主义者 | 抢先交易、奖励捕获、多清算竞争 |
+| **Admin/Guardian** | 参数控制方 | 调整参数、暂停/恢复功能 |
+
+**目标：只讨论“多用户交互才会出现”的风险，不重复单用户快乐路径。**
+
+---
+
+## 测试框架（建议所有场景共用）
+
+```solidity
+// test/MultiUserBase.t.sol
+contract MultiUserBase is Test {
+    address alice = makeAddr("alice");
+    address bob   = makeAddr("bob");
+    address carol = makeAddr("carol");
+    address admin = makeAddr("admin");
+
+    // 每个场景开始时拍一张快照，结束后对比
+    function snapshotUser(address user) internal view returns (UserSnap memory) {
+        return UserSnap({
+            mTokenBalance: mToken.balanceOf(user),
+            borrowBalance: mToken.borrowBalanceStored(user),
+            accruedReward: rewardDistributor.rewardAccrued(user)
+        });
+    }
+}
+```
 
 ---
 
 ## [P0] 场景 1：顺序依赖导致清算资格翻转（Ordering-Dependent Liquidatability）
+
+> **通俗理解：** Carol 在清算 Bob 之前，先做一笔操作（比如大量赎回推高利用率），让 Bob 突然满足了清算条件。问题是：这个操作合法吗？清算资格是否被人为制造了？
+
 ### 完整动作串行
 1. Alice 在市场 A 大额供给，保持健康。
-2. Bob 在市场 A 借款，健康度接近阈值（liquidity 小于安全缓冲）。
+2. Bob 在市场 A 借款，健康度接近阈值（`liquidity` 小于安全缓冲）。
 3. Carol 先执行一次小额借款或大额赎回，降低市场可用 cash 或推动利用率变化。
 4. 同一区块/相邻区块内，Carol 尝试对 Bob 清算。
 5. 对照路径：Carol 不做步骤 3，直接清算 Bob。
 
 ### 为什么单用户测试会漏掉
-- 单用户无法制造“他人先手改变可清算条件/市场流动性”的竞态；同一账户路径看不到资格翻转。
+- 单用户无法制造“他人先手改变可清算条件”的竞态；同一账户路径看不到资格翻转。
 
-### Foundry 测试大纲
-- `function test_OrderDependentLiquidationEligibility() public`
-- 安排两个分支：`withFrontRun` 与 `withoutFrontRun`。
-- 在同样初始快照下分别执行，比较 `getAccountLiquidity(Bob)` 与 `liquidateBorrow` 结果。
+### Foundry 测试代码框架
+```solidity
+function test_OrderDependentLiquidationEligibility() public {
+    // 设置：Bob 在 S4（临界健康）
+    setupBobAtEdge();
+
+    // 路径 A：Carol 先插入操作，再清算
+    uint256 snapId = vm.snapshot();
+    vm.prank(carol);
+    mToken.redeem(largeAmount); // 降低 cash，推高利用率
+    vm.prank(carol);
+    (uint err) = mToken.liquidateBorrow(bob, repayAmt, address(mTokenCollateral));
+    bool liquidatedWithFrontRun = (err == 0);
+
+    // 路径 B：Carol 直接清算（不插入操作）
+    vm.revertTo(snapId);
+    vm.prank(carol);
+    (err) = mToken.liquidateBorrow(bob, repayAmt, address(mTokenCollateral));
+    bool liquidatedWithout = (err == 0);
+
+    // 断言：清算资格差异必须可被协议规则解释
+    // 不允许出现：无 shortfall 也能清算
+    (,, uint256 shortfall) = comptroller.getAccountLiquidity(bob);
+    if (shortfall == 0) {
+        assertFalse(liquidatedWithFrontRun, "liquidation without shortfall");
+    }
+}
+```
 
 ### 关键断言
-- 分支差异必须可解释且符合风控规则，不可出现“无 shortfall 也可清算”。
-- 清算失败路径状态不变（Bob 债务、Carol 余额、全局 borrows/reserves 不变）。
+- 分支差异必须可解释，不可出现“无 shortfall 也可清算”。
+- 清算失败路径：Bob 债务、Carol 余额、全局 `borrows/reserves` 不变（零状态污染）。
 
 ---
 
@@ -53,23 +111,50 @@
 ---
 
 ## [P0] 场景 3：奖励稀释/不公平积累（Late Join Dilution Abuse）
+
+> **通俗理解：** Alice 努力存款了 30 天，Bob 突然在第 30 天的最后一秒大量存入，然后一起领奖励。问题是：Bob 是否通过“插队”获得了不属于他的历史奖励？这是很多 DeFi 协议的经典漏洞。
+
 ### 完整动作串行
 1. Alice 长时间供给，Bob 长时间借款（奖励持续累计）。
-2. Carol 在奖励更新前同块大额供给或借款“插队入场”。
-3. 三方同块/下一块 claim。
-4. 对照路径：Carol 不插队。
+2. Carol 在奖励更新前**同一区块内**大额供给或借款“插队入场”。
+3. 三方在同块/下一块 claim。
+4. 对照路径：Carol 不插队，正常入场。
 
 ### 为什么单用户测试会漏掉
-- 奖励公平性是“相对份额 + 时间”问题，单用户看不到插队稀释。
+- 奖励公平性是“相对份额 + 时间”问题，单用户看不到插队稀释对他人的影响。
 
-### Foundry 测试大纲
-- `function test_RewardDilutionByLateJoinerSameBlock() public`
-- 强制同块操作（不 warp），再做一次 warp 后 claim。
-- 记录每个用户 claim 前后的 `RewardInfo`。
+### Foundry 测试代码框架
+```solidity
+function test_RewardDilutionByLateJoinerSameBlock() public {
+    // Alice 和 Bob 已持仓 30 天
+    vm.warp(block.timestamp + 30 days);
+
+    // 记录 Alice 在 Carol 插队前的应计奖励
+    uint256 aliceRewardBefore = getAccruedReward(alice);
+
+    // Carol 在同一区块大额插队（不 warp）
+    vm.prank(carol);
+    mToken.mint(carolLargeAmount);
+
+    // 三人同块 claim
+    rewardDistributor.claimReward(alice, address(mToken));
+    rewardDistributor.claimReward(carol, address(mToken));
+
+    uint256 aliceRewardAfter = getAccruedReward(alice);
+
+    // Alice 历史 30 天的奖励不应被 Carol 回溯稀释
+    assertGe(aliceRewardAfter, aliceRewardBefore,
+        "Carol should not dilute Alice historical rewards");
+
+    // 奖励守恒：totalAmount == supplySide + borrowSide
+    assertEq(getTotalReward(), getSupplySideReward() + getBorrowSideReward());
+}
+```
 
 ### 关键断言
-- Alice/Bob 历史区间奖励不应被 Carol 回溯稀释。
-- `totalAmount == supplySide + borrowSide` 对每个用户每个 emission token 恒成立。
+- Alice/Bob 的历史区间奖励**不应被 Carol 回溯稀释**。
+- `totalAmount == supplySide + borrowSide` 对每个用户每个 emissionToken 恒成立。
+- Carol 只能从她**入场后**的时间窗口开始积累奖励。
 
 ---
 
@@ -172,22 +257,52 @@
 ---
 
 ## [P1] 场景 9：repayBehalf 与奖励/债务归属错配
+
+> **通俗理解：** Carol 替 Bob 还了债（`repayBorrowBehalf`），但会计系统正确记录了吗？债务应该减少 Bob 的，奖励不应该转给 Carol，否则就出现了“还别人的债却拿别人的奖励”的错误。
+
 ### 完整动作串行
-1. Bob 借款并累计奖励。
-2. Carol 执行 `repayBorrowBehalf(Bob)`。
-3. Bob 与 Carol 分别 claim。
-4. Alice 作为对照组仅 supply+claim。
+1. Bob 借款并持续累计借款侧奖励。
+2. Carol 执行 `repayBorrowBehalf(Bob, amount)`（Carol 出钱，帮 Bob 还债）。
+3. Bob 与 Carol 分别 `claim` 奖励。
+4. Alice 作为对照组仅 supply+claim（验证不受影响）。
 
 ### 为什么单用户测试会漏掉
-- 单用户 repay 不会测试“付款人 != 借款人”时的索引归属问题。
+- 单用户 repay 不会测试“付款人（Carol） != 借款人（Bob）”时的索引归属问题。
 
-### Foundry 测试大纲
-- `function test_RepayBehalfDoesNotMisattributeRewardsOrDebt() public`
-- repayBehalf 前后分别抓取 Bob/Carol 债务与奖励快照。
+### Foundry 测试代码框架
+```solidity
+function test_RepayBehalfDoesNotMisattributeRewardsOrDebt() public {
+    // Bob 借款 30 天，累计奖励
+    vm.prank(bob);
+    mToken.borrow(borrowAmt);
+    vm.warp(block.timestamp + 30 days);
+
+    // 快照：repayBehalf 前的状态
+    uint256 bobDebtBefore  = mToken.borrowBalanceCurrent(bob);
+    uint256 carolDebtBefore = mToken.borrowBalanceCurrent(carol);
+    uint256 bobRewardBefore = getAccruedReward(bob);
+    uint256 carolRewardBefore = getAccruedReward(carol);
+
+    // Carol 替 Bob 还债
+    vm.prank(carol);
+    mToken.repayBorrowBehalf(bob, repayAmt);
+
+    // 验证债务归属正确
+    assertLt(mToken.borrowBalanceCurrent(bob), bobDebtBefore,
+        "Bob debt should decrease");
+    assertEq(mToken.borrowBalanceCurrent(carol), carolDebtBefore,
+        "Carol debt should NOT change");
+
+    // 验证奖励归属正确
+    assertEq(getAccruedReward(carol), carolRewardBefore,
+        "Carol should NOT get Bob reward");
+}
+```
 
 ### 关键断言
-- 债务仅减少 Bob 的，不应减少 Carol 的。
-- 奖励归属不串账：Carol 不应拿到 Bob 的历史借款奖励。
+- 债务**仅减少 Bob 的**，Carol 的债务不变。
+- 奖励不串账：Carol 不应获得 Bob 的历史借款奖励。
+- Bob 的历史奖励在 repayBehalf 后仍属于 Bob，`claimReward(bob)` 应正常工作。
 
 ---
 
@@ -211,9 +326,16 @@
 ---
 
 ## 建议补测优先级
-1. 场景 1/3/5/6（高风险多用户交互核心面）。
-2. 场景 2/4/7（顺序与时间差异竞态）。
-3. 场景 8/9/10（管理与归属一致性）。
+
+> **新手建议：** 每个场景都先用固定输入写一个确定性测试，跑通后再写 fuzz 版本。
+
+1. **场景 1/3/5/6**（高风险多用户交互核心面）— 先做
+   - 场景 3（奖励稀释）最容易落地，建议第一个写
+   - 场景 9（repayBehalf）逻辑清晰，建议第二个写
+
+2. **场景 2/4/7**（顺序与时间差异竞态）— 中期
+
+3. **场景 8/9/10**（管理与归属一致性）— 后期
 
 ## 可复用不变量（用于长序列 stateful fuzz）
 - `invariant_NoCrossUserUnauthorizedValueTransfer()`

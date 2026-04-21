@@ -1,36 +1,85 @@
 # Step 3 - Moonwell式借贷协议风险会计测试缺口清单
 
-目标：只聚焦“带利息累计 + 奖励分配”的贷款市场会计风险，不讨论通用 ERC20 话题。
+> **这份清单干什么用？**
+> “会计漏洞”是借贷协议最隐蔽的一类风险——用户操作看起来成功了，但合约内部的账本悄悄偏离了真实值，最终在赎回或清算时爆发。这份清单只聚焦“带利息累计 + 奖励分配”的会计风险，帮你补上这类测试缺口。
 
-建议统一测试基建（Foundry）
-- 角色：alice（借款/供给）、bob（对手方/清算）、carol（第三方还款）。
-- 全局快照：marketCash、totalBorrows、totalReserves、totalSupply、borrowIndex、exchangeRate、rewardSupplyIndex、rewardBorrowIndex。
-- 常用后置检查：
-  - assertMarketAccounting(mToken)
-  - assertUserDebtConsistency(user, mToken)
-  - assertRewardAccounting(user, mToken, emissionToken)
+---
+
+## 测试基建约定（先搭好这套基础，后面的测试写起来快很多）
+
+**角色：**
+- `alice`：借款 / 供给主角
+- `bob`：对手方 / 清算者
+- `carol`：第三方还款者
+
+**关键状态快照字段（在每个测试前后都抓一份）：**
+```solidity
+struct MarketSnap {
+    uint256 cash;              // 合约持有的底层资产余额
+    uint256 totalBorrows;      // 全部待还借款（含利息）
+    uint256 totalReserves;     // 协议储备金（从利息中抽取）
+    uint256 totalSupply;       // 流通中的 mToken 总量
+    uint256 borrowIndex;       // 借款累积利息指数（单调递增）
+    uint256 exchangeRate;      // 1 mToken 对应多少底层资产
+    uint256 rewardSupplyIndex; // 供给侧奖励累积指数
+    uint256 rewardBorrowIndex; // 借款侧奖励累积指数
+}
+```
+
+**统一后置检查函数（每个测试结尾都调用）：**
+```solidity
+assertMarketAccounting(mToken);          // 会计恒等式
+assertUserDebtConsistency(user, mToken); // 用户债务与全局一致
+assertRewardAccounting(user, mToken, emissionToken); // 奖励守恒
+```
 
 ---
 
 ## [P0] 1) 利率指数会计（Interest Index Accounting）
+
+> **通俗理解：** `borrowIndex` 就像一张“累积利息凭条”，时间过去越多，上面的数字应该越大，绝不能变小，也不能在同一时刻更新两次。
+
 ### 应始终成立的不变量
-- borrowIndex 单调不减。
-- 当 timeDelta > 0 且 totalBorrows > 0 时，borrowIndex 严格增加。
-- 当 timeDelta = 0 时，重复 accrue 不应改变 borrowIndex（幂等）。
+- `borrowIndex` 单调不减（永远只涨不跌）。
+- 当 `timeDelta > 0` 且 `totalBorrows > 0` 时，`borrowIndex` 严格增加。
+- 当 `timeDelta = 0` 时，重复调用 `accrueInterest` 不应改变 `borrowIndex`（幂等性）。
 
 ### 如何被违反
-- accrue 前后时间差处理错误（同块重复计息或漏计息）。
-- 高 utilization 或参数突变时指数更新公式精度/顺序错误。
+- `accrueInterest` 内的时间差处理错误（同块重复计息或漏计息）。
+- 高 utilization 或治理参数突变时，指数更新公式出现精度/顺序错误。
 
 ### 建议测试（模糊/不变）
-- fuzz: testFuzzBorrowIndexMonotonicity(uint40 dt, uint256 utilSeed)
-- invariant: invariant_borrowIndexNeverDecreases()
-- 分支：同块连续触发 accrueInterest 两次。
+- `testFuzzBorrowIndexMonotonicity(uint40 dt, uint256 utilSeed)` — 随机时间差，验证指数只涨不跌
+- `invariant_borrowIndexNeverDecreases()` — 长序列不变量测试
+- 分支：同块连续触发 `accrueInterest` 两次
 
 ### 关键断言
-- assertGe(borrowIndexAfter, borrowIndexBefore)
-- dt==0 时 assertEq(borrowIndexAfter, borrowIndexBefore)
-- dt>0 且 borrows>0 时 assertGt(borrowIndexAfter, borrowIndexBefore)
+```solidity
+assertGe(borrowIndexAfter, borrowIndexBefore);           // 永不降低
+if (dt == 0) assertEq(borrowIndexAfter, borrowIndexBefore); // 同块幂等
+if (dt > 0 && totalBorrows > 0)
+    assertGt(borrowIndexAfter, borrowIndexBefore);       // 有借款时严格递增
+```
+
+### 新手 invariant 模板
+```solidity
+// test/invariants/BorrowIndexInvariant.t.sol
+contract BorrowIndexInvariant is Test {
+    MToken mToken;
+    uint256 lastBorrowIndex;
+
+    function setUp() public {
+        // ... 初始化市场 ...
+        lastBorrowIndex = mToken.borrowIndex();
+    }
+
+    function invariant_borrowIndexNeverDecreases() public {
+        uint256 current = mToken.borrowIndex();
+        assertGe(current, lastBorrowIndex, "borrow index decreased!");
+        lastBorrowIndex = current;
+    }
+}
+```
 
 ---
 
@@ -54,24 +103,39 @@
 ---
 
 ## [P0] 3) 奖励指数更新正确性（Reward Index Correctness）
+
+> **通俗理解：** 奖励应该“先结算旧账，再更新仓位”。如果顺序反了（先更新仓位再结算），就会出现“幽灵奖励”——用户凭空多领了本不属于他的奖励。
+
 ### 应始终成立的不变量
-- 每个 emissionToken：user.totalReward == supplySide + borrowSide。
-- 全局奖励索引仅在有效时间窗内推进（endTime 后不继续）。
-- 同块重复 claim/update 不应双计。
+- 每个 `emissionToken`：`user.totalReward == supplySide + borrowSide`（奖励总量守恒）。
+- 全局奖励索引仅在有效时间窗内推进（`endTime` 后不继续累计）。
+- 同块重复 `claim/update` 不应双计（幂等性）。
 
 ### 如何被违反
-- updateMarketSupplyIndex / updateMarketBorrowIndex 调用顺序错。
-- 先改仓位后结算旧索引，导致奖励漂移（幽灵奖励）。
+- `updateMarketSupplyIndex` / `updateMarketBorrowIndex` 调用顺序写错。
+- 先修改用户仓位，再结算旧索引，导致新仓位享受了旧时间段的奖励（幽灵奖励）。
 
 ### 建议测试
-- fuzz: testFuzzRewardIndexUpdateOrdering(uint40 dt, uint8 actionOrder)
-- invariant: invariant_rewardTotalEqualsSides()
-- 分支：mint->borrow->repay->liquidate->claim 混合路径。
+- `testFuzzRewardIndexUpdateOrdering(uint40 dt, uint8 actionOrder)` — 随机操作顺序
+- `invariant_rewardTotalEqualsSides()` — 长序列守恒
+- 分支：`mint→borrow→repay→liquidate→claim` 混合路径
 
 ### 关键断言
-- assertEq(totalAmount, supplySide + borrowSide)
-- endTime 后 deltaReward == 0
-- 同块重复 claim 前后奖励增量为 0 或符合设计最小增量
+```solidity
+// 对每个 emissionToken 验证
+assertEq(totalAmount, supplySide + borrowSide, "reward total mismatch");
+// endTime 后不再增加
+if (block.timestamp > endTime)
+    assertEq(deltaReward, 0, "reward after endTime");
+// 同块重复 claim 无额外增量
+assertEq(rewardAfterSecondClaim, rewardAfterFirstClaim);
+```
+
+### 关键顺序规则（新手必读）
+```
+正确顺序：先 updateIndex（结算旧奖励）→ 再 updateBalance（修改仓位）
+错误顺序：先 updateBalance（修改仓位）→ 再 updateIndex（结算时用了新仓位）
+```
 
 ---
 
@@ -278,4 +342,5 @@
 - 用于发现环境耦合问题，不用于替代基础公式验证。
 
 ### 一句话准则
-- 会计问题优先“公式先行”：手推和 unit 能证明 80% 风险，fork 只验证剩下 20% 真实环境耦合。
+- **会计问题优先“公式先行”**：手推和 unit 能证明 80% 风险，fork 只验证剩下 20% 真实环境耦合。
+- **快速自测：** 如果你对某个公式或不变量“说不清楚为什么成立”，那就是最值得先补的测试。

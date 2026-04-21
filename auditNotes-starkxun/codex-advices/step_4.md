@@ -1,25 +1,36 @@
 # Step 4 - 借贷协议状态机审计视角测试缺口
 
-目标：把 Moonwell 式借贷市场建模为状态机，聚焦“危险过渡”而不是快乐路径。
+> **这份清单干什么用？**
+> 把借贷协议的账户生命周期画成“状态机”（状态流转图），从状态 A 到状态 B 的每次跳转就是一个“过渡”。安全审计关注的是：**某些过渡应该被拒绝，某些应该被允许，你的测试覆盖了这些边界吗？**
+
+---
 
 ## 1) 状态机骨架
 
-### 账户状态（按风险语义分层）
-- S0 无仓位：无供给、无借款、未入市。
-- S1 仅供给未入市：持有 mToken 但未作为抵押启用。
-- S2 供给且已入市：抵押已启用，可借。
-- S3 已借款且健康：shortfall=0，liquidity>=0。
-- S4 临界健康：接近清算阈值（liquidity≈0）。
-- S5 可清算：shortfall>0。
-- S6 部分清算后：债务下降但可能仍接近阈值。
-- S7 全部还清待退出：债务=0，可尝试失效抵押/退出市场。
+> **看不懂符号？** 每个状态用 `S数字` 表示，全局环境用 `G数字` 表示，用户动作用 `A_动作名` 表示。下面的表格是可视化参考。
 
-### 全局状态（影响所有账户）
-- G0 正常参数：价格稳定、市场未暂停、cap 充足。
-- G1 时间推进：利息累计、奖励索引推进。
-- G2 价格冲击：抵押品价格下跌或借款资产价格上涨。
-- G3 参数突变：collateral factor / close factor / reserve factor / cap / pause 变化。
-- G4 流动性紧张：市场 cash 不足，赎回/借款受限。
+### 账户状态（S）—— 按风险级别从低到高
+
+| 状态 | 名称 | 含义 | 危险程度 |
+|------|------|------|---------|
+| S0 | 无仓位 | 无供给、无借款、未入市 | 无风险 |
+| S1 | 仅供给未入市 | 持有 mToken 但未作为抵押启用 | 低 |
+| S2 | 供给已入市 | 抵押已启用，可以借款 | 低（但开始承担风险） |
+| S3 | 借款且健康 | `shortfall=0`，`liquidity>=0` | 中（需持续监控） |
+| S4 | 临界健康 | 接近清算阈值（`liquidity≈0`） | 高（危险区域） |
+| S5 | 可被清算 | `shortfall>0` | 极高 |
+| S6 | 部分清算后 | 债务下降但可能仍接近阈值 | 高 |
+| S7 | 还清待退出 | 债务=0，可尝试退出市场 | 低 |
+
+### 全局状态（G）—— 影响所有账户的环境条件
+
+| 状态 | 名称 | 触发方式 |
+|------|------|---------|
+| G0 | 正常参数 | 价格稳定、市场未暂停、cap 充足 |
+| G1 | 时间推进 | `vm.warp()` 模拟利息累计 |
+| G2 | 价格冲击 | 修改 oracle 价格，模拟抵押品贬值 |
+| G3 | 参数突变 | 治理调整 collateral factor / reserve factor / pause 等 |
+| G4 | 流动性紧张 | 市场 cash 不足，赎回或借款受限 |
 
 ### 用户动作
 - A_supply 供给
@@ -45,13 +56,18 @@
 - T7: S7 --A_disableCollateral--> S1/S0
 - T8: 任意有仓位状态 --A_claim--> 同状态（仅奖励余额变化）
 
-### 禁止跃迁（应始终拒绝）
-- F1: S0 --A_borrow--> 成功（禁止）
-- F2: S3/S4/S5 --A_disableCollateral--> 成功且导致 shortfall>0（禁止）
-- F3: S5 --A_withdraw--> 成功（禁止）
-- F4: G3.pauseBorrow=true 时任何账户 --A_borrow--> 成功（禁止）
-- F5: closeFactor 限制外清算成功（禁止）
-- F6: 同块重复更新导致奖励或利息双计（禁止）
+### 禁止跃迁（应始终拒绝）—— 这些是重点测试对象
+
+| 编号 | 描述 | 为什么危险 |
+|------|------|-----------|
+| F1 | `S0 → 借款成功` | 没有抵押品就能借款，直接产生坏账 |
+| F2 | `S3/S4/S5 → 退出抵押且导致 shortfall` | 有借款时移除抵押品，形成无担保债务 |
+| F3 | `S5 → 提现成功` | 资不抵债时仍可提走资产，损害清算人权益 |
+| F4 | `borrow已暂停 → 任何借款成功` | 紧急暂停失效，无法阻止风险扩散 |
+| F5 | `超出 closeFactor 限制的清算成功` | 清算人过度清算，侵害借款人利益 |
+| F6 | `同块重复更新导致奖励/利息双计` | 通过同块多次操作凭空获取额外收益 |
+
+> **测试建议：** 对每条禁止跃迁写一个专门的失败测试（预期 revert），并验证失败前后的状态**完全相同**（无状态污染）。
 
 ---
 
@@ -60,12 +76,29 @@
 以下每一项均给出：初始状态、动作场景、预期结果、漏洞类别。
 
 ## [ ] M1 临界健康到账户可清算的“静默跃迁”
-- 初始状态：S4（liquidity 很小，shortfall=0）。
-- 动作场景：无用户主动操作，仅 G1 时间推进（利息累计）或 G2 小幅价格波动，再触发一次 borrow/redeem/liquidate 检查。
-- 预期有效/无效结果：
-  - 有效：账户进入 S5 后仅允许 repay/liquidate，borrow/withdraw 必须拒绝。
-  - 无效：仍允许 borrow 或 withdraw。
-- 可能暴露漏洞类别：过时缓存值、风险检查时机错误、计息前后状态竞争。
+- **初始状态：** S4（`liquidity` 很小接近 0，`shortfall=0`）。
+- **动作场景：** 无用户主动操作，仅 G1 时间推进（利息累计）或 G2 小幅价格波动，再触发一次 borrow/redeem/liquidate 检查。
+- **通俗理解：** 就像一个人的信用额度刚好够用，但等你真正去刷卡时，时间过去了几天，利息涨了一点点，账户已经资不抵债。这个“静默跃迁”不需要用户任何操作就能发生，最容易被忽视。
+- **预期结果：**
+  - ✅ 账户进入 S5 后：仅允许 repay/liquidate，borrow/withdraw 必须拒绝。
+  - ❌ 不允许：时间推进后仍可以借款或提现。
+- **可能暴露的漏洞类型：** 过时缓存值（用了旧的 exchangeRate）、风险检查时机错误、计息前后状态竞争。
+- **测试示例：**
+  ```solidity
+  function test_SilentTransitionS4toS5() public {
+      // 设置 alice 在 S4（liquidity 很小）
+      setupAliceAtEdge();
+      // 时间推进，利息累计使 alice 进入 S5
+      vm.warp(block.timestamp + 1 days);
+      // 现在 alice 应该可以被清算
+      (,, uint256 shortfall) = comptroller.getAccountLiquidity(alice);
+      assertGt(shortfall, 0, "should be liquidatable");
+      // alice 尝试再借款应该失败
+      vm.prank(alice);
+      vm.expectRevert();
+      mToken.borrow(1);
+  }
+  ```
 
 ## [ ] M2 他人先行动导致你的退出失效
 - 初始状态：alice 在 S3（有借款），bob 在同市场可操作。
@@ -144,16 +177,31 @@
 ## 4) 测试建议：单元 / 多步模糊 / 长串不变量
 
 ### A. 基于过渡的单元测试（Transition Unit Tests）
-- testTransition_S4_to_S5_ByTimeAccrual()
-- testTransition_DisableCollateral_Rejected_WhenWouldShortfall()
-- testTransition_SameBlockClaim_NoDoubleCount()
-- testTransition_PartialRepay_DoesNotOverUnlockCollateral()
-- testTransition_LiquidationSplit_Conservation()
 
-单元断言重点
-- 动作前后状态标签变化符合预期（例如 S4->S5）。
-- 禁止跃迁必须拒绝且状态无污染。
-- 会计守恒：collateral seized = liquidator part + protocol part（容差内）。
+> **新手提示：** 每个测试函数只验证一条状态跃迁，失败时定位最清晰。
+
+推荐测试函数：
+- `testTransition_S4_to_S5_ByTimeAccrual()` — 时间推进触发清算资格
+- `testTransition_DisableCollateral_Rejected_WhenWouldShortfall()` — F2 禁止跃迁
+- `testTransition_SameBlockClaim_NoDoubleCount()` — F6 幂等性
+- `testTransition_PartialRepay_DoesNotOverUnlockCollateral()` — M3 场景
+- `testTransition_LiquidationSplit_Conservation()` — 清算守恒
+
+单元断言重点：
+- 动作前后的 `shortfall` / `liquidity` 变化符合预期（例如 S4→S5）。
+- **禁止跃迁必须 revert 且状态零污染**（用快照对比确认）。
+- 清算守恒：`seized = liquidatorPart + protocolPart`（容差 2 wei）。
+
+**状态检查辅助函数：**
+```solidity
+function getAccountState(address user) internal view returns (uint8) {
+    (, uint256 liquidity, uint256 shortfall) = comptroller.getAccountLiquidity(user);
+    if (shortfall > 0) return 5;           // S5: 可清算
+    if (liquidity == 0) return 4;          // S4: 临界
+    if (getBorrowBalance(user) > 0) return 3; // S3: 健康借款
+    // ... 其他状态 ...
+}
+```
 
 ### B. 多步模糊场景（Scenario Fuzz）
 - testFuzzScenario_ActionSequence_WithTimeAndPriceShocks(uint8[] actions, uint40[] dts, int24[] priceMoves)

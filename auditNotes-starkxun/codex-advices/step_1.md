@@ -1,5 +1,26 @@
 # Step 1 - 借贷协议测试缺口优先级清单（Moonwell-like）
 
+> **这份清单干什么用？**
+> 你已经写了"正常流程"测试（存入、借款、还款都能跑通），但安全审计更关注"极端情况"和"组合拳"。
+> 这份清单按照生产事故的真实触发概率，列出最需要补充的测试方向，帮你把有限时间花在刀刃上。
+
+---
+
+## 关键术语速查（看不懂时来这里找答案）
+
+| 术语 | 通俗含义 |
+|------|----------|
+| **shortfall（资金缺口）** | 抵押品价值 < 借出债务价值，即"资不抵债"，此时账户可被清算 |
+| **liquidity（安全余量）** | 用户还能借多少或提多少的剩余空间；shortfall > 0 时为负 |
+| **invariant test（不变量测试）** | 无论做任何操作，某个等式或不等式应永远成立；对应 Foundry 的 `invariant_xxx` 函数 |
+| **borrow index（借款指数）** | 记录"自合约上线以来借款累积了多少利息"的单调递增数字 |
+| **exchange rate（汇率）** | 1 份 mToken 能换回多少底层资产，随利息增长而增大 |
+| **close factor（清算比例上限）** | 单次清算最多允许还掉借款人债务的百分比（例如 50%） |
+| **seize（扣押）** | 清算人替借款人还债后，从借款人抵押品中扣取一定份额作为奖励 |
+| **fuzz test（模糊测试）** | 用随机参数大量自动运行测试，寻找边界上的意外崩溃 |
+
+---
+
 ## 范围与基线
 你当前已覆盖：供应/借款/还款/奖励/利息/抵押检查的主成功路径。
 
@@ -11,32 +32,53 @@
 - 奖励核算与主账本同步
 - 跨链/治理执行时序
 
-注：当前 invariant 框架中已有多个模板仍是 TODO（如会计恒等式、membership 双向一致、清算后状态校验、索引单调性），说明这些风险目前大概率没有被系统性验证。
+> **当前状态提示：** invariant 框架中已有多个模板仍是 TODO（如会计恒等式、membership 双向一致、清算后状态校验、索引单调性），说明这些风险目前大概率没有被系统性验证。
 
 ---
 
 ## P0（高严重 + 高可能）
 
 ### 1) 多市场交叉抵押与退出市场（exitMarket）状态竞争
-- 为什么重要：Moonwell/Compound 风险引擎是“账户级聚合”，不是单市场孤立判断。单市场测试通过，不代表跨市场组合安全。
-- 现实故障模式：
+- **为什么重要：** Moonwell/Compound 风险引擎是“账户级聚合”——它把你在所有市场的抵押品和债务加在一起计算安全度，而不是逐市场单独看。单市场测试通过，不代表跨市场组合安全。
+- **通俗类比：** 就像你用房子（A 市场）做抵押贷了款（B 市场），房价暴跌后还想取走房产证——正确的风控应该拒绝这个操作，但代码可能只检查了 A 市场本身，忘了检查整体资产负债表。
+- **现实故障模式：**
   - 用户在 A 市场供给、B 市场借款，随后 C 市场价格波动或参数变更后仍可错误 exit A。
-  - getAssetsIn 与 checkMembership 不一致，导致风控绕过或误拒绝。
-- 缺少什么测试：
-  - 先 enter 多市场，再在不同价格和借款分布下尝试 exitMarket，断言仅在 liquidity >= 0 时成功。
-  - 双向校验：assetsIn 包含的市场必须 membership=true，反之亦然。
-- 推荐类型：不变测试 + 分支/集成测试。
+  - `getAssetsIn` 与 `checkMembership` 不一致，导致风控绕过或误拒绝。
+- **缺少什么测试：**
+  - 先 enter 多市场，再在不同价格和借款分布下尝试 `exitMarket`，断言仅在 `liquidity >= 0` 时成功。
+  - 双向校验：`assetsIn` 包含的市场必须 `membership=true`，反之亦然。
+- **推荐类型：** 不变测试 + 分支/集成测试。
+- **新手开始提示：**
+  ```solidity
+  // 1. alice 在 mTokenA 供给，在 mTokenB 借款（接近上限）
+  // 2. 降低 mTokenA 的 collateral factor（或模拟价格下跌）
+  // 3. 尝试 exitMarket(mTokenA)，此时应拒绝
+  uint256 err = comptroller.exitMarket(address(mTokenA));
+  assertGt(err, 0, "exitMarket should fail when shortfall would occur");
+  // 4. 还清 mTokenB 全部债务后再退出，此时应成功
+  ```
 
 ### 2) 清算 close factor / seize 计算边界（尤其四舍五入）
-- 为什么重要：清算是资金重新分配的核心，高价值事故常见于“边界金额+精度”导致多拿/少拿。
-- 现实故障模式：
-  - repayAmount 接近 closeFactor 上限时，允许超额清算或拒绝合法清算。
-  - seizeTokens 因舍入偏差导致协议或清算人获得异常份额。
-- 缺少什么测试：
-  - 在 shortfall 刚刚 > 0、刚刚 == 0、刚刚 < 0 三个边界做 liquidateBorrow。
-  - repayAmount 取 0、1 wei、closeFactor*debt、closeFactor*debt+1。
-  - 对账：borrower 债务减少、liquidator 抵押增加、protocol seize share 与总扣减守恒。
-- 推荐类型：模糊测试 + 单元测试（精确数学断言）+ 集成测试。
+- **为什么重要：** 清算是把价值从借款人转给清算人的核心操作，边界金额和精度是历史上最常见的高危漏洞来源。
+- **通俗类比：** 银行拍卖抵押物，“拍了 100 万，只入账了 99.9999 万”，单次误差很小，但若可以反复利用就能积累成真实损失。
+- **现实故障模式：**
+  - `repayAmount` 接近 `closeFactor` 上限时，允许超额清算（多清）或拒绝合法清算（少清）。
+  - `seizeTokens` 因舍入偏差导致协议或清算人获得异常份额。
+- **缺少什么测试：**
+  - 在 `shortfall` 刚刚 > 0、刚刚 == 0、刚刚 < 0 三个边界分别调 `liquidateBorrow`。
+  - `repayAmount` 取 `0`、`1 wei`、`closeFactor * debt`、`closeFactor * debt + 1`。
+  - 对账守恒：借款人债务减少量 = 清算人所得 + 协议分成（seize share）。
+- **推荐类型：** 模糊测试 + 单元测试（精确数学断言）+ 集成测试。
+- **新手开始提示：**
+  ```solidity
+  // 制造恰好超过阈值的 shortfall（例如让价格下跌 1 wei 对应精度）
+  // bob 用恰好 = closeFactor * debt 的金额清算
+  uint256 repayAmt = (borrowBalance * closeFactor) / 1e18;
+  uint256 bobMTokenBefore = mTokenA.balanceOf(bob);
+  liquidator.liquidateBorrow(bob_address, repayAmt, mTokenA);
+  // 守恒验证：liquidator 获得的 = 协议分成 + liquidator 自留
+  assertEq(liquidatorGain + protocolGain, totalSeized);
+  ```
 
 ### 3) mToken transfer 对抵押账户流动性的影响
 - 为什么重要：在 Compound 架构中，mToken 转账会触发 allowed 检查；如果漏测，可能出现“转走抵押仍保留借款”。
@@ -160,12 +202,32 @@
 ---
 
 ## 建议先补的 6 个测试任务（可直接开工）
-1. 多市场账户流动性与 exitMarket 拒绝/放行矩阵（P0）。
-2. 清算边界数学套件：closeFactor、seize、舍入守恒（P0）。
-3. transfer 触发风控拒绝路径（借款后转抵押）+ 不变断言（P0）。
-4. 会计恒等式 invariant：exchangeRate/cash/borrows/reserves + borrowIndex 单调（P0）。
-5. 奖励-账本同步回归：repayBehalf + liquidation + claim 顺序组合（P1）。
-6. cap/pause 组合状态机测试，明确哪些动作必须允许（尤其 repay/liquidate）（P1）。
+
+> **新手建议：** 按序号顺序来，先从单元测试写起，再逐步升级到 invariant 和模糊测试。每完成一项就新增对应测试文件。
+
+1. **多市场账户流动性与 exitMarket 拒绝/放行矩阵（P0）**
+   - 建议文件：`test/MultiMarketExit.t.sol`
+   - 最小第一步：alice 在两个市场各有仓位，尝试退出其中一个市场，断言有借款时失败。
+
+2. **清算边界数学套件：closeFactor、seize、舍入守恒（P0）**
+   - 建议文件：`test/LiquidationBoundary.t.sol`
+   - 最小第一步：制造刚好超过清算阈值的账户，用恰好等于 `closeFactor * debt` 的金额清算，验证值守恒。
+
+3. **transfer 触发风控拒绝路径（借款后转抵押）+ 不变断言（P0）**
+   - 建议文件：`test/TransferRiskCheck.t.sol`
+   - 最小第一步：alice 借款后尝试把全部 mToken 转给 bob，断言转账失败且状态不变。
+
+4. **会计恒等式 invariant：exchangeRate/cash/borrows/reserves + borrowIndex 单调（P0）**
+   - 建议文件：`test/invariants/AccountingInvariant.t.sol`
+   - 最小第一步：写一个 `invariant_exchangeRateBalanceSheet()` 函数，断言 `exchangeRate ≈ (cash + borrows - reserves) / totalSupply`。
+
+5. **奖励-账本同步回归：repayBehalf + liquidation + claim 顺序组合（P1）**
+   - 建议文件：`test/RewardSyncRegression.t.sol`
+   - 最小第一步：mint→borrow→liquidate→claim，每步后验证 `totalReward == supplySide + borrowSide`。
+
+6. **cap/pause 组合状态机测试，明确哪些动作必须允许（尤其 repay/liquidate）（P1）**
+   - 建议文件：`test/PauseCapMatrix.t.sol`
+   - 最小第一步：pause borrow 后，验证 repay 和 liquidate 仍然可以执行（紧急风险收敛操作不应被误阻断）。
 
 ## 测试策略分配建议
 - 单元测试：数学与权限边界（可精确断言数值和错误码）。

@@ -1,31 +1,82 @@
 # Step 2 - 贷款协议对抗性与边缘覆盖检查表（Foundry）
 
-目标：补齐当前偏快乐路径的测试缺口。每个条目都给出可直接转成 Foundry 用例的结构。
+> **这份清单干什么用？**
+> 正常流程测试只覆盖了“一切正常时”的路径。这份清单专门补充那些“边界情况”和“对抗性操作”——现实中的漏洞正是藏在这里。每个条目都给出可直接转成 Foundry 测试的结构。
 
-建议约定（便于统一实现）
-- 角色：alice（供应者/借款者）、bob（对手方/清算者）、carol（第三方还款者）。
-- 通用断言函数：
-  - assertAccountLiquidityInvariant(user)
-  - assertMarketAccountingInvariant(mToken)
-  - assertRewardConservation(user, mToken)
-- 时间控制：同块不 warp；跨时间用 vm.warp(block.timestamp + dt)。
-- 允许误差：涉及除法的断言使用绝对误差或相对误差（如 1~2 wei 或 1e-12 比例）。
+---
+
+## 测试基础约定（先读这里，写代码时作为参考）
+
+**角色设定（统一使用，方便阅读）：**
+- `alice`：主要供应者或借款者（正常用户）
+- `bob`：对手方或清算者（可能是攻击者）
+- `carol`：第三方还款者或机会主义者
+
+**可复用的断言辅助函数（建议写一个 `BaseTest.sol` 统一管理）：**
+
+```solidity
+// 验证账户流动性健康
+function assertAccountLiquidityInvariant(address user) internal view {
+    (uint256 err, uint256 liquidity, uint256 shortfall) =
+        comptroller.getAccountLiquidity(user);
+    assertEq(err, 0, "liquidity check error");
+    assertEq(shortfall, 0, "unexpected shortfall");
+}
+
+// 验证市场会计恒等式: exchangeRate ≈ (cash + borrows - reserves) / totalSupply
+function assertMarketAccountingInvariant(address mToken) internal view {
+    uint256 cash = MToken(mToken).getCash();
+    uint256 borrows = MToken(mToken).totalBorrows();
+    uint256 reserves = MToken(mToken).totalReserves();
+    uint256 supply = MToken(mToken).totalSupply();
+    if (supply > 0) {
+        uint256 expected = (cash + borrows - reserves) * 1e18 / supply;
+        uint256 actual = MToken(mToken).exchangeRateStored();
+        assertApproxEqAbs(actual, expected, 2, "accounting invariant broken");
+    }
+}
+
+// 验证奖励总量守恒: totalReward == supplySide + borrowSide
+function assertRewardConservation(address user, address mToken) internal view {
+    // 根据具体 reward 合约补充实现
+}
+```
+
+**时间控制：**
+- 同一区块内不使用 `vm.warp`（测试幂等性）
+- 跨时间用 `vm.warp(block.timestamp + dt)`（`dt` 单位为秒，例如 1天 = 86400）
+
+**允许误差：** 涉及除法的断言使用绝对误差或相对误差（如 1\~2 wei，或 1e-12 比例）
 
 ---
 
 ## [ ] 1. 边界值（Boundary Values）
-- 盲点：只测中间值时，常漏掉 min/max 边缘分支（例如 closeFactor 上限、cap 边界、可借额度边界）。
-- 用户串行：
-  1) alice 供应抵押并 enter market。
-  2) 计算 maxBorrow，分别尝试 maxBorrow-1、maxBorrow、maxBorrow+1 借款。
-  3) 在 cap 临界位重复 mint/borrow。
-- 建议测试名：
-  - testBorrowAtLiquidityBoundary()
-  - testMintAtSupplyCapBoundary()
-  - testRepayAtCloseFactorBoundary()
-- 预期断言：
-  - 边界内成功，边界外失败（错误码/自定义错误符合预期）。
-  - 成功路径后账户 liquidity >= 0；失败路径状态完全不变。
+- **盲点：** 只测中间值时，常漏掉 min/max 边缘分支（例如 closeFactor 上限、cap 边界、可借额度边界）。
+- **通俗理解：** 就像测一扇门，不仅要测“正常开关”，还要测“刚好满载时”和“超重一丁点时”会发生什么。
+- **测试步骤：**
+  1. alice 供应抵押并 enter market。
+  2. 计算 `maxBorrow`，分别尝试 `maxBorrow-1`、`maxBorrow`、`maxBorrow+1` 借款。
+  3. 在 supply cap 临界位重复 mint/borrow。
+- **建议测试名：**
+  - `testBorrowAtLiquidityBoundary()`
+  - `testMintAtSupplyCapBoundary()`
+  - `testRepayAtCloseFactorBoundary()`
+- **预期断言：**
+  - 边界内：操作成功，账户 `liquidity >= 0`。
+  - 边界外：操作失败，错误码符合预期，且**失败前后状态完全一致**（重要！）。
+- **最小代码示例：**
+  ```solidity
+  function testBorrowAtLiquidityBoundary() public {
+      uint256 maxBorrow = getMaxBorrow(alice);
+      // 恰好在边界内：应成功
+      vm.prank(alice);
+      mToken.borrow(maxBorrow - 1);
+      // 恰好超出边界：应失败
+      vm.prank(alice);
+      vm.expectRevert();  // 或检查返回错误码
+      mToken.borrow(2);   // 再借 2 就超出了
+  }
+  ```
 
 ## [ ] 2. 零金额（Zero Amount）
 - 盲点：0 金额调用可能错误成功、错误扣奖励、或破坏索引更新顺序。
@@ -64,16 +115,36 @@
   - 失败前后状态一致；成功路径索引单调、会计恒等式成立。
 
 ## [ ] 5. 同一块内重复操作（Same-Block Repetition）
-- 盲点：依赖 block.timestamp 的索引更新在同块 delta=0，可能出现重复领收益、重复计息或漏计。
-- 用户串行：
-  1) alice 在同一块连续 mint -> borrow -> repay -> claimReward（不 warp）。
-  2) 重复第二轮相同操作。
-- 建议测试名：
-  - testRepeatedActionsInSameBlockIdempotence()
-  - testSameBlockRewardIndexNoDoubleCount()
-- 预期断言：
-  - 同块重复不会额外产生利息或奖励（除非设计明确允许）。
-  - 第二轮与第一轮对关键状态增量一致或为 0（按预期）。
+- **盲点：** 依赖 `block.timestamp` 的索引更新在同块 `delta=0`，可能出现重复领收益、重复计息或漏计。
+- **通俗理解：** 如果银行按“每天”结算利息，那你一天内存取多次，不应该结算多次利息。合约里的“每天”是通过 `block.timestamp` 判断的，同一个区块内时间不变，所以索引不应该更新多次。
+- **测试步骤：**
+  1. alice 在同一块连续 `mint` → `borrow` → `repay` → `claimReward`（**不调用** `vm.warp`）。
+  2. 记录第一轮结束时的状态快照。
+  3. 重复一轮相同操作，比较状态变化。
+- **建议测试名：**
+  - `testRepeatedActionsInSameBlockIdempotence()`
+  - `testSameBlockRewardIndexNoDoubleCount()`
+- **预期断言：**
+  - 同块重复操作不会额外产生利息或奖励（除非协议设计明确允许）。
+  - 第二轮结束后，`borrowIndex`、`supplyIndex`、`rewardIndex` 与第一轮结束时相同。
+- **最小代码示例：**
+  ```solidity
+  function testSameBlockRewardIndexNoDoubleCount() public {
+      // 第一轮：mint + claim
+      vm.prank(alice);
+      mToken.mint(100e18);
+      uint256 rewardBefore = getAccruedReward(alice);
+      rewardDistributor.claimReward(alice, address(mToken));
+      uint256 rewardAfter1 = getAccruedReward(alice);
+
+      // 同一块再次 claim（不 warp）
+      rewardDistributor.claimReward(alice, address(mToken));
+      uint256 rewardAfter2 = getAccruedReward(alice);
+
+      // 第二次 claim 不应增加奖励
+      assertEq(rewardAfter2, rewardAfter1, "double count in same block");
+  }
+  ```
 
 ## [ ] 6. 长时间间隔后的行动（Long Idle Gap）
 - 盲点：长时间无交互后首次操作承担大量 accrue，易暴露溢出、极端舍入、奖励截止处理错误。
@@ -168,15 +239,60 @@
 ---
 
 ## Foundry 实施建议（便于快速落地）
-- 用表驱动参数化：amount、warpDelta、priceShock、actionOrder。
-- 对每个 checklist 条目至少实现一个确定性测试 + 一个 fuzz 版本。
-- 在 fuzz 中加入状态快照前后比对：
-  - market 级：cash、totalBorrows、totalReserves、borrowIndex、exchangeRate。
-  - user 级：mToken balance、borrow balance、liquidity/shortfall、outstanding rewards。
-- 增加统一后置断言（每个测试结尾调用）：
-  - assertMarketAccountingInvariant(mToken)
-  - assertAccountLiquidityInvariant(alice/bob)
-  - assertRewardConservation(alice/bob, mToken)
+
+**测试文件组织结构建议：**
+```
+test/
+├── BaseTest.sol          ← 统一存放角色设置、assert 辅助函数
+├── BoundaryTest.t.sol    ← 条目 1、2、3、4（边界值类）
+├── SameBlockTest.t.sol   ← 条目 5（同块重复）
+├── LongIdleTest.t.sol    ← 条目 6（长时间空闲）
+├── OrderingTest.t.sol    ← 条目 7、8（顺序依赖）
+├── RoundingTest.t.sol    ← 条目 10（舍入方向）
+└── invariants/
+    └── RewardInvariant.t.sol  ← 条目 11（奖励指数漂移）
+```
+
+**参数化 fuzz 通用模板：**
+```solidity
+function testFuzz_BorrowAndRepay(uint256 amount, uint40 dt) public {
+    amount = bound(amount, 1e6, maxBorrow);
+    dt = uint40(bound(dt, 0, 180 days));
+
+    vm.prank(alice);
+    mToken.borrow(amount);
+    vm.warp(block.timestamp + dt);
+    vm.prank(alice);
+    mToken.repayBorrow(amount);
+
+    // 统一后置断言（每个测试都加上）
+    assertMarketAccountingInvariant(address(mToken));
+    assertAccountLiquidityInvariant(alice);
+    assertRewardConservation(alice, address(mToken));
+}
+```
+
+**fuzz 状态快照对比建议（在复杂测试中使用）：**
+```solidity
+struct MarketSnapshot {
+    uint256 cash;
+    uint256 totalBorrows;
+    uint256 totalReserves;
+    uint256 borrowIndex;
+    uint256 exchangeRate;
+}
+MarketSnapshot memory before = takeSnapshot(mToken);
+// ... 执行操作 ...
+MarketSnapshot memory after_ = takeSnapshot(mToken);
+// 验证变化量符合预期
+```
+
+- 用表驱动参数化：`amount`、`warpDelta`、`priceShock`、`actionOrder`。
+- 对每个 checklist 条目至少实现一个**确定性测试**（fixed inputs）+ 一个 **fuzz 版本**（随机 inputs）。
+- **统一后置断言**（每个测试结尾都要调用）：
+  - `assertMarketAccountingInvariant(mToken)`
+  - `assertAccountLiquidityInvariant(alice)`（或 `bob`）
+  - `assertRewardConservation(alice, mToken)`
 
 ## 建议优先补测顺序
 1. 同一块重复操作 + 奖励指数漂移（高概率抓到隐藏计数问题）。

@@ -42,7 +42,48 @@ contract LiquidationBoundaryMathUintTest is Test {
         // 借款年化率约等于 2% + 利用率 * 20%
         irm = new WhitePaperInterestRateModel(0.02e18, 0.2e18);
 
+        // q - 设置价格语言机？ 返回 0 表示成功？
+        assertEq(comptroller._setPriceOracle(oracle), 0);
+        // 设置清算上限 50% （这里的清算逻辑还没完全理解）
+        assertEq(comptroller._setCloseFactor(0.5e18), 0);
+        // 设置清算激励为 1.08， 偿还 100$ 的债务， 清算人能到 $108 的抵押品
+        assertEq(comptroller._setLiquidationIncentive(1.08e18), 0);
+
+        // 部署 MErc20Immutable 后，如果用 admin 调 supportMarket，列表检查通常能过
+        // 但要借款/抵押真正可用，还需要配置 oracle 价格和 collateral factor 等参数。
+        mCollateral = new MErc20Immutable(
+            address(collateralUnderlying),
+            comptroller,
+            irm,
+            uint(INTERNAL_EXCHANGE_RATE),
+            "Moonwell Collateral",
+			"mCOL",
+            8,
+            payable(address(this))
+        );
         
+        mBorrow = new MErc20Immutable(
+            address(borrowUnderlying),
+            comptroller,
+            irm,
+            uint(INTERNAL_EXCHANGE_RATE),
+            "Moonwell Borrow",
+			"mBRW",
+            8,
+            payable(address(this))
+        );
+        
+        assertEq(comptroller._supportMarket(mCollateral), 0);
+        assertEq(comptroller._supportMarket(mBorrow), 0);
+        
+        oracle.setUnderlyingPrice(mCollateral, 1e18);
+        oracle.setUnderlyingPrice(mBorrow, 1e18);
+
+        // q - 这里断言的意义是什么？
+        assertEq(comptroller._setCollateralFactor(mCollateral, 0.8e18), 0);
+        assertEq(comptroller._setCollateralFactor(mBorrow, 0), 0);
+
+        _seedBorrowMarketCash();        // info - 尚未定义
 
     }
 

@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "@protocol/MErc20.sol";
 
+// 把父合约的初始化流程封装到构造函数里，一次性部署完成
 /// @notice unused in production so moved to mock folder
 /**
  * @title Moonwell's MErc20Immutable Contract
@@ -21,6 +22,14 @@ contract MErc20Immutable is MErc20 {
      * @param decimals_ ERC-20 decimal precision of this token
      * @param admin_ Address of the administrator of this token
      */
+
+    // underlying_: 底层资产地址
+    // comptroller_: 风控入口
+    // interestRateModel_: 利率模型
+    // initialExchangeRateMantissa_: 初始汇率
+    // name_/symbol_/decimals_: 代币元数据
+    // 初始化结束后，把 admin 切换为你传入的 admin_
+
     constructor(
         address underlying_,
         ComptrollerInterface comptroller_,

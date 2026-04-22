@@ -12,6 +12,7 @@ import "../SafeMath.sol";
 contract JumpRateModel is InterestRateModel {
     using SafeMath for uint;
 
+    // 把初始化后的每秒参数和 kink 记录到链上日志，方便审计和前端读取历史配置
     event NewInterestParams(
         uint baseRatePerTimestamp,
         uint multiplierPerTimestamp,
@@ -22,6 +23,7 @@ contract JumpRateModel is InterestRateModel {
     /**
      * @notice The approximate number of timestamps per year that is assumed by the interest rate model
      */
+    //  按“秒”估算一年
     uint public constant timestampsPerYear = 60 * 60 * 24 * 365;
 
     /**
@@ -54,6 +56,10 @@ contract JumpRateModel is InterestRateModel {
      * @param jumpMultiplierPerYear The multiplierPerTimestamp after hitting a specified utilization point
      * @param kink_ The utilization point at which the jump multiplier is applied
      */
+    //  baseRatePerYear：基础年化借款利率（当利用率 (util=0) 时的起点），决定整条曲线在 y 轴上的起始高度
+    //  multiplierPerYear：kink 之前的年化斜率（利用率每上升一点，利率增加多少），决定“正常区间”上涨快慢
+    //  jumpMultiplierPerYear： 超过 kink 之后的年化斜率（跳升区间的更陡斜率）
+    //  kink_： 拐点利用率阈值，决定从哪一刻开始切换到 jump 斜率
     constructor(
         uint baseRatePerYear,
         uint multiplierPerYear,
@@ -92,6 +98,11 @@ contract JumpRateModel is InterestRateModel {
     //  计算资金利用率(市场里借出去的钱 占 可用总资金的比例)
     // 公式:  `borrows * 1e18 / (cash + borrows - reserves)`
     // reserves 是协议留存，不算可供借贷的有效流动性，所以要减掉
+
+    // 直观理解：池子里的钱有多少比例被借走了。
+    // 利用率 = 0%：没人借钱，资金全部闲置
+    // 利用率 = 80%：池子里 80% 的钱都被借走了
+    // 利用率 = 100%：资金被借空，新存款人无法提款（极危险）
     function utilizationRate(
         uint cash,
         uint borrows,
@@ -117,18 +128,26 @@ contract JumpRateModel is InterestRateModel {
         uint borrows,
         uint reserves
     ) public view override returns (uint) {
+        // q - 计算市场资金利用率？
         uint util = utilizationRate(cash, borrows, reserves);
 
+        // 正常区间，使用较缓斜率
         if (util <= kink) {
+            // 公式： 基础利率 + 利用率线性增长
+            // 
             return
                 util.mul(multiplierPerTimestamp).div(1e18).add(
                     baseRatePerTimestamp
                 );
         } else {
+            // 跳升区间
+            // 先算拐点出正常利率： normalRate
             uint normalRate = kink.mul(multiplierPerTimestamp).div(1e18).add(
                 baseRatePerTimestamp
             );
+            // 超出拐点的部分
             uint excessUtil = util.sub(kink);
+            // 最后计算总利率
             return
                 excessUtil.mul(jumpMultiplierPerTimestamp).div(1e18).add(
                     normalRate

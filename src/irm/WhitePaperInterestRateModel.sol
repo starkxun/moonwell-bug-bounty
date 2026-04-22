@@ -38,10 +38,13 @@ contract WhitePaperInterestRateModel is InterestRateModel {
      * @param multiplierPerYear The rate of increase in interest rate wrt utilization (scaled by 1e18)
      */
     constructor(uint baseRatePerYear, uint multiplierPerYear) {
+        // 年化基础利率
         baseRatePerTimestamp = baseRatePerYear
             .mul(1e18)
             .div(timestampsPerYear)
             .div(1e18);
+        
+        // 年化斜率（利用率上升时，借款利率上升的速度）
         multiplierPerTimestamp = multiplierPerYear
             .mul(1e18)
             .div(timestampsPerYear)

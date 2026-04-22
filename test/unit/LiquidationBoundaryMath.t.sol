@@ -87,6 +87,17 @@ contract LiquidationBoundaryMathUintTest is Test {
 
     }
 
+    // q - 这个函数 是干什么的？
+    function _seedBorrowMarketCash() internal {
+        uint256 seed = 10_000e18;
+        borrowUnderlying.mint(supplier, seed);
+
+        vm.startPrank(supplier);
+        borrowUnderlying.approve(address(mBorrow), seed);
+        assertEq(mBorrow.mint(seed), 0, "supplier mint to borrow market failed");
+        vm.stopPrank();
+    }
+
 
 }
 

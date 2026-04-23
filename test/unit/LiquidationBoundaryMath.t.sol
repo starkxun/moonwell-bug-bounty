@@ -99,10 +99,28 @@ contract LiquidationBoundaryMathUintTest is Test {
         // q - 获取应当偿还的本金和利息
         uint256 borrowBalance = mBorrow.borrowBalanceStored(borrower);
         // q - 这里计算的值是什么？
+        // a - 乘以清算因子，计算目前最大清算额度
         uint256 maxClose = (borrowBalance * comptroller.closeFactorMantissa()) / 1e18;
         assertGt(maxClose, 0, "maxClose should be positive");
 
-        _fundAndApprovalLiquidator(maxClose);
+        _fundAndApprovalLiquidator(maxClose);   // mBorrow 市场注入资金
+        vm.prank(liquidator);
+        // 尝试清算
+        // q - 此时 shortfall 已经产生 $200， 允许清算？
+        uint256 okErr = mBorrow.liquidateBorrow(borrower, maxClose, mCollateral);
+        assertEq(okErr, 0, "Liquidation at maxClose should be successed");
+
+        // q - 重新创立测试环境？
+        setUp();
+        _createShortfallPosition();
+        
+        uint256 borrowBalance2 = mBorrow.borrowBalanceStored(borrower);
+        uint256 maxClose2 = (borrowBalance2 * comptroller.closeFactorMantissa()) / 1e18;
+        
+        _fundAndApprovalLiquidator(maxClose2 + 1);
+        vm.prank(liquidator);
+        uint256 tooMuchErr = mBorrow.liquidateBorrow(borrower, maxClose2 + 1, mCollateral);
+        assertTrue(tooMuchErr != 0, "maxClose2 + 1 should be reject");
 
     }
 
@@ -154,6 +172,8 @@ contract LiquidationBoundaryMathUintTest is Test {
     }
 
     // q - 这个函数的作用是什么？
+    // 给结款市场注入资金，后续参与清算
+    // 若 mBorrow 市场没有足够资金，则会导致失败
     function _fundAndApprovalLiquidator(uint256 repayAmount) internal {
         borrowUnderlying.mint(liquidator, repayAmount);
         vm.prank(liquidator);

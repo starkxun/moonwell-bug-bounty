@@ -1421,11 +1421,16 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param repayAmount The amount of the underlying borrowed asset to repay
      * @return (uint, uint) An error code (0=success, otherwise a failure, see ErrorReporter.sol), and the actual repayment amount.
      */
+    //  borrower：被清算的借款人
+    //  repayAmount：清算人想代还的借款金额
+    //  mTokenCollateral：借款人用作抵押的那个市场（mToken）
     function liquidateBorrowInternal(
         address borrower,
         uint repayAmount,
         MTokenInterface mTokenCollateral
     ) internal nonReentrant returns (uint, uint) {
+        // q - 更新全局利息？
+        // a - 更新结款市场利息到最新
         uint error = accrueInterest();
         if (error != uint(Error.NO_ERROR)) {
             // accrueInterest emits logs on errors, but we still want to log the fact that an attempted liquidation failed
@@ -1437,7 +1442,7 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
                 0
             );
         }
-
+        // 更新抵押市场利息到最新
         error = mTokenCollateral.accrueInterest();
         if (error != uint(Error.NO_ERROR)) {
             // accrueInterest emits logs on errors, but we still want to log the fact that an attempted liquidation failed

@@ -9,6 +9,12 @@ import {MErc20Immutable} from "@test/mock/MErc20Immutable.sol";
 import {MockERC20} from "@test/mock/MockERC20.sol";
 import {SimplePriceOracle} from "@test/helper/SimplePriceOracle.sol";
 
+
+
+/****************************************************************************** 
+ *                                starkxuntest                                * 
+ ******************************************************************************/
+
 contract LiquidationBoundaryMathUintTest is Test {
 
     MockERC20 internal collateralUnderlying;
@@ -19,8 +25,8 @@ contract LiquidationBoundaryMathUintTest is Test {
     InterestRateModel internal irm;
 
     // q - 这连个值是干什么的？
-    MErc20Immutable internal mCollateral;
-    MErc20Immutable internal mBorrow;
+    MErc20Immutable internal mCollateral;      // 用户把 collateralUnderlying 存进去当抵押
+    MErc20Immutable internal mBorrow;          // 用户从这里借 borrowUnderlying
 
     address internal borrower;
     address internal liquidator;
@@ -83,11 +89,27 @@ contract LiquidationBoundaryMathUintTest is Test {
         assertEq(comptroller._setCollateralFactor(mCollateral, 0.8e18), 0);
         assertEq(comptroller._setCollateralFactor(mBorrow, 0), 0);
 
-        _seedBorrowMarketCash();        // info - 尚未定义
+        _seedBorrowMarketCash();    // 借款市场注入资金
 
     }
 
+    function testCloseFactorBoundary_MaxCloseSucceeds_MaxClosePlusOneFails() public {
+        _createShortfallPosition();
+        
+        // q - 获取应当偿还的本金和利息
+        uint256 borrowBalance = mBorrow.borrowBalanceStored(borrower);
+        // q - 这里计算的值是什么？
+        uint256 maxClose = (borrowBalance * comptroller.closeFactorMantissa()) / 1e18;
+        assertGt(maxClose, 0, "maxClose should be positive");
+
+        _fundAndApprovalLiquidator(maxClose);
+
+    }
+
+
+
     // q - 这个函数 是干什么的？
+    //  mBorrow 市场先“注入现金池”
     function _seedBorrowMarketCash() internal {
         uint256 seed = 10_000e18;
         borrowUnderlying.mint(supplier, seed);
@@ -98,11 +120,47 @@ contract LiquidationBoundaryMathUintTest is Test {
         vm.stopPrank();
     }
 
+    // q - 这个函数的功能？
+    // 构建一个“先健康， 后资不抵债” 的借款账户
+    // 方便后续边界测试
+    function _createShortfallPosition() internal {
+        uint256 collateralDeposit = 1_000e18;   // 初始抵押 $1000
+        uint256 borrowAmount = 600e18;          // collateral factor 为 0.8， 借款上限为 800$, 实际借款 600$
+
+        collateralUnderlying.mint(borrower, collateralDeposit); // q - 给借款者mint
+        
+        vm.startPrank(borrower);
+        collateralUnderlying.approve(address(mCollateral), collateralDeposit);
+        assertEq(mCollateral.mint(collateralDeposit), 0, "borrwer mint collateral failed");
+
+        address[] memory markets = new address[](1);
+        markets[0] = address(mCollateral);
+        comptroller.enterMarkets(markets);
+
+        assertEq(mBorrow.borrow(borrowAmount), 0, "Borrow failed");     // 借款
+        vm.stopPrank();
+
+        // 之前价格是 1e18
+        // 现在降低抵押品价格，是借款者负债超过贷款额度
+        oracle.setUnderlyingPrice(mCollateral, 5e17);       // 跌价后抵押 $500 -> 新的借款上限: 400
+        // q - borrower 是借款者，可以被用作 getAccountLiquidity 的参数吗？
+        // a - 可以，getAccountLiquidity 查询任意账户的流动性
+        // 此时借款仍是 600$, shortfall 应为 200$, 可以被清算
+        (uint256 err, uint256 liquidity, uint256 shortfall) = comptroller.getAccountLiquidity(borrower);
+
+        assertEq(err, 0, "account liquidity querry faild");
+        assertEq(liquidity, 0, "liquidity should be zero after price drop");
+        assertGt(shortfall, 0, "borrower should be liquidatable");  // q - shortfall 为 0 表示 具有清算能力？
+    }
+
+    // q - 这个函数的作用是什么？
+    function _fundAndApprovalLiquidator(uint256 repayAmount) internal {
+        borrowUnderlying.mint(liquidator, repayAmount);
+        vm.prank(liquidator);
+        borrowUnderlying.approve(address(mBorrow), repayAmount);
+    }
+
 
 }
 
 
-
-/****************************************************************************** 
- *                                starkxuntest                                * 
- ******************************************************************************/

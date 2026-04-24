@@ -176,7 +176,31 @@ contract LiquidationBoundaryMathUintTest is Test {
     }
 
 
+    function testSeizeConservation_BorrowerLossEqualsLiquidatorGainPlusProtocolCut() public {
+        _createShortfallPosition();
 
+        uint256 repayAmount = 111e18;
+        // q - 这里不使用调用者，是默认清算市场里的所有账户吗
+        (uint256 errCode, uint256 expectSeizeToken) =  comptroller.liquidateCalculateSeizeTokens(
+           mBorrow , mCollateral, repayAmount);
+        assertEq(errCode, 0, "liquidator should be succeed");
+        assertGt(expectSeizeToken, 0, "expectSeizeToken should be positive");
+
+        uint256 borrowerBefore = mCollateral.balanceOf(borrower);
+        uint256 liquidatorBefore = mCollateral.balanceOf(liquidator);
+        uint256 totalSupplyBefore = mCollateral.totalSupply(); 
+
+        // 给清算者打钱
+        _fundAndApprovalLiquidator(repayAmount);
+        vm.prank(liquidator);
+        uint256 err = mBorrow.liquidateBorrow(borrower, repayAmount, mCollateral);
+        assertEq(err, 0, "liquidate should be success");
+
+
+
+
+
+    }
 
     // q - 这个函数 是干什么的？
     //  mBorrow 市场先“注入现金池”

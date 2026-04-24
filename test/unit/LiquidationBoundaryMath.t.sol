@@ -124,6 +124,58 @@ contract LiquidationBoundaryMathUintTest is Test {
 
     }
 
+    // 验证清算计算出来的 seizeToken 是向下取整，且取整边界是 紧 的 
+    // seizeToken: 清算后，借款人被没收并转给清算人抵押品 mToken 的数量
+    
+    // liquidateCalculateSeizeTokens 函数已给出计算公式：
+    // seizeAmount = actualRepayAmount * liquidationIncentive * priceBorrowed / priceCollateral
+    // seizeTokens = seizeAmount / exchangeRate
+    // 假设：
+    // borrowed token = USDC
+    // collateral token = ETH
+    // actualRepayAmount = 1000 USDC
+    // liquidationIncentive = 1.08
+    // USDC price = 1 USD
+    // ETH price = 2000 USD
+    // mETH exchangeRate = 0.02 ETH / mETH
+    // 也就是说，清算者偿还了 1000 USDC，但是可以拿到价值 1080 美元的 ETH 抵押品。
+    // 第二步，把底层 ETH 数量换算成 mETH：
+    // // seizeTokens = 0.54 / 0.02 = 27 mETH
+    // 以清算者最终从 borrower 那里拿走的是：27 mETH
+    // 不是直接拿 0.54 ETH。之后清算者可以选择继续持有 mETH，也可以 redeem 成底层 ETH
+
+    function testSeizeFormula_RoundsDownWithTightBounds() public {
+        _createShortfallPosition();
+
+        uint256 repayAmount = 111e18;
+        (uint256 errCode, uint256 seizeToken) = comptroller.liquidateCalculateSeizeTokens(
+            address(mBorrow), address(mCollateral), repayAmount);
+        assertEq(errCode, 0, "seize calculation should succeed");
+        assertGt(seizeToken, 0, "seizeToken should be positive");
+
+        // 拿到清算激励值？
+        uint256 liqIncentive = comptroller.liquidationIncentiveMantissa();
+        uint256 priceBorrow = oracle.getUnderlyingPrice(mBorrow);
+        uint256 priceCollateral = oracle.getUnderlyingPrice(mCollateral);
+        uint256 exchangeRate = mCollateral.exchangeRateStored();
+
+        // 分子
+        uint256 numerator = (liqIncentive * priceBorrow) / 1e18;
+        uint256 denominator = (priceCollateral * exchangeRate) / 1e18;
+
+        // 这两个值根据 liquidateCalculateSeizeTokens 的公式来理解
+        uint256 lhs = seizeToken * denominator; // 用返回整数反推回去的值
+        uint256 rhs = repayAmount * numerator;  // 真实分子
+
+        // q - 这里的断言是啥意思？
+        // a - lhs 应当小于 rhs, 表示向下取整, seizeToken 不会超发抵押品
+        assertLe(lhs, rhs, "floor bound lower side violated");
+        // + 1 则会超过真实值
+        assertGt((seizeToken + 1) * denominator, rhs, "floor bound upper side violated");
+ 
+    }
+
+
 
 
     // q - 这个函数 是干什么的？

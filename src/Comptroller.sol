@@ -1042,6 +1042,7 @@ contract Comptroller is
         uint oldLiquidationIncentiveMantissa = liquidationIncentiveMantissa;
 
         // Set liquidation incentive to new incentive
+        // q - 这个值是清算激励值吗？
         liquidationIncentiveMantissa = newLiquidationIncentiveMantissa;
 
         // Emit event with old incentive, new incentive

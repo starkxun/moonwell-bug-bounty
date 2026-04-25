@@ -93,6 +93,7 @@ contract LiquidationBoundaryMathUintTest is Test {
 
     }
 
+    // 测试正常清算 和 超过清算值的异常情况
     function testCloseFactorBoundary_MaxCloseSucceeds_MaxClosePlusOneFails() public {
         _createShortfallPosition();
         
@@ -175,14 +176,15 @@ contract LiquidationBoundaryMathUintTest is Test {
  
     }
 
-
+    // 测试清算后，借款人损失的抵押品 mToken，必须等于清算人拿到的部分 + 协议抽成的部分
     function testSeizeConservation_BorrowerLossEqualsLiquidatorGainPlusProtocolCut() public {
         _createShortfallPosition();
 
         uint256 repayAmount = 111e18;
         // q - 这里不使用调用者，是默认清算市场里的所有账户吗
+        // a - 不用指定被清算者，仅需使用 repayAmount， 根据市场参数做换算，计算出需要没收抵押品 mToken 数量
         (uint256 errCode, uint256 expectSeizeToken) =  comptroller.liquidateCalculateSeizeTokens(
-           mBorrow , mCollateral, repayAmount);
+           address(mBorrow) , address(mCollateral), repayAmount);
         assertEq(errCode, 0, "liquidator should be succeed");
         assertGt(expectSeizeToken, 0, "expectSeizeToken should be positive");
 
@@ -196,8 +198,27 @@ contract LiquidationBoundaryMathUintTest is Test {
         uint256 err = mBorrow.liquidateBorrow(borrower, repayAmount, mCollateral);
         assertEq(err, 0, "liquidate should be success");
 
+        uint256 borrowerAfter = mCollateral.balanceOf(borrower);
+        uint256 liquidatorAfter = mCollateral.balanceOf(liquidator);
+        uint256 totalSupplyAfter = mCollateral.totalSupply();
 
+        uint256 borrowerLost = borrowerBefore - borrowerAfter;
+        uint256 liquidatorGained = liquidatorAfter - liquidatorBefore;
+        uint256 protocolSeizeToken = borrowerLost - liquidatorGained;   // q - 协议赚取的差价？
 
+        assertEq(borrowerLost, expectSeizeToken, "borrower lost must match expect");
+        assertEq(
+            liquidatorGained + protocolSeizeToken,
+            expectSeizeToken,
+            "seize split must conserve mTokens units"
+        );
+        // q - 这句断言里的翻译怎么理解？
+        // a - 总量变化完全由协议份额解释
+        assertEq(
+            totalSupplyAfter - totalSupplyBefore,
+            protocolSeizeToken,
+            "only protocol seize tokens should burn from totalSupply"
+        );
 
 
     }

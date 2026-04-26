@@ -74,11 +74,37 @@ contract TransferRiskCheckUnitTest is Test {
             8,
             payable(address(this))
         );
+        
+        assertEq(comptroller._supportMarket(mCollateral), 0);
+        assertEq(comptroller._supportMarket(mBorrow), 0);
+
+        oracle.setUnderlyingPrice(mCollateral, 1e18);
+        oracle.setUnderlyingPrice(mBorrow, 1e18);
+
+        // 抵押品市场 CF = 80%，借款市场 CF = 0（不能拿借出的资产再当抵押）
+        // q - 这句注释是什么意思？
+        assertEq(comptroller._setCollateralFactor(mCollateral, 0.8e18), 0);
+        assertEq(comptroller._setCollateralFactor(mBorrow, 0), 0);
+
+        _seedBorrowMarketCash();
 
     }
 
-    // assertEq(comptroller._supportMarket(mCollateral), 0);
-    // assertEq(comptroller._supportMarket(mBorrow), 0);
+
+    function _seedBorrowMarketCash() internal {
+        uint256 seed = 10_000e18;
+        mBorrowUnderlying.mint(Supplier, seed);
+
+        vm.startPrank(Supplier);
+        mBorrowUnderlying.approve(address(mBorrow), seed);
+        // q - 这里是 Supplier 调用 mint， 给 Borrow market 铸造代币吗？
+        assertEq(mBorrow.mint(seed), 0, "supplier mint to borrow market failed");
+        vm.stopPrank();
+
+
+    }
+    
+
 
 
 

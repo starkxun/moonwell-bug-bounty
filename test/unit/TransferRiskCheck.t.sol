@@ -54,23 +54,23 @@ contract TransferRiskCheckUnitTest is Test {
         assertEq(comptroller._setLiquidationIncentive(1.08e18), 0, "set liqIncentive should succeed");
 
         mBorrow = new MErc20Immutable(
-            address(mCollateralUnderlying),
-            comptroller,
-            irm,
-            uint(INTERNAL_CHANGE_RATE),
-            "Moonwell Collateral",
-            "mCOL",
-            8,
-            payable(address(this))
-        );
-
-        mCollateral = new MErc20Immutable(
             address(mBorrowUnderlying),
             comptroller,
             irm,
             uint(INTERNAL_CHANGE_RATE),
             "Moonwell Borrow",
             "mBRW",
+            8,
+            payable(address(this))
+        );
+
+        mCollateral = new MErc20Immutable(
+            address(mCollateralUnderlying),
+            comptroller,
+            irm,
+            uint(INTERNAL_CHANGE_RATE),
+            "Moonwell Collateral",
+            "mCOL",
             8,
             payable(address(this))
         );
@@ -91,6 +91,29 @@ contract TransferRiskCheckUnitTest is Test {
     }
 
 
+
+    
+    // 用户没有借款时候，转出全部 mToken 应当成功
+    function testTransfer_NoBorrow_FullTransferSucceed() public {
+        uint256 deposit = 1_000e18;
+        // Alice 仅共给 抵押品， 没有借款，没有 enter market
+        _supplyCollateral(Alice, deposit);
+        
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+        assertGt(AliceBefore, 0, "Alice should hold MToken");
+        
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Bob, AliceBefore);
+        assertTrue(ok, "Healthy transfer should succeed");
+
+        assertEq(mCollateral.balanceOf(Alice), 0, "Alice should drain to 0");
+        assertEq(mCollateral.balanceOf(Bob), AliceBefore + BobBefore, "Bob receives all");
+
+    }
+
+    
+    // 给借款市场注入资金，让 借款交易 有底层资产可拿
     function _seedBorrowMarketCash() internal {
         uint256 seed = 10_000e18;
         mBorrowUnderlying.mint(Supplier, seed);
@@ -100,12 +123,16 @@ contract TransferRiskCheckUnitTest is Test {
         // q - 这里是 Supplier 调用 mint， 给 Borrow market 铸造代币吗？
         assertEq(mBorrow.mint(seed), 0, "supplier mint to borrow market failed");
         vm.stopPrank();
-
-
     }
-    
 
-
+    // 账户在抵押市场存入 指定 underlying，但不进入市场
+    function _supplyCollateral(address user, uint256 amount) internal {
+        mCollateralUnderlying.mint(user, amount);
+        vm.startPrank(user);
+        mCollateralUnderlying.approve(address(mCollateral), amount);
+        assertEq(mCollateral.mint(amount), 0, "supply mint failed");
+        vm.stopPrank();
+    }
 
 
 

@@ -110,6 +110,10 @@ contract TransferRiskCheckUnitTest is Test {
 
     }
 
+    /****************************************************************************** 
+     *                                核心场景测试                                * 
+     ******************************************************************************/
+
     // 有借款时转出所有抵押品，必须失败
     function testTransfer_AfterBorrow_FullTransferFails_StateUnchanged() public {
         _createBorrowingPosition(1000e18, 600e18);
@@ -216,9 +220,31 @@ contract TransferRiskCheckUnitTest is Test {
         assertTrue(ok, "Current behavior: 1 wei transfer slips through due to truncation");
         assertEq(mCollateral.balanceOf(Alice), AliceBefore - 1, "Alice debited by 1 wei");
         assertEq(mCollateral.balanceOf(Bob), BobBefore + 1, "Bob credited by 1 wei");
-
     }
     
+
+
+    /****************************************************************************** 
+     *                                边角分支测试                                * 
+     ******************************************************************************/
+
+    // 从 src => dst 的转账失败，被内部拦截
+    function testTransfer_ToSelf_Fails() public {
+        _supplyCollateral(Alice, 1000e18);
+
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        assertGt(AliceBefore, 0, "Alice should hold mTokens");
+        
+        // Alice 尝试转账给自己
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Alice, AliceBefore);
+        assertFalse(ok, "Self Transfer should be failed");
+        
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore, "Balance unchange on self-transfer");
+
+    }
+
+
 
 
     // 二分发找到最大可赎回数量

@@ -110,7 +110,7 @@ contract TransferRiskCheckUnitTest is Test {
 
     }
 
-    // 有借款时转出抵押品，必须失败
+    // 有借款时转出所有抵押品，必须失败
     function testTransfer_AfterBorrow_FullTransferFails_StateUnchanged() public {
         _createBorrowingPosition(1000e18, 600e18);
         
@@ -133,8 +133,65 @@ contract TransferRiskCheckUnitTest is Test {
         assertEq(err, 0, "liquidity query ok");
         assertGt(liq, 0, "liquidity should be positive");
         assertEq(shortfall, 0 ,"shortfall should be 0 after transfer be reject");
+    }
+
+    // 借款后转出部分 mToken，只要不超过上限，就允许通过
+    function testTransfer_AfterBorrow_PartialWithSafeyMagin_Succeed() public {
+        // moonwell 协议的抵押率为 0.8
+        _createBorrowingPosition(1000e18, 400e18);  // 抵押 1000， 借款 400 （liquidity = 400）
+        
+
+        // q - 为什么这里要用二分法找到最大可赎回数量
+        // a - getHypotheticalAccountLiquidity 只能获取 shortfall 的值
+        uint256 maxSafeMTokens = _maxRedeemableSafe(Alice);
+        assertGt(maxSafeMTokens, 0, "should have no-zero safetransable amount");
+
+        uint256 Amount = maxSafeMTokens / 2;   // 取一半，防止超出边界
+
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+        uint256 BorrowBefore = mBorrow.borrowBalanceStored(Alice);
+
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Bob, Amount);   // 稍后替换成 AliceBefore
+        assertTrue(ok, "Transfer should be succeed");
+
+        // 断言状态发生改变
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore - Amount, "Alice's balance should change");
+        assertEq(mCollateral.balanceOf(Bob), BobBefore + Amount, "Bob should get the transfer");
+        assertEq(mBorrow.borrowBalanceStored(Alice), BorrowBefore, "Alice's borrow shouldn't change");
+
+        // 断言状态发生改变
+        (uint256 err, uint256 liq, uint256 shortfall) = comptroller.getAccountLiquidity(Alice);
+        assertEq(err, 0, "Transfer should succeed");
+        assertGt(liq, 0, "After transfer should still have liquidity");       // q - transfer 之后流动性不应该减少吗
+        assertEq(shortfall, 0, "borrow amount is not overflow so shortfall should be 0");
 
     }
+
+    // 二分发找到最大可赎回数量
+    function _maxRedeemableSafe(address who) internal view returns (uint256) {
+        uint256 lo = 0;
+        uint256 hi = mCollateral.balanceOf(who);
+
+        // 二分：找到最大的 x 使得 redeem x 后 shortfall == 0
+        while (lo < hi) {
+            uint256 mid = (lo + hi + 1) / 2; // 向上取整，避免死循环
+            (uint err, , uint shortfall) = comptroller.getHypotheticalAccountLiquidity(
+                who,
+                address(mCollateral),
+                mid,
+                0
+            );
+            if (err == 0 && shortfall == 0) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return lo;
+    }
+
 
     // 构建一个：已进入市场 + 已借款 的账户
     function _createBorrowingPosition(

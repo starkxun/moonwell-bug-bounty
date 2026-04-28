@@ -166,8 +166,35 @@ contract TransferRiskCheckUnitTest is Test {
         assertEq(err, 0, "Transfer should succeed");
         assertGt(liq, 0, "After transfer should still have liquidity");       // q - transfer 之后流动性不应该减少吗
         assertEq(shortfall, 0, "borrow amount is not overflow so shortfall should be 0");
-
     }
+
+    // 边界测试，maxSafeMTokens + 1 必须失败，maxSafe 通过
+    function testTransfer_AfterBorrow_BoundryIsTight_MaxOkPlusOneFails() public {
+        _createBorrowingPosition(1000e18, 800e18); //  抵押 1000， 借满 800， liquidity = 0
+
+        uint256 maxSafeTokens = _maxRedeemableSafe(Alice);
+        
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+        
+        // 尝试转账 maxSafeTokens + 1
+        vm.prank(Alice);
+        bool okOver = mCollateral.transfer(Bob, maxSafeTokens + 1);     // q - 在这里不久应该失败revert吗，但是只是返回失败值？ 
+        assertFalse(okOver, "Plus one trasfer should be failed");
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore, "Alice's balance shouldn't be change");
+        assertEq(mCollateral.balanceOf(Bob), BobBefore, "Bob's balance shouldn't be change");
+
+        // 如果 maxSafe = 0 则表示 1 wei 都不让转，跳过该分支
+        if(maxSafeTokens > 0) {
+            vm.prank(Alice);
+            bool ok = mCollateral.transfer(Bob, maxSafeTokens);
+            assertTrue(ok, "Transfer should be succeed");
+            assertEq(mCollateral.balanceOf(Alice), AliceBefore - maxSafeTokens);
+            assertEq(mCollateral.balanceOf(Bob), BobBefore + maxSafeTokens);
+        }
+
+    } 
+
 
     // 二分发找到最大可赎回数量
     function _maxRedeemableSafe(address who) internal view returns (uint256) {

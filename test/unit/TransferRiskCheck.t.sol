@@ -228,7 +228,7 @@ contract TransferRiskCheckUnitTest is Test {
      *                                边角分支测试                                * 
      ******************************************************************************/
 
-    // 从 src => dst 的转账失败，被内部拦截
+    // 从 src => dst 的转账失败，被内部拦截(出发 BAD_INPUT)
     function testTransfer_ToSelf_Fails() public {
         _supplyCollateral(Alice, 1000e18);
 
@@ -244,6 +244,35 @@ contract TransferRiskCheckUnitTest is Test {
 
     }
 
+    // 转账为 0 时应成功
+    // 符合常理吗？不应该拒绝吗？还是前端会阻止这个操作？
+    function testTransfer_ZeroAmoumt_Succeed() public {
+        _supplyCollateral(Alice, 1000e18);
+        
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+        assertGt(AliceBefore, 0, "Alice should hold mTokens");
+
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Bob, 0);
+        assertTrue(ok, "zero amount transfer succeed");
+        
+        // 状态检查
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore);
+        assertEq(mCollateral.balanceOf(Bob), BobBefore);
+    }
+
+    // transferGuardianPaused = true 时，所有 transfer 都会 revert
+    function testTransfer_WhenPaused_Reverts() public {
+        _supplyCollateral(Alice, 1000e18);
+
+        // 测试合约部署了 Comptroller，所以为 admin
+        assertTrue(comptroller._setTransferPaused(true), "should set transfer state succeed");
+
+        vm.prank(Alice);
+        vm.expectRevert(bytes("transfer is paused"));
+        mCollateral.transfer(Bob, 1);
+    }
 
 
 

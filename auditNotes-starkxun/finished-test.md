@@ -18,3 +18,5 @@
 * [X] 有借款的情况下，转出 safeTokenAmount + 1 必须失败，safeTokenAmount 成功
 * [X] 有借款没有流动性的情况下，转出极小的 抵押品数量，会成功
 * [X] 转账给自己必须失败
+* [X] 转账为 0 时成功
+* [X] transferGuardianPaused = true 时，所有 transfer 都会 revert

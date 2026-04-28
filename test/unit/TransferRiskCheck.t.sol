@@ -197,6 +197,7 @@ contract TransferRiskCheckUnitTest is Test {
 
     // 粉尘测试，liquidity = 0 时，单笔极小 mToken （1 wei） 由于整数截断仍能通过
     // threshold: 零界点
+    // q - 该测试成立的话，是否会造成资金损失呢？ -> Alice 转账后 shortfall > 0, 导致被清算？ 或者是否可以取回抵押品？
     function testTransfer_AfterBorrow_DustBelowRoundingThreshold_PassesDueToRounding() public {
         _createBorrowingPosition(1000e18, 800e18);  // liquidity = 0
 
@@ -212,8 +213,9 @@ contract TransferRiskCheckUnitTest is Test {
         // 尝试极小额度转账
         vm.prank(Alice);
         bool ok = mCollateral.transfer(Bob, 1);
-        assertTrue(ok, "Transfer should succeed");
-        
+        assertTrue(ok, "Current behavior: 1 wei transfer slips through due to truncation");
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore - 1, "Alice debited by 1 wei");
+        assertEq(mCollateral.balanceOf(Bob), BobBefore + 1, "Bob credited by 1 wei");
 
     }
     

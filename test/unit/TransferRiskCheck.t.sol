@@ -195,6 +195,29 @@ contract TransferRiskCheckUnitTest is Test {
 
     } 
 
+    // 粉尘测试，liquidity = 0 时，单笔极小 mToken （1 wei） 由于整数截断仍能通过
+    // threshold: 零界点
+    function testTransfer_AfterBorrow_DustBelowRoundingThreshold_PassesDueToRounding() public {
+        _createBorrowingPosition(1000e18, 800e18);  // liquidity = 0
+
+        // 获取当前 shortfall
+        (uint256 err, uint256 liq, uint256 shortfall) = comptroller.getAccountLiquidity(Alice);
+        assertEq(liq, 0, "liquidity should be 0");
+        assertEq(shortfall, 0 ,"shortfall should be 0");
+
+        // 转账前的状态
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+
+        // 尝试极小额度转账
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Bob, 1);
+        assertTrue(ok, "Transfer should succeed");
+        
+
+    }
+    
+
 
     // 二分发找到最大可赎回数量
     function _maxRedeemableSafe(address who) internal view returns (uint256) {

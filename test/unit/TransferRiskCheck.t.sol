@@ -91,8 +91,6 @@ contract TransferRiskCheckUnitTest is Test {
     }
 
 
-
-    
     // 用户没有借款时候，转出全部 mToken 应当成功
     function testTransfer_NoBorrow_FullTransferSucceed() public {
         uint256 deposit = 1_000e18;
@@ -111,6 +109,56 @@ contract TransferRiskCheckUnitTest is Test {
         assertEq(mCollateral.balanceOf(Bob), AliceBefore + BobBefore, "Bob receives all");
 
     }
+
+    // 有借款时转出抵押品，必须失败
+    function testTransfer_AfterBorrow_FullTransferFails_StateUnchanged() public {
+        _createBorrowingPosition(1000e18, 600e18);
+        
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+        uint256 BorrowBefore = mBorrow.borrowBalanceStored(Alice);  // 当前的债务
+
+        // 尝试转账，应当失败
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Bob, AliceBefore);
+        assertFalse(ok, "Transfer shoud be failed");
+
+        // 断言状态未发生改变
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore, "Alice's balance shoudn't be change");
+        assertEq(mCollateral.balanceOf(Bob), BobBefore, "Bob's balance shoudn't be change");
+        assertEq(mBorrow.borrowBalanceStored(Alice), BorrowBefore, "Alice's borrowBalance shoudn't be change");
+
+        // 断言账户流动性未发生改变
+        (uint256 err, uint256 liq, uint256 shortfall) = comptroller.getAccountLiquidity(Alice);
+        assertEq(err, 0, "liquidity query ok");
+        assertGt(liq, 0, "liquidity should be positive");
+        assertEq(shortfall, 0 ,"shortfall should be 0 after transfer be reject");
+
+    }
+
+    // 构建一个：已进入市场 + 已借款 的账户
+    function _createBorrowingPosition(
+        uint256 collateralAmount,
+        uint256 borrowAmount
+    ) internal {
+        // 先给 借款 账户 mint 
+        // 授权 抵押品市场 使用
+        // 进入市场
+
+        mCollateralUnderlying.mint(Alice, collateralAmount);
+        vm.startPrank(Alice);
+        mCollateralUnderlying.approve(address(mCollateral), collateralAmount);
+        assertEq(mCollateral.mint(collateralAmount), 0 , "Alice supply failed");
+
+        address[] memory markets = new address[](1);
+        markets[0] = address(mCollateral);
+        comptroller.enterMarkets(markets);
+        
+        assertEq(mBorrow.borrow(borrowAmount), 0 , "Alice Borrow failed");
+        vm.stopPrank();
+
+    }
+
 
     
     // 给借款市场注入资金，让 借款交易 有底层资产可拿

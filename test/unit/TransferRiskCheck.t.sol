@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.19;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {Comptroller} from "@protocol/Comptroller.sol";
 import {InterestRateModel} from "@protocol/irm/InterestRateModel.sol";
 import {WhitePaperInterestRateModel} from "@protocol/irm/WhitePaperInterestRateModel.sol";
@@ -274,6 +274,24 @@ contract TransferRiskCheckUnitTest is Test {
         mCollateral.transfer(Bob, 1);
     }
 
+
+    // audit - 转账给 address(0) 时，资产会被永久锁死
+    function testTransfer_ToZeroAddress_LocksToken_AuditObservation() public {
+        _supplyCollateral(Alice, 100e18);
+
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);     // q - 这里获取的是 Alice 的可用流动性？
+        uint256 zeroAddressBefore = mCollateral.balanceOf(address(0));
+        uint256 totalSupplyBefore = mCollateral.totalSupply();
+        
+        vm.prank(Alice);
+        (bool ok) = mCollateral.transfer(address(0), AliceBefore);
+        
+        assertTrue(ok, "Transfer succeed");
+        assertEq(mCollateral.balanceOf(Alice), 0, "Alice's balance should be 0");
+        assertEq(mCollateral.balanceOf(address(0)), zeroAddressBefore + AliceBefore);
+        assertEq(mCollateral.totalSupply(), totalSupplyBefore, "totalSupply will not change, mToken is lost");
+
+    }
 
 
     // 二分发找到最大可赎回数量

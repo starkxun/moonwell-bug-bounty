@@ -293,6 +293,24 @@ contract TransferRiskCheckUnitTest is Test {
 
     }
 
+    // 边界测试：Alice 仅有 1 wei， 转出后余额应该归零
+    function testTransfer_TransferOneWei_Succeed() public {
+        
+        // 用最小 underlying 单位让 Alice 获得极少 mToken
+        // q - mToken 数 = underlying * 1e18 / exchangeRate；exchangeRate=2e16 → 1 underlying ≈ 50 mToken
+        _supplyCollateral(Alice, 1);
+        
+        uint256 AliceBeforeDust = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+
+        vm.prank(Alice);
+        bool ok = mCollateral.transfer(Bob, AliceBeforeDust);
+        assertTrue(ok, "Transfer should be succeed");
+        assertEq(mCollateral.balanceOf(Alice), 0, "Alice's balance should be 0");
+        assertEq(mCollateral.balanceOf(Bob), AliceBeforeDust, "Bob's balance should be 1");
+
+    }
+
 
     // 二分发找到最大可赎回数量
     function _maxRedeemableSafe(address who) internal view returns (uint256) {

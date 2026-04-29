@@ -20,6 +20,7 @@
 * [X] 转账给自己必须失败
 * [X] 转账为 0 时成功
 * [X] 转账给 `address(0)` 时通过，资金丢失锁死
+* [X] 转账 1 wei 的极端情况必须成功
 * [X] transferGuardianPaused = true 时，所有 transfer 都会 revert
 
 发现的异常点：

@@ -97,7 +97,7 @@ contract PauseCapMatrixUintTest is Test {
     }
 
     /****************************************************************************** 
-     *                                   主测试 mint                              * 
+     *                                   主测试 mint pause                        * 
      ******************************************************************************/
 
     // mint: Pause -> mint: Revert
@@ -135,6 +135,54 @@ contract PauseCapMatrixUintTest is Test {
     }
 
 
+    /****************************************************************************** 
+     *                            主测试 Borrow Pause                             * 
+     ******************************************************************************/
+
+    // Borrow 暂停， borrow 必须 revert
+    function testBorrow_BorrowPaused_BorrowRevert() public {
+        _supplyCollateral(Alice, 100e18);
+        _enterMarkets(Alice, address(mCollateral));      // q - 对 enter market 的逻辑没理解，是 user 进入 market ？ 为什么是 mCollateral 而不是 mBorrow？
+
+        // 设置 borrow 暂停
+        assertTrue(comptroller._setBorrowPaused(mBorrow, true), "set mBorrow paused");
+        
+        // 尝试借款，revert
+        vm.prank(Alice);
+        vm.expectRevert(bytes("borrow is paused"));
+        mBorrow.borrow(100e18);
+
+    }
+
+    // borrow 暂停时，repay 必须仍可执行
+    function testBorrowPaused_RepayStillWork() public {
+        // 创建一个已进入 market 并产生 借款 的环境
+        _createBorrowingPosition(1000e18, 400e18);     // liquidity = 400
+
+        // 暂停 borrow
+        bool ok = comptroller._setBorrowPaused(mBorrow, true);
+        assertTrue(ok, "set borrow pause failed");
+
+        // 准备偿还金
+        uint256 repayAmount = 100e18;
+        // q - 这里是 mBorrowUnderlying 直接给 Alice mint 金额
+        // 现时中应该需要 Alice 自己去兑换代币把?
+        mBorrowUnderlying.mint(Alice, repayAmount);
+
+        uint256 AliceBeforeDebt = mBorrow.borrowBalanceStored(Alice);
+
+        // 授权给 mBorrow 扣款
+        vm.startPrank(Alice);
+        mBorrowUnderlying.approve(address(mBorrow), repayAmount);
+        assertEq(mBorrow.repayBorrow(repayAmount), 0, "Alice repay failed");
+        vm.stopPrank();
+
+        uint256 AliceAfterDebt = mBorrow.borrowBalanceStored(Alice);
+
+        assertEq(AliceBeforeDebt - AliceAfterDebt, repayAmount, "Alice's debt should debt");
+
+
+    }
 
 
 
@@ -165,6 +213,28 @@ contract PauseCapMatrixUintTest is Test {
         markets[0] = market;
         vm.prank(user);                         // q - 这里用 user 的地址干啥
         comptroller.enterMarkets(markets);
+    }
+
+    // 创建一个已进入市场，已借款的账户
+    function _createBorrowingPosition(
+        uint256 collateralAmount,
+        uint256 borrowAmount
+    ) public {
+        // 先给 Alice 打点钱，投入抵押品市场
+        mCollateralUnderlying.mint(Alice, collateralAmount);
+        vm.startPrank(Alice);
+        mCollateralUnderlying.approve(address(mCollateral), collateralAmount);
+        assertEq(mCollateral.mint(collateralAmount), 0, "Alice supply failed");
+        
+        // 进入市场
+        address[] memory markets = new address[](1);
+        markets[0] = address(mCollateral);
+        comptroller.enterMarkets(markets);  // q - 这里 comptroller 不是 admin 才能调用吗？
+
+
+        // 借款
+        assertEq(mBorrow.borrow(borrowAmount), 0, "Alice borrow faild");
+        vm.stopPrank();
     }
 
 

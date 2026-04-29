@@ -2,7 +2,7 @@
 
 ### **清算相关：**
 
-测试文件路径：
+测试文件路径：test/unit/LiquidationBoundaryMath.t.sol
 
 - [X] 正常清算和超出清算值的异常情况
 - [X] 验证清算出来的 seizeToken 是向下取整并且是收紧的

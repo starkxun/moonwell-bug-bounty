@@ -36,7 +36,7 @@ contract ComptrollerVXStorage is UnitrollerAdminStorage {
     /**
      * @notice Multiplier used to calculate the maximum repayAmount when liquidating a borrow
      */
-    uint public closeFactorMantissa;
+    uint public closeFactorMantissa;    //清算因子
 
     /**
      * @notice Multiplier representing the discount on collateral that a liquidator receives

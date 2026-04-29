@@ -256,7 +256,7 @@ contract LiquidationBoundaryMathUintTest is Test {
         vm.stopPrank();
 
         // 之前价格是 1e18
-        // 现在降低抵押品价格，是借款者负债超过贷款额度
+        // 现在降低抵押品价格，让借款者负债超过贷款额度
         oracle.setUnderlyingPrice(mCollateral, 5e17);       // 跌价后抵押 $500 -> 新的借款上限: 400
         // q - borrower 是借款者，可以被用作 getAccountLiquidity 的参数吗？
         // a - 可以，getAccountLiquidity 查询任意账户的流动性

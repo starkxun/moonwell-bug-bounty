@@ -180,6 +180,24 @@ contract PauseCapMatrixUintTest is Test {
         uint256 AliceAfterDebt = mBorrow.borrowBalanceStored(Alice);
 
         assertEq(AliceBeforeDebt - AliceAfterDebt, repayAmount, "Alice's debt should debt");
+    }
+
+    // borrow 暂停时，Liquidation 必须仍可执行
+    function testBorrowPaused_LiquidationStillWork() public {
+        // 创建一个已进入 market 且有借款记录的场景
+        createShortfallPosition(1_000e18, 500e18);
+
+        // borrow 暂停
+        assertTrue(comptroller._setBorrowPaused(mBorrow, true), "Pause borrow failed");
+        
+        // 获取需要偿还的本金和利息
+        uint256 AliceBeforeDebt = mBorrow.borrowBalanceStored(Alice);
+        // 乘以清算因子，计算最大清算额度
+        uint256 maxClose = (AliceBeforeDebt * comptroller.closeFactorMantissa) / 1e18;
+        assertGt(maxClose, 0, "maxClose should be positive");
+        
+        // Borrow 市场注入资金， 执行清算
+        _fundAndApproveLiquidator; 
 
 
     }
@@ -231,12 +249,43 @@ contract PauseCapMatrixUintTest is Test {
         markets[0] = address(mCollateral);
         comptroller.enterMarkets(markets);  // q - 这里 comptroller 不是 admin 才能调用吗？
 
-
         // 借款
         assertEq(mBorrow.borrow(borrowAmount), 0, "Alice borrow faild");
         vm.stopPrank();
     }
 
+    // 创建一个 “先健康，后资不抵债” 的账户
+    function createShortfallPosition(
+        uint256 collateralAmount,
+        uint256 borrowAmount 
+    ) public {
+        
+        // 给 Alice 打款，Alice 供应给抵押市场
+        mCollateralUnderlying.mint(Alice, collateralAmount);
+        vm.startPrank(Alice);
+        mCollateralUnderlying.approve(address(mCollateral), collateralAmount);
+        assertEq(mCollateral.mint(collateralAmount), 0, "Alice supply failed");
+        
+        // 进入市场
+        address[] memory markets = new address[](1);
+        markets[0] = address(mCollateral);
+        comptroller.enterMarkets(markets);
+
+        // 借款
+        assertEq(mBorrow.borrow(borrowAmount), 0, "Alice borrow failed");
+        vm.stopPrank();
+
+        // 修改价格，之前是 1e18 -> 5e17(折半)
+        // 之前借款 1000， 现在新的借款上限 1000 -> 500
+        // 实际可借 500 * 0.8 = 400（）
+        // shortfall = 100 (可被清算)
+        oracle.setUnderlyingPrice(mCollateral, 5e17);
+        (uint256 err, uint256 liq, uint256 shortfall) = comptroller.getAccountLiquidity(Alice);
+        
+        assertEq(err, 0, "query liquidity failed");
+        assertEq(liq, 0, "liquidity should be 0 after price drop");
+        assertGt(shortfall, 0, "shortfall should be positive");
+    }
 
 
 }

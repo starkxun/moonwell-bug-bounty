@@ -39,3 +39,5 @@
 * [X] Seize 暂停不应该影响 正常用户的 transfer
 * [X] transfer 暂停后，transfer 操作必须 revert
 * [X] transfer 暂停后，不影响 mint / borrow / repay
+* [X] 达到 supplyCap 上限后， 不允许再 mint
+* [X] SupplyCap 达到上限不应该影响 redeem 和 borrow

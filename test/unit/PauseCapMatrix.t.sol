@@ -319,7 +319,44 @@ contract PauseCapMatrixUintTest is Test {
         vm.stopPrank();
     }
 
+/****************************************************************************** 
+ *                             主测试 Supply Cap                              * 
+ ******************************************************************************/
 
+    // supplyCap 达上限 → mint revert("market supply cap reached")
+    function testSupplyCap_BlockMintAtBoundary() public {
+        _supplyCollateral(Bob, 500e18);     // moonwell 默认 supplyCap 为 0， 表示无上限
+
+        // 修改supplyCap
+        // 合约用 require(nextTotalSupplies < supplyCap)（严格小于）
+        // 所以 nextTotal == cap 也会 revert
+        _setSupplyCap(mCollateral, 600e18);
+
+        // Alice 继续供应
+        mCollateralUnderlying.mint(Alice, 100e18);
+        vm.startPrank(Alice);
+        mCollateralUnderlying.approve(address(mCollateral), 100e18);
+        vm.expectRevert(bytes("market supply cap reached"));
+        mCollateral.mint(100e18);
+        vm.stopPrank();
+    }
+
+    // SupplyCap 达上限不应该影响 reedem 和 borrow
+    function testSupplyCap_RedeemAndBorrowStillWork() public {
+        _supplyCollateral(Alice, 600e18);
+        _enterMarkets(Alice, address(mCollateral));
+        
+        _setSupplyCap(mCollateral, 600e18); // 这里会报错吗？ -> 供应量达上限在去设置上限不会报错
+
+        // 尝试 redeem
+        vm.prank(Alice);
+        assertEq(mCollateral.redeem(100e18), 0, "Alice redeem failed");
+        
+        // 尝试 borrow
+        vm.prank(Alice);
+        assertEq(mCollateral.borrow(100e18), 0, "Alice borrow failed");
+
+    }
 
 
     // 给借款市场注入资金，让 借款交易 有底层资产可拿
@@ -411,6 +448,17 @@ contract PauseCapMatrixUintTest is Test {
         mBorrowUnderlying.mint(Liquiditor, repayAmount);
         vm.prank(Liquiditor);
         mBorrowUnderlying.approve(address(mBorrow), repayAmount);
+    }
+
+    function _setSupplyCap(MErc20Immutable market, uint256 cap) internal {
+        // q - 这里为什么要用数组？
+        MToken[] memory ms = new MToken[](1);
+        uint256[] memory caps = new uint256[](1);
+
+        ms[0] = market;
+        caps[0] = cap;
+
+        comptroller._setMarketSupplyCaps(ms, caps);
     }
 
 

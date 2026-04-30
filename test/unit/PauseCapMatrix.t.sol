@@ -215,6 +215,60 @@ contract PauseCapMatrixUintTest is Test {
     }
 
 
+   /****************************************************************************** 
+    *                             主测试 Seize Pause                             * 
+    ******************************************************************************/
+
+    // Seize 暂停，清算的 Seize 步骤 revert， 整个清算回滚
+    function testSeizePaused_LiquiditeBlocked() public {
+        createShortfallPosition(1000e18, 700e18);
+        
+        // Seize 暂停
+        assertTrue(comptroller._setSeizePaused(true), "Seize pause failed");
+
+        // Alice 的债务
+        uint256 AliceBeforeDebt = mBorrow.borrowBalanceStored(Alice);
+        // 计算清算上限
+        uint256 maxClose = (AliceBeforeDebt * comptroller.closeFactorMantissa())/ 1e18;      // q - 为什么要除以 1e18
+        assertGt(maxClose, 0, "maxClose should be positive");
+
+        // Borrow 市场注入资金，执行清算
+        _fundAndApproveLiquidator(maxClose);
+
+        uint256 LiquiditorBefore = mCollateral.balanceOf(Liquiditor);
+
+        // 执行清算
+        vm.startPrank(Liquiditor);
+        vm.expectRevert(bytes("seize is paused"));
+        uint256 AliceAfterDebt = mBorrow.liquidateBorrow(Alice, maxClose, mCollateral);
+        vm.stopPrank();
+        
+        // 断言状态未发生改变
+        assertEq(mBorrow.borrowBalanceStored(Alice),  AliceBeforeDebt, "Alice's debt should not change");
+    }
+
+    // Seize 暂停不应该影响 正常用户的 transfer
+    function testSeizePaused_NormalTransferStillWork() public {
+        _supplyCollateral(Alice, 1000e18);
+
+        comptroller._setSeizePaused(true);
+
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+
+        // 转账
+        vm.prank(Alice);
+        assertTrue(mCollateral.transfer(Bob, 100e18), "Transfer failed");
+
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore - 100e18, "Alice tranfer failed");
+        assertEq(mCollateral.balanceOf(Bob), BobBefore + 100e18, "Bob receive failed");    
+
+    }
+
+
+
+
+
 
     // 给借款市场注入资金，让 借款交易 有底层资产可拿
     function _seedBorrowMarketCash() internal {

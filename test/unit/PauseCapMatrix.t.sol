@@ -193,12 +193,24 @@ contract PauseCapMatrixUintTest is Test {
         // 获取需要偿还的本金和利息
         uint256 AliceBeforeDebt = mBorrow.borrowBalanceStored(Alice);
         // 乘以清算因子，计算最大清算额度
-        uint256 maxClose = (AliceBeforeDebt * comptroller.closeFactorMantissa) / 1e18;
-        assertGt(maxClose, 0, "maxClose should be positive");
+        uint256 maxClose = (AliceBeforeDebt * comptroller.closeFactorMantissa()) / 1e18;
+        assertGt(maxClose, 0, "maxClose should be positive");   // 2.5e20
         
-        // Borrow 市场注入资金， 执行清算
-        _fundAndApproveLiquidator; 
+        uint256 LiquiditorBefore =  mCollateral.balanceOf(Liquiditor);
 
+        // Borrow 市场注入资金， 执行清算
+        _fundAndApproveLiquidator(maxClose);
+
+        // 执行清算
+        vm.prank(Liquiditor);
+        assertEq(mBorrow.liquidateBorrow(Alice, maxClose, mCollateral), 0, "Liquidate failed");
+        
+        // 清算后 Alice 的债务
+        uint256 AliceAfterDebt = mBorrow.borrowBalanceStored(Alice);
+
+        assertEq(AliceBeforeDebt - AliceAfterDebt, maxClose, "liquidite not normal");
+        // 这里不用 assertEq， 是因为还需要给协议一些 抵押品， 并不是全部给到 清算者
+        assertGt(mCollateral.balanceOf(Liquiditor), LiquiditorBefore , "Liquititor's balance is not normal");
 
     }
 
@@ -285,6 +297,14 @@ contract PauseCapMatrixUintTest is Test {
         assertEq(err, 0, "query liquidity failed");
         assertEq(liq, 0, "liquidity should be 0 after price drop");
         assertGt(shortfall, 0, "shortfall should be positive");
+    }
+
+    // 给借款市场注入资金，后续参与清算
+    // 若 mBorrow 市场没有足够资金，则会导致失败
+    function _fundAndApproveLiquidator(uint256 repayAmount) public {
+        mBorrowUnderlying.mint(Liquiditor, repayAmount);
+        vm.prank(Liquiditor);
+        mBorrowUnderlying.approve(address(mBorrow), repayAmount);
     }
 
 

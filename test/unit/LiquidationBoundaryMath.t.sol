@@ -269,7 +269,7 @@ contract LiquidationBoundaryMathUintTest is Test {
     }
 
     // q - 这个函数的作用是什么？
-    // 给结款市场注入资金，后续参与清算
+    // 给借款市场注入资金，后续参与清算
     // 若 mBorrow 市场没有足够资金，则会导致失败
     function _fundAndApprovalLiquidator(uint256 repayAmount) internal {
         borrowUnderlying.mint(liquidator, repayAmount);

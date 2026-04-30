@@ -34,3 +34,4 @@
 
 * [X] mint 暂停后尝试 mint 必须失败
 * [X] mint暂停后不影响 redeem 和 borrow 操作
+* [X] borrow 暂停时，Liquidation 必须仍可执行

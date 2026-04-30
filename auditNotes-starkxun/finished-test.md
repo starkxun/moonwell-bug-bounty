@@ -37,3 +37,5 @@
 * [X] borrow 暂停时，Liquidation 必须仍可执行
 * [X] Seize 暂停，清算的 Seize 步骤 revert， 整个清算回滚
 * [X] Seize 暂停不应该影响 正常用户的 transfer
+* [X] transfer 暂停后，transfer 操作必须 revert
+* [X] transfer 暂停后，不影响 mint / borrow / repay

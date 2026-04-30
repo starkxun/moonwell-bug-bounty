@@ -266,6 +266,58 @@ contract PauseCapMatrixUintTest is Test {
     }
 
 
+/****************************************************************************** 
+ *                           主测试 Transfer Pause                            * 
+ ******************************************************************************/
+
+    // transfer 暂停后，transfer 操作必须 revert
+    function testTransferPaused_TransferBlocked() public {
+        _supplyCollateral(Alice, 1000e18);
+        
+        // 暂停 Transfer
+        assertTrue(comptroller._setTransferPaused(true), "Set tranfer pause failed");
+        
+        uint256 AliceBefore = mCollateral.balanceOf(Alice);
+        uint256 BobBefore = mCollateral.balanceOf(Bob);
+
+        // 尝试转账
+        vm.prank(Alice);
+        vm.expectRevert(bytes("transfer is paused"));
+        mCollateral.transfer(Bob, 100e18);
+
+        // 断言状态未发生改变
+        assertEq(mCollateral.balanceOf(Alice), AliceBefore);
+        assertEq(mCollateral.balanceOf(Bob), BobBefore);
+    }
+
+
+    // transfer 暂停后，不影响 mint / borrow / repay
+    function testTransferPaused_OtherActionStillWork() public {
+        _createBorrowingPosition(1000e18, 400e18);
+
+        // 暂停 Transfer
+        assertTrue(comptroller._setTransferPaused(true), "Set transfer pause failed");
+
+        // 尝试mint
+        mCollateralUnderlying.mint(Alice, 100e18);
+        vm.startPrank(Alice);
+        mCollateralUnderlying.approve(address(mCollateral), 100e18);
+        assertEq(mCollateral.mint(100e18), 0, "Alice supply failed");
+        vm.stopPrank();
+
+        // 尝试 borrow
+        vm.prank(Alice);
+        assertEq(mBorrow.borrow(100e18), 0, "Alice borrow failed");
+
+        // 尝试 repay
+        // Alice 的债务：
+        uint256 AliceBeforeDebt = mBorrow.borrowBalanceStored(Alice);
+
+        vm.startPrank(Alice);
+        mBorrowUnderlying.approve(address(mBorrow), AliceBeforeDebt);
+        assertEq(mBorrow.repayBorrow(AliceBeforeDebt), 0, "Alice repay failed");
+        vm.stopPrank();
+    }
 
 
 

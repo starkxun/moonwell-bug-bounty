@@ -41,3 +41,4 @@
 * [X] transfer 暂停后，不影响 mint / borrow / repay
 * [X] 达到 supplyCap 上限后， 不允许再 mint
 * [X] SupplyCap 达到上限不应该影响 redeem 和 borrow
+* [X] Borrow Cap 达到后，所有 borrow 操作 revert

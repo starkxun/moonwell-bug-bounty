@@ -358,6 +358,22 @@ contract PauseCapMatrixUintTest is Test {
 
     }
 
+/****************************************************************************** 
+ *                             主测试 Borrow Cap                              * 
+ ******************************************************************************/
+    // Borrow Cap 达到后，所有 borrow 操作 revert
+    function testBorrowCap_BlocksBorrowBoundry() public {
+        _createBorrowingPosition(1000e18, 400e18);
+
+        _setBorrowCap(mBorrow, 400e18);
+
+        // 尝试借款
+        vm.prank(Alice);
+        vm.expectRevert(bytes("market borrow cap reached"));
+        mBorrow.borrow(100e18);
+    }
+
+
 
     // 给借款市场注入资金，让 借款交易 有底层资产可拿
     function _seedBorrowMarketCash() internal {
@@ -459,6 +475,16 @@ contract PauseCapMatrixUintTest is Test {
         caps[0] = cap;
 
         comptroller._setMarketSupplyCaps(ms, caps);
+    }
+
+    // 设置借款上限
+    function _setBorrowCap(MErc20Immutable market, uint256 cap) internal {
+        MToken[] memory ms = new MToken[](1);
+        uint256[] memory caps = new  uint256[](1);
+        ms[0] = market;
+        caps[0] = cap;
+        comptroller._setMarketBorrowCaps(ms, caps);
+
     }
 
 

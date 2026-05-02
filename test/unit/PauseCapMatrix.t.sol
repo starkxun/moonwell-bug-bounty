@@ -373,6 +373,38 @@ contract PauseCapMatrixUintTest is Test {
         mBorrow.borrow(100e18);
     }
 
+    // Borrow Cap 达上限后， 不能影响 repay 和 liquidate
+    function testBorrowCap_RepayAndLiquidateStillWork() public {
+        _createBorrowingPosition(1000e18, 500e18);
+        _setBorrowCap(mBorrow, 500e18);
+
+
+        mBorrowUnderlying.mint(Alice, 50e18);
+
+        // 继续 repay
+        vm.startPrank(Alice);
+        mBorrowUnderlying.approve(address(mBorrow), 50e18);
+        assertEq(mBorrow.repayBorrow(50e18), 0, "Alice repay failed");
+        vm.stopPrank();
+
+        uint256 AliceBeforeDebt = mBorrow.borrowBalanceStored(Alice);
+        uint256 AliceBeforeBalance = mCollateral.balanceOf(Alice);
+        uint256 LiquiditorBefore = mCollateral.balanceOf(Liquiditor);
+
+        // 继续 Liquidate
+        // 制造 shortfall
+        oracle.setUnderlyingPrice(mCollateral, 5e17);
+
+        // 计算最大清算上限
+        uint256 maxLiq = (AliceBeforeDebt * comptroller.closeFactorMantissa()) / 1e18;
+        _fundAndApproveLiquidator(maxLiq);
+        vm.startPrank(Liquiditor);
+        assertEq(mBorrow.liquidateBorrow(Alice, maxLiq, mCollateral), 0, "Liquidate Alice failed");
+        vm.stopPrank();
+
+
+    }
+
 
 
     // 给借款市场注入资金，让 借款交易 有底层资产可拿

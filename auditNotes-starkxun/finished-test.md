@@ -44,3 +44,8 @@
 * [X] Borrow Cap 达到上限后，所有 borrow 操作 revert
 * [X] Borrow Cap 达到上限后，不影响 repay 和 liquidate 操作
 * [X] 暂停守卫的权限边界,只能执行暂停,不能取消暂停
+
+### **利率模型:**
+
+reserveFactor 参数突变后的连续性.
+测试文件路径:

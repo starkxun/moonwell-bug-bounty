@@ -405,6 +405,28 @@ contract PauseCapMatrixUintTest is Test {
 
     }
 
+/****************************************************************************** 
+ *                          Pause Guardian 权限边界                           * 
+ ******************************************************************************/
+
+    function testPasueGuardian_CanPause_CannotUnpause() public {
+        assertEq(comptroller._setPauseGuardian(Guardian), 0, "Set pauseGuardian failed");
+
+        // Guardian 可以设置暂停
+        vm.prank(Guardian);
+        assertTrue(comptroller._setMintPaused(mCollateral,true), "pause mint failed");
+
+        // Guardian 不能取消暂停
+        vm.prank(Guardian);
+        vm.expectRevert(bytes("only admin can unpause"));
+        comptroller._setMintPaused(mCollateral, false);
+
+        // admin 可以取消暂停
+        assertFalse(comptroller._setMintPaused(mCollateral, false));
+        assertFalse(comptroller.mintGuardianPaused(address(mCollateral)));
+
+    }
+
 
 
     // 给借款市场注入资金，让 借款交易 有底层资产可拿

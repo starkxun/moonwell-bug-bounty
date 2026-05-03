@@ -1202,6 +1202,7 @@ contract Comptroller is
      */
     // q - 设置暂停守卫？
     // q - 这个有什么用？
+    // a - 设置一个地址成为暂停守卫,可以执行暂停操作,但是不能执行恢复操作
     function _setPauseGuardian(address newPauseGuardian) public returns (uint) {
         if (msg.sender != admin) {
             return

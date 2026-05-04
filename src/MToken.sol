@@ -2110,9 +2110,12 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
      * @param newInterestRateModel the new interest rate model to use
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
+    // 切换市场利率模型
     function _setInterestRateModel(
         InterestRateModel newInterestRateModel
     ) public override returns (uint) {
+        // 把上次清算到当前的利息全部更新
+        // totalBorrows, borrowIndex, totalReserves 等
         uint error = accrueInterest();
         if (error != uint(Error.NO_ERROR)) {
             // accrueInterest emits logs on errors, but on top of that we want to log the fact that an attempted change of interest rate model failed
@@ -2148,6 +2151,8 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         }
 
         // We fail gracefully unless market's block timestamp equals current block timestamp
+        // 保证 accureInterest() 已在当前区块把利息结算到最新状态
+        // 避免在不同区块/未结算状态下切换模型造成竞态或不一致
         if (accrualBlockTimestamp != getBlockTimestamp()) {
             return
                 fail(
@@ -2157,9 +2162,11 @@ abstract contract MToken is MTokenInterface, Exponential, TokenErrorReporter {
         }
 
         // Track the market's current interest rate model
+        // 保存旧模型,用于事件
         oldInterestRateModel = interestRateModel;
 
         // Ensure invoke newInterestRateModel.isInterestRateModel() returns true
+        // 防止把任意合约错误的设置为利率模型
         require(
             newInterestRateModel.isInterestRateModel(),
             "marker method returned false"

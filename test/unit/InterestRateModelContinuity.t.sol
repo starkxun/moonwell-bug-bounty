@@ -22,6 +22,8 @@ contract InterestRateModelContinuityUnitTest is Test {
     SimplePriceOracle internal oracle;
 
     // q - 这两个参数是什么意思?
+    // a - 低利率配置 和 高利率配置
+    // 用于测试切换市场利率模型 观察行为差异
     InterestRateModel internal irmLow;
     InterestRateModel internal irmHigh;
 
@@ -37,7 +39,9 @@ contract InterestRateModelContinuityUnitTest is Test {
     
     uint256 internal constant  INIT_EXCHANGE_RATE = 2e16;
     uint256 internal constant CF_COLLATERAL = 0.8e16;
-    uint256 internal constant SECOND_PER_YEAR = 31_536_000;     // q - 这个参数是干什么的?
+    // q - 这个参数是干什么的?
+    // a - 一年对应的秒数
+    uint256 internal constant SECOND_PER_YEAR = 31_536_000;
 
     // 初始借贷规模
     uint256 internal constant SUPPLIER_SEED = 1_000e18;
@@ -57,6 +61,7 @@ contract InterestRateModelContinuityUnitTest is Test {
         oracle      = new SimplePriceOracle();
 
         // q - 这两句是什么意思?
+        // a - 构造两个 WhitePaper 模型
         irmLow = new WhitePaperInterestRateModel(0.02e18, 0.20e18);  
         irmHigh = new WhitePaperInterestRateModel(0.10e18, 0.50e18);
 
@@ -112,13 +117,36 @@ contract InterestRateModelContinuityUnitTest is Test {
         comptroller.enterMarkets(markets);
         assertEq(mBorrow.borrow(ALICE_BORROW), 0);
         vm.stopPrank();
-
-
     }
 
+/****************************************************************************** 
+ *                              IRM 切换的连续性                              * 
+ ******************************************************************************/
 
+    function testSetIRM_NojumpAtSwitchInstant() public {
+        vm.warp(block.timestamp + 365 days);        // q - 这里推进时间干什么?
+        // a - 模拟时间流逝,让利息在这段时间内产生／累积
+        // 从而在切换模型前后能观测到借款余额、储备、borrowIndex 等是否有跳变或不连续的情况
 
+        // 过结算后的实时欠款
+        uint256 borrowBefore = mBorrow.borrowBalanceCurrent(Alice);
+        // q - 这两个值是什么?
+        // a - totalReserves()：协议当前累积的准备金（来自借款利息中分配到协议的那部分），表示协议可提取/记录的储备数量
+        // 全局的借款指数（累积因子），用于按时间把每个账户的本金放大以计算利息；随着利息结算，borrowIndex 会增加,
+        // 个人借款账户用 interestIndex 字段结合 borrowIndex 来计算应付利息
+        uint256 reservesBefore = mBorrow.totalReserves();
+        uint256 indexBefore = mBorrow.borrowIndex();
 
+        // 治理切换
+        assertEq(mBorrow._setInterestRateModel(irmHigh), 0, "Set irm should secceed");
+
+        uint256 borrowAfter = mBorrow.borrowBalanceCurrent(Alice);
+        uint256 reservesAfter = mBorrow.totalReserves();
+        uint256 indexAfter = mBorrow.borrowIndex();
+
+        // 借款利率本身已经反应新模型
+        assertEq(address(mBorrow.interestRateModel()), address(irmHigh), "new model installed");
+    }
 
 
 }

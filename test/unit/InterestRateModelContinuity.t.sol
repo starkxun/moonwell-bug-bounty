@@ -38,7 +38,8 @@ contract InterestRateModelContinuityUnitTest is Test {
     address internal NotAdmin;
     
     uint256 internal constant  INIT_EXCHANGE_RATE = 2e16;
-    uint256 internal constant CF_COLLATERAL = 0.8e16;
+    uint256 internal constant CF_COLLATERAL = 0.8e18;
+
     // q - 这个参数是干什么的?
     // a - 一年对应的秒数
     uint256 internal constant SECOND_PER_YEAR = 31_536_000;
@@ -122,7 +123,7 @@ contract InterestRateModelContinuityUnitTest is Test {
 /****************************************************************************** 
  *                              IRM 切换的连续性                              * 
  ******************************************************************************/
-
+    // 切换 IRM 后, 余额不应该跳变
     function testSetIRM_NojumpAtSwitchInstant() public {
         vm.warp(block.timestamp + 365 days);        // q - 这里推进时间干什么?
         // a - 模拟时间流逝,让利息在这段时间内产生／累积
@@ -146,6 +147,28 @@ contract InterestRateModelContinuityUnitTest is Test {
 
         // 借款利率本身已经反应新模型
         assertEq(address(mBorrow.interestRateModel()), address(irmHigh), "new model installed");
+    }
+
+    // 切换 IRM 后,下一段时间的累积应使用新模型(更高利率 -> 更大增量)
+    function testSetIRM_NewRateAppliesAfterSwitch() public {
+        vm.warp(block.timestamp + 365 days);
+        uint256 borrowAfterY1 = mBorrow.borrowBalanceCurrent(Alice);
+        uint256 deltaY1 = borrowAfterY1 - ALICE_BORROW;     // 过去一年的增量
+
+        // 切换利率模型
+        // 借款年化 ≈ 10% + 0.5 * 50% = 35% 年化
+        assertEq(mBorrow._setInterestRateModel(irmHigh), 0, "Set new Interest rate model failed");
+
+        // 在走一年,按新的利率模型来计算
+        vm.warp(block.timestamp + 365 days);
+        uint256 borrowAfterY2 = mBorrow.borrowBalanceCurrent(Alice);
+        uint256 deltaY2 = borrowAfterY2 - borrowAfterY1;
+
+        // 新模型在相同 utilization（~50%）下年化 35% > 旧 12%，因此第二段增量必须显著大于第一段
+        assertGt(deltaY2, deltaY1, "new IRM should produce large interest");
+
+        // 粗略量级检查：新增量至少是旧增量的 2 倍
+        assertGt(deltaY2, deltaY1 * 2, "delta ratio should reflect rate ratio (>2x)");
     }
 
 

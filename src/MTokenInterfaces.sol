@@ -44,6 +44,9 @@ contract MTokenStorage {
     uint public reserveFactorMantissa;
 
     /// @notice Block number that interest was last accrued at
+    // 是一次结算利息记录的时间戳
+    // 作用: 在每次 accrueInterest() 时，用当前时间减去 accrualBlockTimestamp 得到时间差（delta），
+    // 再按该时间差和当前利率计算利息增量，从而更新 borrowIndex、totalBorrows、totalReserves 等
     uint public accrualBlockTimestamp;
 
     /// @notice Accumulator of the total earned interest rate since the opening of the market

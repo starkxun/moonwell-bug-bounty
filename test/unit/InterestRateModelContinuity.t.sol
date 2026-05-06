@@ -201,4 +201,40 @@ contract InterestRateModelContinuityUnitTest is Test {
         assertGt(idx3, idx2);
     }
 
+    // 切换 IRM 时，记录的 accrualBlockTimestamp 应等于当前 block.timestamp
+    // 否则下一次 accrue 会把"本次切换之前的时间段"重复计入新 IRM
+    function testSetIRM_AccuralBlockTimestampAdvance() public {
+        vm.warp(block.timestamp + 100 days);
+
+        assertEq(mBorrow._setInterestRateModel(irmHigh), 0);
+
+        assertEq(mBorrow.accrualBlockTimestamp(), block.timestamp, "timestamp should be equal");
+    }
+
+/****************************************************************************** 
+ *                         ReserveFactor 切换的连续性                         * 
+ ******************************************************************************/
+
+    // 切换 reserveFactor 的那一刻，totalReserve 不应该跳变
+    function testSetReserveFactor_NoJumpAtSwitchInstant() public {
+        assertEq(mBorrow._setReserveFactor(0.10e18), 0);       // 先把 RF 设置非0，让储备金累计起来
+
+        vm.warp(block.timestamp + 365 days);
+
+        // 切换前，旧 RF 累计至此
+        assertEq(mBorrow.accrueInterest(), 0);
+        uint256 borrowBefore = mBorrow.totalBorrows();
+        uint256 reservesBefore = mBorrow.totalReserves();
+
+        assertEq(mBorrow._setReserveFactor(0.30e18), 0);     // 切换更大的 RF
+
+        // 切换瞬间，余额不发生改变
+        
+        assertEq(mBorrow.totalBorrows(), borrowBefore);
+        assertEq(mBorrow.totalReserves(), reservesBefore);
+         
+    }
+
+
+
 }

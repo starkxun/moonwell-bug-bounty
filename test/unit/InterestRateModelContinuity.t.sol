@@ -172,4 +172,33 @@ contract InterestRateModelContinuityUnitTest is Test {
     }
 
 
+    // 借款指数 borrowIndex 必须单调不减
+    // 账户欠款 = 存储的本金 * 当前 borrowIndex / 账户的 interestIndex
+    function testBorrowIndex_MonotonAcrossIRMSwap() public {
+        uint256 idx0 = mBorrow.borrowIndex();
+
+        // 模拟时间过去 30 天，累计新利率
+        vm.warp(block.timestamp + 30 days);
+        assertEq(mBorrow.accrueInterest(), 0);
+        uint256 idx1 = mBorrow.borrowIndex();
+        // q - borrowIndex 每次什么时候会变？计算公式是什么？
+        // - 只有在调用 `accrueInterest()`（或其他触发结算的交互，如借/还/清算）时才会更新；单纯时间推进不会自动修改。
+        // - 近似关系：`newIndex = oldIndex * (1 + borrowRatePerSecond * deltaT)`（如果利率按秒计）；按区块则用 borrowRatePerBlock。
+        // - 在正常（非负利率）情况下 `borrowIndex` 应是单调不减（要么不变，要么增加）。
+        assertGt(idx1, idx0);
+
+        // 切换 IRM
+        assertEq(mBorrow._setInterestRateModel(irmHigh), 0);
+        // 同一个区块下切换，不发生改变
+        // - `_setInterestRateModel` 仅替换利率模型地址，不会立刻结算利息或修改 `borrowIndex`，因此读取索引应保持不变。
+        uint256 idx2 = mBorrow.borrowIndex();
+        assertEq(idx2, idx1);
+
+        vm.warp(block.timestamp + 30 days);
+        assertEq(mBorrow.accrueInterest(), 0);
+        // 经过时间并结算后，`borrowIndex` 应根据新 IRM 的借款利率继续增加（保持单调）。
+        uint256 idx3 = mBorrow.borrowIndex();
+        assertGt(idx3, idx2);
+    }
+
 }

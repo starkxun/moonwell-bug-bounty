@@ -57,3 +57,5 @@ reserveFactor 参数突变后的连续性.
 * [X] 切换 ReserveFactor， totalReserve 不应该跳
 * [X] 切换ReserveFactor 后下一段时间，储备金按新 RF 累积（更高 RF → 更大储备增量）
 * [X] 设置 reserveFactor 超过 1e18（100%）应当 revert
+* [X] 非 admin 调用 _setInterestRateModel 应返回 UNAUTHORIZED（不 revert）
+* [X] 非 admin 调用 _setReserveFactor 应返回 UNAUTHORIZED

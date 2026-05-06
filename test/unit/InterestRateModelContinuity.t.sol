@@ -271,4 +271,22 @@ contract InterestRateModelContinuityUnitTest is Test {
     }
 
 
+    // 非 admin 调用 _setInterestRateModel 应返回 UNAUTHORIZED（不 revert）
+    function testSetIRM_OnlyAdmin() public {
+        vm.prank(NotAdmin);
+        uint256 ret = mBorrow._setInterestRateModel(irmHigh);
+        // TokenErrorReporter.Error.UNAUTHORIZED == 1
+        assertEq(ret, 1, "non-admin should get UNAUTHORIZED");
+        assertEq(address(mBorrow.interestRateModel()), address(irmLow), "model unchanged");
+    }
+
+    // 非 admin 调用 _setReserveFactor 应返回 UNAUTHORIZED
+    function testSetReserveFactor_OnlyAdmin() public {
+        vm.prank(NotAdmin);
+        uint256 ret = mBorrow._setReserveFactor(0.20e18);
+        assertEq(ret, 1, "non-admin should get UNAUTHORIZED");
+        assertEq(mBorrow.reserveFactorMantissa(), 0, "RF unchanged");
+    }
+
+
 }

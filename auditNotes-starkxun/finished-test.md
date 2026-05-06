@@ -59,3 +59,24 @@ reserveFactor 参数突变后的连续性.
 * [X] 设置 reserveFactor 超过 1e18（100%）应当 revert
 * [X] 非 admin 调用 _setInterestRateModel 应返回 UNAUTHORIZED（不 revert）
 * [X] 非 admin 调用 _setReserveFactor 应返回 UNAUTHORIZED
+
+### **奖励-账本同步回归**
+
+测试文件路径:
+
+* [X] claim 之后未领奖励应基本清零
+* [X] repayBorrowBehalf 不应给 payer 记奖励
+* [X] 清算之后，被扣押的 mToken 上的 supply 奖励归清算人
+* [X] 多 emission token 各自独立累计
+
+### **非标准 ERC20 行为**
+
+测试文件路径:
+
+* [X] fee-on-transfer：mint 路径正确处理（按实际到账记账）
+* [X] fee-on-transfer：redeem 路径存在不对称（已知风险）
+* [X] 无返回值的 ERC20 (USDT 风格)：mint / redeem 都正常
+* [X] transferFrom 返回 false：mint 必须 revert
+* [X] rebasing token：cash 漂移直接影响 exchangeRate（已知风险）
+
+发现异常点：testFeeOnTransfer_RedeemAsymmetry_DocumentedRisk 此测试通过 → 证实风险存在；若未来加上 wrapper 或 balance-after 检查，需重写本测试。

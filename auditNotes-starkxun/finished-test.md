@@ -48,7 +48,7 @@
 ### **利率模型:**
 
 reserveFactor 参数突变后的连续性.
-测试文件路径:
+测试文件路径: test/unit/InterestRateModelContinuity.t.sol
 
 * [X] 切换 IRM 后,，余额不应该跳变
 * [X] 切换 IRM 后，下一段时间的累积应使用新模型(更高利率 -> 更大增量)
@@ -62,7 +62,7 @@ reserveFactor 参数突变后的连续性.
 
 ### **奖励-账本同步回归**
 
-测试文件路径:
+测试文件路径: test/unit/RewardSyncRegression.t.sol
 
 * [X] claim 之后未领奖励应基本清零
 * [X] repayBorrowBehalf 不应给 payer 记奖励
@@ -71,7 +71,7 @@ reserveFactor 参数突变后的连续性.
 
 ### **非标准 ERC20 行为**
 
-测试文件路径:
+测试文件路径: test/unit/NonStandardERC20.t.sol
 
 * [X] fee-on-transfer：mint 路径正确处理（按实际到账记账）
 * [X] fee-on-transfer：redeem 路径存在不对称（已知风险）

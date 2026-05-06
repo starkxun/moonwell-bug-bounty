@@ -232,9 +232,43 @@ contract InterestRateModelContinuityUnitTest is Test {
         
         assertEq(mBorrow.totalBorrows(), borrowBefore);
         assertEq(mBorrow.totalReserves(), reservesBefore);
-         
+        assertEq(mBorrow.reserveFactorMantissa(), 0.3e18);
     }
 
+    // 切换后下一段时间，储备金按新 RF 累积（更高 RF → 更大储备增量）
+    function testSetReserveFactor_NewFactorAppliesAfterSwitch() public {
+        // 起始 RF = 10%
+        assertEq(mBorrow._setReserveFactor(0.10e18), 0);
+
+        vm.warp(block.timestamp + 365 days);
+        assertEq(mBorrow.accrueInterest(), 0);
+        uint256 reservesY1 = mBorrow.totalReserves();
+
+        // 切到 50%
+        assertEq(mBorrow._setReserveFactor(0.50e18), 0);
+
+        vm.warp(block.timestamp + 365 days);
+        assertEq(mBorrow.accrueInterest(), 0);
+        uint256 reservesY2 = mBorrow.totalReserves();
+
+        uint256 delta1 = reservesY1;                 // 第一年增量（从 0 起）
+        uint256 delta2 = reservesY2 - reservesY1;    // 第二年增量
+
+        // 第二年的 RF 是 5x，单段储备增量应显著超过第一年
+        assertGt(delta2, delta1, "higher RF should produce more reserves");
+        assertGt(delta2, delta1 * 3, "rough magnitude: ~5x but allow rounding & utilization shift");
+    }
+
+    /****************************************************************************** 
+     *                                权限 & 边界                                 * 
+     ******************************************************************************/
+    //  设置 reserveFactor 超过 1e18（100%）应当 revert
+    function testSetReserveFactor_RejectsExceedsMax() public {
+        uint256 ret = mBorrow._setReserveFactor(1e18 + 1);
+
+        assertEq(ret, 2, "should return BAD_INPUT");
+        assertEq(mBorrow.reserveFactorMantissa(), 0, "rserve factor should remain unchange");
+    }
 
 
 }

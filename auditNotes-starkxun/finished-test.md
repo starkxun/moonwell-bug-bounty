@@ -54,3 +54,6 @@ reserveFactor 参数突变后的连续性.
 * [X] 切换 IRM 后，下一段时间的累积应使用新模型(更高利率 -> 更大增量)
 * [X] 切换 IRM 后，借款指数 borrowIndex 必须单调不减
 * [X] 切换 IRM 时，记录的 accrualBlockTimestamp 应等于当前 block.timestamp
+* [X] 切换 ReserveFactor， totalReserve 不应该跳
+* [X] 切换ReserveFactor 后下一段时间，储备金按新 RF 累积（更高 RF → 更大储备增量）
+* [X] 设置 reserveFactor 超过 1e18（100%）应当 revert

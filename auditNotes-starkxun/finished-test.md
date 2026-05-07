@@ -80,3 +80,12 @@ reserveFactor 参数突变后的连续性.
 * [X] rebasing token：cash 漂移直接影响 exchangeRate（已知风险）
 
 发现异常点：testFeeOnTransfer_RedeemAsymmetry_DocumentedRisk 此测试通过 → 证实风险存在；若未来加上 wrapper 或 balance-after 检查，需重写本测试。
+
+
+### **极端时间跳跃（长时间不交互）后的首次交互行为**
+
+* [X] 长期不交互不会导致异常
+
+
+
+### **清算资产与借款资产为同一市场/不同市场的分支差异**
